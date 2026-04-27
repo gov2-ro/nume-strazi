@@ -1,3 +1,7 @@
+_obsolete
+*/_obsolete*
+data
+data/*
 # Generated database — rebuild with build_db.py
 data/streets.db
 
