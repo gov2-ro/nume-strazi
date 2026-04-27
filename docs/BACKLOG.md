@@ -27,7 +27,7 @@ Items detected during sessions. Each entry has enough context to act on cold.
   - [x] `tools/export_unclassified.py` — top-N unclassified `core_name_norm` ordered by frequency, with sample streets/UATs
   - [x] `tools/import_csv.py` — generic upserter for the 4 lookup tables
   - [ ] `tools/wikidata_persons.py` — SPARQL query for top-N unmatched person candidates
-  - [ ] `tools/llm_classify.py` — Claude Haiku batch classifier (rate-limited, idempotent)
+  - [x] `tools/llm_classify.py` — Claude Haiku batch classifier (rate-limited, idempotent)
   - [ ] Coverage view: `streets_classified_pct`
 
 ---
