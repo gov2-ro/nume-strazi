@@ -1,5 +1,19 @@
+# Generated database — rebuild with build_db.py
 data/streets.db
+
+# Source registry files (public data, but large — download separately, see README)
+data/reference/
+
+# GIS assets (future)
+data/gis/
+
+# Curation working files — regeneratable exports
 data/curation/unclassified.csv
+data/curation/llm_*.csv
+
+# Python
 __pycache__/
 *.pyc
+
+# macOS
 .DS_Store
