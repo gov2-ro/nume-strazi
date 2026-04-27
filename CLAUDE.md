@@ -13,8 +13,8 @@ Currently in **prototype phase**. The data layer is being hardened; dashboard ru
 When starting a new session, in this order:
 
 1. **This file** — operational rules and project pulse.
-2. **`CODE_SPEC.md`** — full PRD for the data layer. Schema rationale, cleaning rules, curation strategy, prioritized task list, pitfalls.
-3. **`queries.sql`** — what's already built, organized by dashboard view.
+2. **`docs/CODE_SPEC.md`** — full PRD for the data layer. Schema rationale, cleaning rules, curation strategy, prioritized task list, pitfalls.
+3. **`docs/queries.sql`** — what's already built, organized by dashboard view.
 4. **`DESIGN_BRIEF.md`** — only when work touches editorial decisions or hero findings. Otherwise, skip.
 
 If asked to do something not covered by the above, ask before improvising.
@@ -24,16 +24,25 @@ If asked to do something not covered by the above, ask before improvising.
 ```
 .
 ├── CLAUDE.md             # this file
-├── CODE_SPEC.md          # full data-layer PRD
-├── DESIGN_BRIEF.md       # editorial direction for the dashboard
 ├── build_db.py           # ETL: xlsx → SQLite. Idempotent.
 ├── seed_lookups.py       # Hand-curated starter data (4 lookup tables)
-├── queries.sql           # Named query catalog (-- :name slug)
 ├── run_queries.py        # Runner with log() and regexp() shims
-├── streets.db            # Generated artifact. Not the source of truth.
+├── docs/
+│   ├── CODE_SPEC.md      # full data-layer PRD
+│   ├── DESIGN_BRIEF.md   # editorial direction for the dashboard
+│   ├── queries.sql       # Named query catalog (-- :name slug)
+│   ├── BACKLOG.md        # tracked issues and future work
+│   └── activity-history.md
+├── tools/
+│   ├── export_unclassified.py  # export top-N unclassified keys to CSV
+│   ├── import_csv.py           # upsert classified CSV into lookup tables
+│   ├── seed_top500.py          # batch 1 curation (top-500 keys)
+│   └── seed_batch2.py          # batch 2 curation
 └── data/
-    ├── source/           # Raw xlsx inputs (registry exports)
-    └── curation/         # CSV inputs for incremental curation
+    ├── reference/        # Raw xlsx inputs (registry exports)
+    ├── curation/         # CSV inputs for incremental curation
+    ├── gis/              # GIS / geometry assets (future)
+    └── streets.db        # Generated artifact. Not the source of truth.
 ```
 
 ## Critical rules — read every time
@@ -50,20 +59,31 @@ These are the booby traps. Internalize before writing any query or transform.
 ## Common commands
 
 ```bash
-# Rebuild from scratch (drops streets.db)
+# Rebuild from scratch (drops data/streets.db)
 python3 build_db.py
 
-# Apply curation (always after build_db; idempotent)
+# Rebuild with row limit for fast iteration
+python3 build_db.py --limit 5000
+
+# Apply starter curation (always after build_db; idempotent)
 python3 seed_lookups.py
 
-# Run all named queries from queries.sql
+# Apply batch curation
+python3 tools/seed_top500.py
+python3 tools/seed_batch2.py
+
+# Run all named queries from docs/queries.sql
 python3 run_queries.py
 
-# Quick interactive exploration
-sqlite3 streets.db
-```
+# Export top-N unclassified keys for manual curation
+python3 tools/export_unclassified.py --limit 500
 
-When iterating on the full 140k dataset, add a `--limit N` flag to `build_db.py` for speed (P0 task in CODE_SPEC).
+# Import a classified CSV back into the DB
+python3 tools/import_csv.py data/curation/my_batch.csv
+
+# Quick interactive exploration
+sqlite3 data/streets.db
+```
 
 ## Conventions
 
@@ -111,6 +131,6 @@ Avoid: long lists of clarifying questions, restating the request back, or "I'll 
 
 ## Other notes
 
-When detecting things that need to be addressed later, add to `docs/BACKLOG.md`. Use a checkbox `- [ ]` entry with a clear title and enough context to act on it later.
-
-After completing any meaningful work, add an entry to `docs/activity-history.md` under a `## YYYY-MM-DD — Short Title` heading. Include what was done, why, and any non-obvious decisions.
+- When detecting things that need to be addressed later, add to `docs/BACKLOG.md`. Use a checkbox `- [ ]` entry with a clear title and enough context to act on it later.
+- After completing any meaningful work, add an entry to `docs/activity-history.md` under a `## YYYY-MM-DD — Short Title` heading. Include what was done, why, and any non-obvious decisions.
+- When running Python commands, always first activate the following venv `~/devbox/envs/240826/` (/Users/pax/devbox/envs/240826/bin/activate)
