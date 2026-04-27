@@ -25,6 +25,7 @@ If asked to do something not covered by the above, ask before improvising.
 .
 ├── CLAUDE.md             # this file
 ├── build_db.py           # ETL: xlsx → SQLite. Idempotent.
+├── streets_lib.py        # Shared helpers (normalize_match, strip_street_type, ...)
 ├── seed_lookups.py       # Hand-curated starter data (4 lookup tables)
 ├── run_queries.py        # Runner with log() and regexp() shims
 ├── docs/
@@ -37,7 +38,11 @@ If asked to do something not covered by the above, ask before improvising.
 │   ├── export_unclassified.py  # export top-N unclassified keys to CSV
 │   ├── import_csv.py           # upsert classified CSV into lookup tables
 │   ├── seed_top500.py          # batch 1 curation (top-500 keys)
-│   └── seed_batch2.py          # batch 2 curation
+│   ├── seed_batch2.py          # batch 2 curation
+│   ├── osm_ingest.py           # PBF → osm_streets (needs pyrosm + shapely)
+│   ├── osm_match.py            # streets_dedup ↔ osm_streets join
+│   ├── osm_score.py            # importance_v1 = highway × log(length) + ref bonus
+│   └── osm_sanity.py           # top-10 / coverage report for reference UATs
 └── data/
     ├── reference/        # Raw xlsx inputs (registry exports)
     ├── curation/         # CSV inputs for incremental curation
@@ -55,6 +60,8 @@ These are the booby traps. Internalize before writing any query or transform.
 4. **Aliases require DISTINCT.** Section-rows duplicate the same alias multiple times. Any query joining `street_aliases` should use `SELECT DISTINCT` or aggregate.
 5. **`core_name = NULL` on numeric streets is intentional.** Don't "fix" it.
 6. **Curation upserts must be idempotent.** Use `ON CONFLICT(core_name_norm) DO UPDATE`. Re-running an import with the same CSV must be a no-op.
+7. **`osm_streets` is already grouped per `(uat_siruta, name_normalized)`.** OSM splits one street into many ways at every junction; `tools/osm_ingest.py` merges them before insert. Don't `GROUP BY` again or you'll over-aggregate. To compare a registry street to its OSM counterpart, join `streets_dedup` ↔ `osm_streets` via `street_osm_matches` (don't re-derive the join in queries).
+8. **OSM scope is populated areas only.** Motorways and trunks are filtered out at ingest by design. If a query expects them, it's wrong — they belong to a future inter-city analysis, not this one.
 
 ## Common commands
 
@@ -83,6 +90,12 @@ python3 tools/import_csv.py data/curation/my_batch.csv
 
 # Quick interactive exploration
 sqlite3 data/streets.db
+
+# OSM enrichment (requires pyrosm + shapely; PBF download deferred — see BACKLOG)
+python3 tools/osm_ingest.py                  # PBF → osm_streets
+python3 tools/osm_match.py                   # populate street_osm_matches
+python3 tools/osm_score.py                   # compute importance_v1
+python3 tools/osm_sanity.py                  # eyeball top-10 + coverage
 ```
 
 ## Conventions

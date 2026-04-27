@@ -40,7 +40,19 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [ ] **`ORAŞ CERNAVODĂ` numeric streets named 1848 and 1933** — `anonymous_uats` shows CERNAVODĂ CT with 5 "numeric" streets, lowest=1848, highest=1933. These are likely historical date references rather than true street numbers. Consider a sub-query that separates true sequence numbering (contiguous run starting at 1) from isolated year-numbers.
 
-- [ ] **OSM enrichment: street geometry + importance** — After the data layer stabilises, pull street geometries from OpenStreetMap (Overpass API or a Romania PBF extract) and join on UAT + normalized name. Goals: (1) rank streets by physical size/length and width (highway class → proxy for importance), (2) flag whether a street is a main artery vs a cul-de-sac, (3) weight frequency counts by relative position in town (central vs peripheral). This enrichment would power a "most important street in Romania named after a woman" type of finding. Prerequisite: stable UAT–OSM admin boundary mapping.
+- [x] **OSM enrichment: scaffolding** — Tables (`osm_streets`, `street_osm_matches`) added to `build_db.py`. Tools written: `tools/osm_ingest.py`, `tools/osm_match.py`, `tools/osm_score.py`, `tools/osm_sanity.py`. v1 score = `highway_weight × log(1 + length_m) + ref_bonus`, z-scored within UAT. POI counts deliberately skipped (would measure mapper density, not street importance).
+
+- [ ] **OSM enrichment: download Romania PBF and run end-to-end** — Deferred from the scaffolding session because user was on mobile data. Steps:
+  1. `wget https://download.geofabrik.de/europe/romania-latest.osm.pbf -O data/reference/romania-latest.osm.pbf` (~700 MB).
+  2. From `~/devbox/envs/240826/`: `pip install pyrosm shapely`.
+  3. `python3 tools/osm_ingest.py` (expect ~10–30 min on full PBF).
+  4. `python3 tools/osm_match.py` then `python3 tools/osm_score.py`.
+  5. `python3 tools/osm_sanity.py` — eyeball the top-10 lists for the 5 reference UATs.
+  Document the PBF snapshot date in `docs/CODE_SPEC.md` §11 once ingested.
+
+- [ ] **OSM enrichment: importance v2 (per-UAT betweenness centrality)** — After v1 is validated, add `betweenness_uat` column. For each UAT subgraph (small enough that `networkx.betweenness_centrality` is cheap), build node=intersection / edge=way-segment graph weighted by length. Combine: `score_v2 = 0.6·z(v1) + 0.4·z(betweenness)`. Worth doing only if v1 misranks visibly in `osm_sanity.py` output — inside settlements the highway hierarchy collapses to flat tertiary/residential, which is exactly where centrality discriminates.
+
+- [ ] **OSM enrichment: SIRUTA-on-admin-boundary fallback** — `tools/osm_ingest.py` resolves UAT identity by reading `ref:RO:SIRUTA`/`ref:siruta`/`siruta` tags from admin_level=8 polygons, then falls back to name-match against `populatie-romania-siruta-coords.csv`. If too many UATs drop in step 1 (watch the `unresolved` count), build a centroid-distance fallback against the same CSV.
 
 ---
 
@@ -49,3 +61,9 @@ Items detected during sessions. Each entry has enough context to act on cold.
 - [ ] **`run_queries.py` output not machine-readable** — The runner pretty-prints to stdout. When curation tooling or a dashboard pipeline needs query output, it'll need JSON/CSV mode. Add `--format json|csv|table` flag.
 
 - [ ] **RoWordNet for nature/abstract classification** — After `llm_classify.py` runs, evaluate RoWordNet as a deterministic fallback for residual unclassified nature and abstract terms. Approach: lemmatize `core_name_norm` to dictionary form (genitives like `florilor` → `floare`, `trandafirului` → `trandafir`) using a Romanian morphological lemmatizer, then walk the WordNet hypernym chain to map to a `nature_type` or `category`. Useful if: (a) LLM leaves a long tail of plant/terrain/abstract names unclassified, or (b) reproducibility without API calls is a requirement. Prerequisite: find a Romanian lemmatizer that handles genitive/plural forms reliably (`ro_lemmatizer` in spaCy's `ro_core_news_lg` is a candidate). Skip RoNER — it gives entity type only, not the structured metadata (gender, era, profession) we need for persons.
+
+
+## Misc ideas
+
+Go wild.
+The people, how old, what are the occupations? Reason of death?

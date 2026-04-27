@@ -262,7 +262,81 @@ When adding queries: name them, comment the intent, prefer CTEs over nested subq
 - [ ] `geocoded_streets` table: `(street_id, lat, lng, source, confidence)`. Don't populate yet.
 - [ ] Plan: feature-flag a separate ingest that calls Nominatim/OSM for streets matching a UAT centroid filter. Rate limits: 1 req/sec → 140k requests = ~40 hours. Better: bulk-match against an OSM Romania extract.
 
-## 11. Pitfalls / gotchas
+## 11. OSM enrichment pipeline
+
+Goal: attach geometry, road class, and an importance score to streets that exist in **populated areas**. Motorways and inter-city trunks are out of scope — this is about ranking streets *within* settlements, not roads between them.
+
+### 11.1 Source
+
+- Geofabrik Romania PBF: `https://download.geofabrik.de/europe/romania-latest.osm.pbf` (~700 MB).
+- Stored at `data/reference/romania-latest.osm.pbf`. Document the snapshot date here once downloaded.
+- **Refresh cadence:** pin a snapshot per release; don't auto-update.
+
+### 11.2 Dependency exception
+
+The OSM path imports `pyrosm` and `shapely`. This is the **only** documented exception to the "stdlib + openpyxl" rule for ETL. Justification: PBF parsing without bindings is not feasible; `geopandas` is intentionally avoided (heavier dep tree, no benefit here). The registry ETL (`build_db.py`) remains stdlib-only.
+
+Install in the project venv (`~/devbox/envs/240826/`): `pip install pyrosm shapely`.
+
+### 11.3 Tables
+
+| Table | Grain | Notes |
+|---|---|---|
+| `osm_streets` | one row per `(uat_siruta, name_normalized)` | OSM splits a single street into many ways at intersections; `tools/osm_ingest.py` merges them before insert. Mirrors `streets_dedup`'s grain. |
+| `street_osm_matches` | one row per `(street_id, osm_street_id)` | Two pass types: `exact_normalized` (confidence 1.0), `fuzzy_core_name` (0.6). Below this threshold we don't auto-link — see §11.6. |
+
+### 11.4 Pipeline
+
+```
+tools/osm_ingest.py  →  osm_streets         (PBF → SQLite, geo work)
+tools/osm_match.py   →  street_osm_matches  (pure SQL, fast)
+tools/osm_score.py   →  importance_v1       (pure Python math, fast)
+tools/osm_sanity.py  →  read-only report    (eyeball reference UATs)
+```
+
+Each step is idempotent. `osm_ingest.py --rebuild` truncates `osm_streets` first; the others overwrite their outputs unconditionally.
+
+### 11.5 Populated-area filter
+
+`tools/osm_ingest.py` builds a per-UAT mask as the union of:
+1. `place=city|town|village|hamlet|suburb|neighbourhood` polygons within the admin_level=8 boundary.
+2. `landuse=residential` polygons within the same boundary.
+3. ~300m buffer around `place=*` nodes (fallback for hamlets without polygons).
+
+A way is kept only if its geometry intersects the mask. Inter-village fields inside rural communes are correctly excluded.
+
+UAT identity is resolved by reading `ref:RO:SIRUTA` (or `ref:siruta`/`siruta`) tags on the admin polygon, with a name-match fallback to `data/gis/populatie-romania-siruta-coords.csv`. If the SIRUTA-tag coverage is too low in practice, add a centroid-distance fallback.
+
+### 11.6 Score formula (v1)
+
+```
+raw  = highway_weight × log(1 + length_m) + ref_bonus
+v1_z = z-score of raw within UAT
+```
+
+Weights (`tools/osm_score.py`): `primary=5, secondary=4, tertiary=3, residential=2, unclassified=2, living_street=1, pedestrian=1, service=1`. `ref_bonus=2.0` when `ref` matches `^(DN|DJ|DC|A)\d+`.
+
+**Why per-UAT z-score:** without it, Bucharest streets dominate any national ranking by sheer length. The z-score is the comparable axis; `raw` is informational only.
+
+**Why `ref_bonus`:** a numbered route (DN1, DJ105) running through a town is almost always the local main street, even when OSM tags the in-town segment as just `secondary`. Highest signal-per-line of any addition.
+
+**Why no POI counts:** OSM POI density correlates with mapper activity, not street importance. Would measure Bucharest enthusiasm vs rural neglect, not street prominence.
+
+**v2 plan (deferred):** add per-UAT betweenness centrality as `betweenness_uat`, combine `score_v2 = 0.6·z(v1) + 0.4·z(betweenness)`. Inside settlements the highway hierarchy collapses (lots of tied tertiary/residential), which is exactly where centrality discriminates. Worth doing only if `osm_sanity.py` shows v1 misranking visibly.
+
+### 11.7 Match strategy
+
+Pass 1: `streets_dedup.siruta + name_normalized` ↔ `osm_streets.uat_siruta + name_normalized`. Confidence 1.0.
+
+Pass 2 (only for unmatched registry rows): same join on `core_name_norm`. Confidence 0.6. Catches `Strada` vs `Bulevardul` prefix differences and honorific variations.
+
+We deliberately stop there. Levenshtein on ~100k×100k name pairs produces enough false positives to poison the importance index downstream — better to surface gaps in `tools/osm_sanity.py` than auto-link.
+
+### 11.8 What `geocoded_streets` becomes
+
+The `geocoded_streets` table stub mentioned in §10.P3 is superseded by this pipeline. Per-street lat/lng, when needed, can be derived from `osm_streets.geometry_wkt` (centroid of the merged geometry). No need for Nominatim.
+
+## 12. Pitfalls / gotchas
 
 These are the booby traps. A senior engineer reading this should not have to discover any of them by stubbing toes.
 
@@ -277,7 +351,7 @@ These are the booby traps. A senior engineer reading this should not have to dis
 9. **`core_name=NULL` on numeric streets is intentional.** Queries that join curated tables on `core_name_norm` will correctly skip these. Queries that filter for "anonymous" should use `is_numeric=1`.
 10. **The `(D)` parenthetical is filtered as too short, but other admin codes might exist.** Audit the full 140k for unexpected short parentheticals (`(I)`, `(II)`, `(B)`?).
 
-## 12. Out of scope for the data layer
+## 13. Out of scope for the data layer
 
 - Visual design, color palette, layout — see Design Brief.
 - Editorial copy in Romanian — see Design Brief.
@@ -285,7 +359,7 @@ These are the booby traps. A senior engineer reading this should not have to dis
 - Voter-data joins — different project.
 - Real-time updates — the registry updates infrequently; manual rebuild is fine.
 
-## 13. Reference: current state files
+## 14. Reference: current state files
 
 | File | Purpose |
 |---|---|

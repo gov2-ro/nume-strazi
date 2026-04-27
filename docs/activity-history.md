@@ -1,5 +1,38 @@
 # Activity History
 
+## 2026-04-28 — OSM enrichment scaffolding
+
+### What was done
+- Designed an OSM enrichment pipeline scoped to **populated areas only** (motorways/trunks excluded by design). Plan saved at `~/.claude/plans/we-d-only-be-interested-magical-sutton.md`.
+- Extracted `normalize_match`, `fix_diacritics`, `STREET_TYPES`, plus a new `strip_street_type` helper into `streets_lib.py`. `build_db.py` now imports them; behavior unchanged (verified with `--limit 500` and a full rebuild — same row counts as before).
+- Added two empty tables to `build_db.py`: `osm_streets` (one row per `(uat_siruta, name_normalized)`, mirrors `streets_dedup`'s grain) and `street_osm_matches` (link table with `match_type` + `confidence`).
+- Wrote four scripts under `tools/`:
+  - `osm_ingest.py` — PBF → `osm_streets`. Builds populated-area mask from `admin_level=8 ∩ (place=* ∪ landuse=residential ∪ buffered place nodes)`. Groups OSM ways by `(uat, normalized name)` so one logical street = one row. Lazy-imports `pyrosm`/`shapely` so the file is importable without those deps.
+  - `osm_match.py` — Pure-SQL, two-pass join: exact `name_normalized` (confidence 1.0), then `core_name_norm` fallback for unmatched (0.6). Tested with synthetic rows.
+  - `osm_score.py` — `importance_v1 = highway_weight × log(1+length_m) + ref_bonus`, then per-UAT z-score. Tested end-to-end on three Bucharest stub rows: Calea Victoriei (40.0) > Bd. Magheru (36.6) > Strada Ada Kaleh (11.1).
+  - `osm_sanity.py` — Read-only report: top-10 by score for 5 reference UATs (Bucharest Sector 1, Cluj-Napoca, Sibiu, Câmpulung Moldovenesc, Cornu) + per-UAT registry coverage + sample of OSM-only streets.
+- Updated `docs/CODE_SPEC.md` (new §11 OSM enrichment pipeline; old §11/12 renumbered to §12/13/14), `CLAUDE.md` (commands + two new critical rules about OSM grouping and scope), `docs/BACKLOG.md` (marked scaffolding done; added concrete download steps and v2 betweenness item).
+
+### Deferred
+- PBF download (~700 MB) and `pip install pyrosm shapely` postponed because user was on mobile data. All steps documented in `docs/BACKLOG.md` for the next session on wired connection.
+
+### Non-obvious decisions
+- **`pyrosm` is the only documented exception to the stdlib-only ETL rule.** PBF parsing without bindings isn't feasible; `geopandas` is intentionally avoided (heavier dep tree, no benefit). Justified in CODE_SPEC §11.2.
+- **No POI counts in the score.** OSM POI density correlates with mapper activity, not street importance — including it would measure Bucharest enthusiasm vs rural neglect rather than the thing we want to rank.
+- **No Levenshtein fallback in matching.** With ~100k×100k name pairs, fuzzy matching produces enough false positives to poison the importance index downstream. We surface gaps in `osm_sanity.py` instead and accept some unmatched rows on both sides.
+- **Per-UAT z-score is the comparable axis, not raw `importance_v1`.** Without it, Bucharest dominates everything by length alone. `raw` is informational; `importance_v1_uat_z` is what dashboards should rank by.
+- **Highway-class promotion across way segments.** When an OSM street has segments tagged with different `highway` values (common — a `primary` street can have `service` slip-roads), the merged row keeps the highest class. Mirrors how a human would describe the street.
+
+### Verification
+- `build_db.py --limit 500` → identical row counts after refactor.
+- Full rebuild (`build_db.py` + `seed_lookups.py` + both `seed_*` tools): 127,364 rows / 105,107 deduped, all curated tables seeded as before.
+- `osm_ingest.py` errors cleanly with helpful download instructions when PBF is missing.
+- `osm_match.py` and `osm_sanity.py` error cleanly when `osm_streets` is empty.
+- `osm_match.py` end-to-end test with 5 synthetic registry-derived rows: 5/5 exact matches.
+- `osm_score.py` end-to-end test with 3 synthetic Bucharest rows: ranking matches intuition.
+
+---
+
 ## 2026-04-27 — LLM classifier + CLAUDE.md housekeeping
 
 ### What was done

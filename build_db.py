@@ -11,8 +11,12 @@ Layers in `streets`:
   core_name        - name with title/rank/saint prefixes stripped
   core_name_norm   - normalized version of core_name (the join key for `persons`)
 """
-import openpyxl, sqlite3, unicodedata, re
+import openpyxl, sqlite3, re
 from pathlib import Path
+
+from streets_lib import (
+    DIACRITIC_FIX, fix_diacritics, normalize_match, STREET_TYPES,
+)
 
 import argparse
 _ap = argparse.ArgumentParser()
@@ -26,24 +30,8 @@ DB  = Path(_args.db)
 LIMIT = _args.limit
 if DB.exists(): DB.unlink()
 
-# ---------- normalization ----------
-DIACRITIC_FIX = str.maketrans({"ş":"ș","ţ":"ț","Ş":"Ș","Ţ":"Ț"})
-
-def fix_diacritics(s): return s.translate(DIACRITIC_FIX) if s else s
-
-def normalize_match(s):
-    """Lowercase ASCII, î≡â collapsed. For grouping/joining only."""
-    if not s: return ""
-    s = s.replace("î","â").replace("Î","Â")
-    nfkd = unicodedata.normalize("NFKD", s)
-    return "".join(c for c in nfkd if not unicodedata.combining(c)).lower().strip()
-
-# ---------- street type ----------
-STREET_TYPES = sorted([
-    "Bulevardul","Fundătura","Cartierul","Prelungirea","Strada","Aleea",
-    "Intrarea","Calea","Drumul","Piața","Șoseaua","Ulița","Splaiul",
-    "Pasajul","Cheiul","Trecerea","Cărarea","Stradela","Rampa",
-], key=len, reverse=True)
+# normalization helpers (DIACRITIC_FIX, fix_diacritics, normalize_match) and
+# STREET_TYPES live in streets_lib so the OSM tools can reuse them.
 
 # ---------- titles / ranks / saints ----------
 TITLES = sorted([
@@ -175,6 +163,38 @@ CREATE TABLE nature_terms (
     nature_type TEXT,
     notes TEXT
 );
+
+-- ===== OSM enrichment scaffolds (populated by tools/osm_*.py) =====
+-- One logical street per (uat_siruta, name_normalized). OSM splits a single
+-- street into many `way` rows at every junction; tools/osm_ingest.py groups
+-- those before insert, so this table mirrors streets_dedup's grain.
+CREATE TABLE osm_streets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    uat_siruta INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    name_normalized TEXT NOT NULL,
+    core_name_norm TEXT,
+    highway_class TEXT NOT NULL,
+    ref TEXT,
+    length_m REAL NOT NULL,
+    way_ids TEXT NOT NULL,         -- JSON array of contributing OSM way ids
+    geometry_wkt TEXT,
+    importance_v1 REAL,            -- raw score from tools/osm_score.py
+    importance_v1_uat_z REAL,      -- z-score within UAT
+    UNIQUE (uat_siruta, name_normalized)
+);
+CREATE INDEX ix_osm_uat       ON osm_streets(uat_siruta);
+CREATE INDEX ix_osm_namenorm  ON osm_streets(name_normalized);
+CREATE INDEX ix_osm_corenorm  ON osm_streets(core_name_norm);
+
+CREATE TABLE street_osm_matches (
+    street_id INTEGER NOT NULL REFERENCES streets(id),
+    osm_street_id INTEGER NOT NULL REFERENCES osm_streets(id),
+    match_type TEXT NOT NULL,      -- 'exact_normalized' | 'fuzzy_core_name'
+    confidence REAL NOT NULL,
+    PRIMARY KEY (street_id, osm_street_id)
+);
+CREATE INDEX ix_match_osm     ON street_osm_matches(osm_street_id);
 
 CREATE INDEX ix_streets_judet     ON streets(judet);
 CREATE INDEX ix_streets_uat       ON streets(uat);
