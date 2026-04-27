@@ -30,6 +30,8 @@ Items detected during sessions. Each entry has enough context to act on cold.
   - [x] `tools/llm_classify.py` — Claude Haiku batch classifier (rate-limited, idempotent)
   - [ ] Coverage view: `streets_classified_pct`
 
+- **Classification pipeline decision (settled):** run `llm_classify.py` directly on all unclassified keys. No `rule_classify.py` pre-filter, no spaCy/RoWordNet middle tier. Rationale: full 28k-key run costs ~$2 at Haiku pricing, making rule/NLP pre-filters a complexity cost that saves nothing. LLM handles Romanian morphology and cultural context better than a lemmatizer+wordnet chain would anyway. RoWordNet remains a P3 option only if API-free reproducibility becomes a hard requirement.
+
 ---
 
 ## P2
