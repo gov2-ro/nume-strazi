@@ -63,3 +63,9 @@ Current seed has 1 woman (Elena Văcărescu) → 6 female streets vs 2,972 male.
 ## P3 — `run_queries.py` output not machine-readable
 
 The runner pretty-prints to stdout. When curation tooling or a dashboard pipeline needs query output, it'll need JSON/CSV mode. Add `--format json|csv|table` flag.
+
+
+---
+
+## Misc
+

@@ -1,5 +1,29 @@
 # Activity History
 
+## 2026-04-27 — Batch 2 curation (47.6% → 56.9% street coverage)
+
+### What was done
+- Ran `tools/seed_batch2.py` (written in previous session): generated and imported `data/curation/classified_batch2.csv` with 497 entries — 122 nature terms, 116 persons, 173 name categories, 86 place references.
+- Duplicates in the PERSONS/CATEGORIES lists are silently deduplicated by the `seen` set in the script; idempotent on re-run.
+
+### Coverage after (105,107 deduped streets)
+| status | streets | pct |
+|--------|---------|-----|
+| unclassified | 45,286 | 43.1% |
+| nature | 27,356 | 26.0% |
+| category | 14,849 | 14.1% |
+| person | 11,297 | 10.7% |
+| place | 4,343 | 4.1% |
+| numeric+date+religious | 1,976 | 1.9% |
+
+### Non-obvious decisions
+- `bistrita` maps to both `ro_city` (Bistrița city) and `river` (Bistrița river) — only the city entry survived dedup (river entry was listed second). Street context is ambiguous; accepted for now.
+- `sucevei` similarly maps to both river and city — city entry kept (first seen wins in the script).
+- `timisoarei` appeared in PERSONS list as a sentinel skip (full_name=None); correct, it's a place not a person. Classified correctly as `ro_city` via the PLACES list.
+- Several Hungarian-minority honorees added (Bartók, Arany, Jókai, József Attila, Kossuth, Bethlen, Gábor Áron) — nationality set to `HU`, important for the foreign_honorees query.
+
+---
+
 ## 2026-04-26 — Top-500 pre-classification (16.6% → 47.6% street coverage)
 
 ### What was done
