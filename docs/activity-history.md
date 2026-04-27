@@ -1,5 +1,18 @@
 # Activity History
 
+## 2026-04-27 — LLM classifier + CLAUDE.md housekeeping
+
+### What was done
+- Fixed stale CLAUDE.md: corrected all paths (`docs/`, `data/reference/`, `data/streets.db`), updated layout tree to include `tools/` and `docs/`, rewrote common commands to cover full curation pipeline. Closes P0 backlog item.
+- Wrote `tools/llm_classify.py`: Claude Haiku (`claude-haiku-4-5-20251001`) batch classifier. Queries top-N unclassified `core_name_norm` keys from DB, sends in configurable batches (default 20), appends results to a CSV consumable by `import_csv.py`. Resumable (skips keys already in output file). `--import` flag runs the import step automatically. Requires `ANTHROPIC_API_KEY` in environment.
+- Updated BACKLOG: refactored to checkbox format, marked completed items, added OSM enrichment and RoWordNet items.
+
+### Non-obvious decisions
+- LLM output CSV is append-only (not overwrite) to enable resume after partial runs. The `processed` set is built from the existing CSV at startup, not from the DB, so keys written but not yet imported are still skipped on re-run.
+- `--batch-size` defaults to 20 — balances API latency against prompt length. At 20 keys × ~100 chars context each, the input is well under Haiku's context limit and the JSON output parses reliably.
+
+---
+
 ## 2026-04-27 — Batch 2 curation (47.6% → 56.9% street coverage)
 
 ### What was done
