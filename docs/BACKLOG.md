@@ -12,9 +12,9 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 ## P1
 
-- [ ] **`communist_aliases` query missing DISTINCT** — `docs/queries.sql` `:name communist_aliases` produces duplicate rows: same `(current_name, communist_alias, uat)` triplet repeated once per polling section. The query joins `streets` (not `streets_dedup`) and doesn't use `SELECT DISTINCT`. Fix: add `DISTINCT` or rewrite to join via `streets_dedup`.
+- [x] **`communist_aliases` query missing DISTINCT** — `docs/queries.sql` `:name communist_aliases` produces duplicate rows: same `(current_name, communist_alias, uat)` triplet repeated once per polling section. The query joins `streets` (not `streets_dedup`) and doesn't use `SELECT DISTINCT`. Fix: add `DISTINCT` or rewrite to join via `streets_dedup`.
 
-- [ ] **`unique_names` query polluted by numbered-street names** — `:name unique_names` surfaces names like "1 1 Mai", "1 22 Decembrie 1989" from DJ — strings that parse as `is_numeric=0` but are really section-prefixed street numbers. Consider adding `WHERE is_numeric = 0 AND name NOT REGEXP '^\d'` or filtering in post-processing.
+- [x] **`unique_names` query polluted by numbered-street names** — `:name unique_names` surfaces names like "1 1 Mai", "1 22 Decembrie 1989" from DJ — strings that parse as `is_numeric=0` but are really section-prefixed street numbers. Consider adding `WHERE is_numeric = 0 AND name NOT REGEXP '^\d'` or filtering in post-processing.
 
 - [ ] **Investigate DUMBRĂVIȚA (BV) near-zero entropy** — `uat_diversity` shows DUMBRĂVIȚA BV with entropy 0.14 on 428 streets. Investigate what name dominates and whether it's a data anomaly.
   ```sql
@@ -42,17 +42,13 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [x] **OSM enrichment: scaffolding** — Tables (`osm_streets`, `street_osm_matches`) added to `build_db.py`. Tools written: `tools/osm_ingest.py`, `tools/osm_match.py`, `tools/osm_score.py`, `tools/osm_sanity.py`. v1 score = `highway_weight × log(1 + length_m) + ref_bonus`, z-scored within UAT. POI counts deliberately skipped (would measure mapper density, not street importance).
 
-- [ ] **OSM enrichment: download Romania PBF and run end-to-end** — Deferred from the scaffolding session because user was on mobile data. Steps:
-  1. `wget https://download.geofabrik.de/europe/romania-latest.osm.pbf -O data/reference/romania-latest.osm.pbf` (~700 MB).
-  2. From `~/devbox/envs/240826/`: `pip install pyrosm shapely`.
-  3. `python3 tools/osm_ingest.py` (expect ~10–30 min on full PBF).
-  4. `python3 tools/osm_match.py` then `python3 tools/osm_score.py`.
-  5. `python3 tools/osm_sanity.py` — eyeball the top-10 lists for the 5 reference UATs.
-  Document the PBF snapshot date in `docs/CODE_SPEC.md` §11 once ingested.
+- [x] **OSM enrichment: download Romania PBF and run end-to-end** — Completed 2026-04-28. PBF snapshot 2026-04-28 at `data/reference/romania-latest.osm.pbf`. `osm_ingest.py` rewritten to use `osmium` + `shapely` (pyrosm cannot build on Python 3.12). 105,905 OSM street groups ingested. Match: 52.1% registry coverage, 53.3% OSM coverage. Sanity check passes for all 5 reference UATs.
 
 - [ ] **OSM enrichment: importance v2 (per-UAT betweenness centrality)** — After v1 is validated, add `betweenness_uat` column. For each UAT subgraph (small enough that `networkx.betweenness_centrality` is cheap), build node=intersection / edge=way-segment graph weighted by length. Combine: `score_v2 = 0.6·z(v1) + 0.4·z(betweenness)`. Worth doing only if v1 misranks visibly in `osm_sanity.py` output — inside settlements the highway hierarchy collapses to flat tertiary/residential, which is exactly where centrality discriminates.
 
 - [ ] **OSM enrichment: SIRUTA-on-admin-boundary fallback** — `tools/osm_ingest.py` resolves UAT identity by reading `ref:RO:SIRUTA`/`ref:siruta`/`siruta` tags from admin_level=8 polygons, then falls back to name-match against `populatie-romania-siruta-coords.csv`. If too many UATs drop in step 1 (watch the `unresolved` count), build a centroid-distance fallback against the same CSV.
+
+- [ ] **OSM: Bucharest sector coverage is low (~31%)** — Centroid-based UAT assignment is imprecise for Bucharest's 6 sectors because their boundaries interleave. Two options: (a) parse admin_level=9 boundaries from the PBF using osmium's area assembler to get sector polygons, then re-assign ways by polygon containment; (b) accept as-is for v1 (sector-level scoring is degraded but the rest of Romania is fine). Note: `osm_sanity.py` reference UAT for Bucharest is Sector 1 (SIRUTA 179141); re-run sanity after any fix.
 
 ---
 

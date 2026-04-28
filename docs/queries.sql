@@ -102,6 +102,7 @@ ORDER BY total DESC;
 -- :name unique_names
 SELECT judet, uat, name
 FROM streets_dedup
+WHERE is_numeric = 0 AND is_date = 0 AND name NOT REGEXP '^\d'
 GROUP BY name_normalized
 HAVING COUNT(*) = 1
 LIMIT 50;
@@ -243,7 +244,7 @@ ORDER BY s.uat, s.core_name;
 
 -- "Communist-era" historical aliases (heuristic: contains ideological tokens)
 -- :name communist_aliases
-SELECT s.core_name AS current_name, a.alias AS communist_alias, s.uat
+SELECT DISTINCT s.core_name AS current_name, a.alias AS communist_alias, s.uat
 FROM streets s JOIN street_aliases a ON a.street_id = s.id
 WHERE a.alias_normalized REGEXP '(colectivist|uzin|lenin|stalin|partidul|tovaras|mai 1|7 noiembrie|23 august|cap-?ului|ceapeu)'
 ORDER BY s.uat;

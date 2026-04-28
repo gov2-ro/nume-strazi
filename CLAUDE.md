@@ -91,8 +91,8 @@ python3 tools/import_csv.py data/curation/my_batch.csv
 # Quick interactive exploration
 sqlite3 data/streets.db
 
-# OSM enrichment (requires pyrosm + shapely; PBF download deferred — see BACKLOG)
-python3 tools/osm_ingest.py                  # PBF → osm_streets
+# OSM enrichment (requires osmium + shapely; PBF at data/reference/romania-latest.osm.pbf)
+python3 tools/osm_ingest.py                  # PBF → osm_streets (~15 min on full Romania)
 python3 tools/osm_match.py                   # populate street_osm_matches
 python3 tools/osm_score.py                   # compute importance_v1
 python3 tools/osm_sanity.py                  # eyeball top-10 + coverage

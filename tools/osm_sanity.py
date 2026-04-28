@@ -21,10 +21,10 @@ from pathlib import Path
 # data/gis/populatie-romania-siruta-coords.csv.
 REFERENCE_UATS = [
     ("București (Sector 1)", 179141),
-    ("Cluj-Napoca",            54975),
-    ("Sibiu",                 143426),
-    ("Câmpulung Moldovenesc", 146734),  # small town in Suceava
-    ("Cornu (rural, PH)",     132581),
+    ("Cluj-Napoca",           54975),
+    ("Sibiu",                143450),  # MUNICIPIUL SIBIU
+    ("Câmpulung Moldovenesc",146502),  # MUNICIPIUL CÂMPULUNG MOLDOVENESC, SV
+    ("Cornu (rural, PH)",    132805),  # CORNU, PH
 ]
 
 

@@ -268,15 +268,17 @@ Goal: attach geometry, road class, and an importance score to streets that exist
 
 ### 11.1 Source
 
-- Geofabrik Romania PBF: `https://download.geofabrik.de/europe/romania-latest.osm.pbf` (~700 MB).
-- Stored at `data/reference/romania-latest.osm.pbf`. Document the snapshot date here once downloaded.
+- Geofabrik Romania PBF: `https://download.geofabrik.de/europe/romania-latest.osm.pbf` (~300 MB compressed).
+- Stored at `data/reference/romania-latest.osm.pbf`. **Snapshot date: 2026-04-28.**
 - **Refresh cadence:** pin a snapshot per release; don't auto-update.
 
 ### 11.2 Dependency exception
 
-The OSM path imports `pyrosm` and `shapely`. This is the **only** documented exception to the "stdlib + openpyxl" rule for ETL. Justification: PBF parsing without bindings is not feasible; `geopandas` is intentionally avoided (heavier dep tree, no benefit here). The registry ETL (`build_db.py`) remains stdlib-only.
+The OSM path imports `osmium` and `shapely`. This is the **only** documented exception to the "stdlib + openpyxl" rule for ETL. Justification: PBF parsing without bindings is not feasible; `geopandas` is intentionally avoided (heavier dep tree, no benefit here). The registry ETL (`build_db.py`) remains stdlib-only.
 
-Install in the project venv (`~/devbox/envs/240826/`): `pip install pyrosm shapely`.
+Install in the project venv (`~/devbox/envs/240826/`): `pip install osmium shapely`.
+
+Note: `pyrosm` was the originally planned dep but cannot build on Python 3.12 (`pyrobuf` dep fails). `osmium` (pyosmium 4.x) is the replacement — lighter, maintained, compatible.
 
 ### 11.3 Tables
 
@@ -296,16 +298,15 @@ tools/osm_sanity.py  →  read-only report    (eyeball reference UATs)
 
 Each step is idempotent. `osm_ingest.py --rebuild` truncates `osm_streets` first; the others overwrite their outputs unconditionally.
 
-### 11.5 Populated-area filter
+### 11.5 UAT assignment
 
-`tools/osm_ingest.py` builds a per-UAT mask as the union of:
-1. `place=city|town|village|hamlet|suburb|neighbourhood` polygons within the admin_level=8 boundary.
-2. `landuse=residential` polygons within the same boundary.
-3. ~300m buffer around `place=*` nodes (fallback for hamlets without polygons).
+Each OSM way is assigned to a UAT by **nearest-centroid matching**: the way's midpoint is compared against a spatial grid of UAT centroids loaded from `data/gis/populatie-romana-siruta-coords.csv`, filtered to SIRUTAs present in the registry DB.
 
-A way is kept only if its geometry intersects the mask. Inter-village fields inside rural communes are correctly excluded.
+Grid is 0.5°×0.5° cells (≈ 50 km), so each lookup checks only the way's cell plus the 8 adjacent cells — typically 9–54 candidates instead of all 1207 UATs. Fast enough for 4M ways without numpy.
 
-UAT identity is resolved by reading `ref:RO:SIRUTA` (or `ref:siruta`/`siruta`) tags on the admin polygon, with a name-match fallback to `data/gis/populatie-romania-siruta-coords.csv`. If the SIRUTA-tag coverage is too low in practice, add a centroid-distance fallback.
+The 6 Bucharest sectors (SIRUTAs 179141–179196) are absent from the coords CSV (which only has the municipality code 179132). Their centroids are hardcoded in `tools/osm_ingest.py:_BUCHAREST_SECTOR_CENTROIDS` with approximate per-sector coordinates. Coverage for Bucharest sectors is lower than other cities (~30%) because sector boundaries are complex and the centroid assignment is less precise — acceptable for v1.
+
+The original plan (geopandas polygon containment via admin_level=8 boundaries) was dropped because `pyrosm` cannot build on Python 3.12. Centroid assignment is simpler and sufficient for importance scoring, which is per-UAT z-scored anyway.
 
 ### 11.6 Score formula (v1)
 

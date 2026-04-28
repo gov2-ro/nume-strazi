@@ -1,5 +1,44 @@
 # Activity History
 
+## 2026-04-28 — OSM pipeline end-to-end (ingest → match → score → sanity)
+
+### What was done
+- Downloaded Romania PBF from Geofabrik (303 MB, snapshot 2026-04-28) to `data/reference/romania-latest.osm.pbf`.
+- Installed `osmium` 4.3.1 + `shapely` 2.1.2 in the project venv (`~/devbox/envs/240826/`). `pyrosm` could not be installed on Python 3.12 — `pyrobuf` dependency fails with `AttributeError: 'PyrobufDistribution' object has no attribute 'dry_run'` (setuptools compatibility breakage).
+- Rewrote `tools/osm_ingest.py`: replaced pyrosm/geopandas with osmium's `SimpleHandler.apply_file(locations=True)` + shapely. UAT assignment changed from polygon containment to **nearest-centroid with a 0.5°×0.5° spatial grid** (fast enough for 4M ways × 1207 UATs without numpy). Added `_BUCHAREST_SECTOR_CENTROIDS` hardcode for the 6 sector SIRUTAs (179141–179196) absent from the coords CSV.
+- Fixed `osm_sanity.py` reference SIRUTA codes: 143426→143450 (MUNICIPIUL SIBIU), 146734→146502 (MUNICIPIUL CÂMPULUNG MOLDOVENESC, SV), 132581→132805 (CORNU, PH). The original codes were from the SIRUTA coords CSV and didn't match registry codes.
+- Ran full pipeline:
+  - `osm_ingest.py --rebuild`: 4M ways scanned, 105,905 (UAT, street) groups, 0 skipped.
+  - `osm_match.py`: 490 exact_normalized + 56,002 fuzzy_core_name = 56,492 matches. Registry coverage 52.1%, OSM coverage 53.3%.
+  - `osm_score.py`: 105,905 rows scored across 1,185 UATs.
+  - `osm_sanity.py`: top-10 lists for all 5 reference UATs look correct. Coverage: Cluj 75.3%, Sibiu 77.3%, Câmpulung 64.1%, Cornu 64.5%, București Sector 1 31.5% (known issue — see BACKLOG).
+- Updated `docs/CODE_SPEC.md` §11.1 (snapshot date), §11.2 (osmium replaces pyrosm), §11.5 (centroid approach replaces polygon containment). Updated `CLAUDE.md` common commands.
+
+### Non-obvious decisions
+- **Nearest-centroid instead of polygon containment**: The polygon approach required pyrosm/geopandas (unavailable on Py3.12). Centroid assignment is sufficient for importance scoring, which is per-UAT z-scored anyway — a way misassigned to an adjacent UAT doesn't corrupt the scoring of its true UAT.
+- **Bucharest sector centroids hardcoded**: The SIRUTA coords CSV has only the municipality code (179132), not the 6 sector codes. Hardcoded approximate centroids are reasonable for v1 — sectors are well-known geographic areas. Accuracy is limited (31% coverage) but the rest of Romania is unaffected.
+- **Low pass 1 count (490)**: OSM often omits the street type prefix from `name` tags (just "Mihai Eminescu" not "Strada Mihai Eminescu"), so `name_normalized` rarely matches between registry and OSM. `core_name_norm` (pass 2) does the work.
+- **Spatial grid step 0.5°**: At Romanian latitudes, 0.5° ≈ 50 km. Average UAT density in the grid: ~6 UATs/cell. Each way checks 9 cells × 6 = 54 candidates — fast enough in pure Python (~15 min total for 4M ways).
+
+### Verification
+- `osm_sanity.py`: top-10 rankings for Cluj, Sibiu, Câmpulung, Cornu match expected main roads. Unmatched OSM top list shows Transfăgărășan, Transalpina, generic "Strada Principală" — all explainable (scenic cross-commune roads, no registered voters).
+
+---
+
+## 2026-04-28 — Fix P1 query bugs
+
+### What was done
+- `docs/queries.sql` `:name communist_aliases`: added `DISTINCT` to `SELECT` to eliminate duplicate rows caused by the same street spanning multiple polling sections in the raw `streets` table.
+- `docs/queries.sql` `:name unique_names`: added `WHERE is_numeric = 0 AND is_date = 0 AND name NOT REGEXP '^\d'` to filter out section-prefixed numeric artifact names (e.g. "1 1 Mai", "1 22 Decembrie 1989") that were polluting the hapax list.
+- Marked both P1 backlog items as complete.
+
+### Non-obvious decisions
+- `communist_aliases` cannot be rewritten to use `streets_dedup` because `street_aliases` is keyed to `streets.id`. DISTINCT on output is the correct fix, consistent with `real_renamings` which uses the same pattern.
+- `name NOT REGEXP '^\d'` catches names that evade both `is_numeric` and `is_date` flags — these are a data artifact from section-numbering in the source registry, not real street names.
+
+---
+
+
 ## 2026-04-28 — OSM enrichment scaffolding
 
 ### What was done
