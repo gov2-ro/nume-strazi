@@ -1,0 +1,133 @@
+{
+  "title": "Romanian Street Names Analysis",
+  "description": "Electoral registry + OSM enrichment + curated classification",
+  "dashboards": [
+    {
+      "name": "overview",
+      "title": "Overview: Coverage & Gap Analysis",
+      "description": "Street name classification status and overall statistics",
+      "cards": [
+        {
+          "query_name": "dashboard_coverage",
+          "title": "Classification Status",
+          "chart_type": "pie",
+          "x": "status",
+          "y": "pct"
+        },
+        {
+          "query_name": "dashboard_gender",
+          "title": "Gender Breakdown (Person-Named Streets)",
+          "chart_type": "bar",
+          "x": "gender",
+          "y": "streets"
+        },
+        {
+          "query_name": "dashboard_themes",
+          "title": "Macro Theme Composition",
+          "chart_type": "pie",
+          "x": "theme",
+          "y": "streets"
+        }
+      ]
+    },
+    {
+      "name": "people",
+      "title": "People: Gender Gap & Representation",
+      "description": "Who gets streets named after them?",
+      "cards": [
+        {
+          "query_name": "dashboard_top_people",
+          "title": "Top 30 Most-Honored People",
+          "chart_type": "bar",
+          "x": "full_name",
+          "y": "streets",
+          "sort": "-streets",
+          "limit": 15
+        },
+        {
+          "query_name": "dashboard_top_women",
+          "title": "Top 20 Most-Honored Women (THE GAP)",
+          "description": "Compare with top_people above to see the disparity",
+          "chart_type": "bar",
+          "x": "full_name",
+          "y": "streets"
+        },
+        {
+          "query_name": "dashboard_professions",
+          "title": "Professions of Honorees",
+          "chart_type": "bar",
+          "x": "profession",
+          "y": "streets",
+          "sort": "-streets",
+          "limit": 15
+        }
+      ]
+    },
+    {
+      "name": "regions",
+      "title": "Regional Comparison: OSM Coverage Inequality",
+      "description": "How do judete (counties) differ?",
+      "cards": [
+        {
+          "query_name": "dashboard_osm_coverage",
+          "title": "OSM Coverage by Judet",
+          "description": "Gorj 17.7%, Tulcea 87.3% — mapper distribution inequality",
+          "chart_type": "bar",
+          "x": "judet",
+          "y": "pct_osm",
+          "sort": "-pct_osm"
+        },
+        {
+          "query_name": "dashboard_judet_stats",
+          "title": "Per-Judet Statistics",
+          "chart_type": "bar",
+          "x": "judet",
+          "y": "total_streets",
+          "sort": "-total_streets",
+          "limit": 20
+        }
+      ]
+    },
+    {
+      "name": "curiosities",
+      "title": "Curiosities: Outliers & Patterns",
+      "description": "Poetic outliers and anomalies",
+      "cards": [
+        {
+          "query_name": "dashboard_longest_names",
+          "title": "Longest Street Names",
+          "chart_type": "bar",
+          "x": "name",
+          "y": "chars",
+          "sort": "-chars",
+          "limit": 15
+        },
+        {
+          "query_name": "dashboard_top_common_names",
+          "title": "Most Common Street Names Nationwide",
+          "chart_type": "bar",
+          "x": "name",
+          "y": "occurrences",
+          "sort": "-occurrences",
+          "limit": 15
+        }
+      ]
+    },
+    {
+      "name": "osm",
+      "title": "OSM Integration: Coverage Gaps",
+      "description": "Electoral registry vs OpenStreetMap",
+      "cards": [
+        {
+          "query_name": "dashboard_osm_gaps",
+          "title": "Registry Streets NOT in OSM",
+          "chart_type": "bar",
+          "x": "name",
+          "y": "uats",
+          "sort": "-uats",
+          "limit": 15
+        }
+      ]
+    }
+  ]
+}

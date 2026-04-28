@@ -1,0 +1,156 @@
+dashboards:
+  overview:
+    title: "Overview: Coverage & Gap Analysis"
+    description: "Street name classification status and overall statistics"
+    cards:
+      - query_name: dashboard_coverage
+        title: "Classification Status"
+        chart_type: pie
+        x: status
+        y: pct
+
+      - query_name: dashboard_gender
+        title: "Gender Breakdown (Person-Named Streets)"
+        description: "Shows the gender gap in street naming"
+        chart_type: bar
+        x: gender
+        y: streets
+
+      - query_name: dashboard_themes
+        title: "Macro Theme Composition"
+        description: "Person vs Nature vs Place vs Abstract"
+        chart_type: pie
+        x: theme
+        y: streets
+
+  people:
+    title: "People: Gender Gap & Representation"
+    description: "Who gets streets named after them?"
+    cards:
+      - query_name: dashboard_top_people
+        title: "Top 30 Most-Honored People"
+        description: "Click name to filter by profession/era"
+        chart_type: bar
+        x: full_name
+        y: streets
+        sort: "-streets"
+        limit: 15
+
+      - query_name: dashboard_top_women
+        title: "Top 20 Most-Honored Women (THE GAP)"
+        description: "Compare with top_people above to see the disparity"
+        chart_type: bar
+        x: full_name
+        y: streets
+        color: gender
+
+      - query_name: dashboard_professions
+        title: "Professions of Honorees"
+        chart_type: bar
+        x: profession
+        y: streets
+        sort: "-streets"
+        limit: 15
+
+      - query_name: dashboard_foreign_honorees
+        title: "Non-Romanian Honorees"
+        description: "International recognition on Romanian streets"
+        chart_type: bar
+        x: full_name
+        y: streets
+        sort: "-streets"
+        limit: 15
+
+  nature:
+    title: "Nature: Flora vs Fauna Dominance"
+    description: "Which plants and animals name the most streets?"
+    cards:
+      - query_name: dashboard_nature_types
+        title: "Nature Subtypes"
+        description: "Flora (plants) vs Fauna (animals) vs Terrain"
+        chart_type: bar
+        x: nature_type
+        y: streets
+
+  regions:
+    title: "Regional Comparison: Inequality in Data"
+    description: "How do judete (counties) differ in naming patterns and OSM coverage?"
+    cards:
+      - query_name: dashboard_osm_coverage
+        title: "OSM Coverage by Judet (Regional Stratification)"
+        description: "Gorj 17.7%, Tulcea 87.3% — mapper distribution inequality"
+        chart_type: bar
+        x: judet
+        y: pct_osm
+        sort: "-pct_osm"
+
+      - query_name: dashboard_judet_stats
+        title: "Per-Judet Statistics"
+        description: "Total streets, female representation, anonymous streets"
+        chart_type: bar
+        x: judet
+        y: total_streets
+        sort: "-total_streets"
+        limit: 20
+
+      - query_name: dashboard_uat_diversity
+        title: "Name Diversity (Entropy) - Monocultures vs Diverse"
+        description: "Low entropy = same names repeated; High entropy = all different"
+        chart_type: scatter
+        x: streets
+        y: entropy
+        color: judet
+        tooltip: uat
+
+  curiosities:
+    title: "Curiosities: Outliers & Patterns"
+    description: "Poetic outliers, repetition patterns, and anomalies"
+    cards:
+      - query_name: dashboard_longest_names
+        title: "Longest Street Names"
+        description: "Poetic and elaborate street designations"
+        chart_type: bar
+        x: name
+        y: chars
+        sort: "-chars"
+        limit: 15
+
+      - query_name: dashboard_top_common_names
+        title: "Most Common Street Names Nationwide"
+        description: "Which names repeat across the country?"
+        chart_type: bar
+        x: name
+        y: occurrences
+        sort: "-occurrences"
+        limit: 15
+
+      - query_name: dashboard_anonymous_streets
+        title: "UATs with Numeric/Anonymous Streets"
+        description: "Which places number their streets instead of naming them?"
+        chart_type: bar
+        x: uat
+        y: anonymous_count
+        sort: "-anonymous_count"
+        limit: 15
+
+  osm:
+    title: "OSM Integration: Coverage Gaps & Real Streets"
+    description: "Electoral registry vs OpenStreetMap mapping"
+    cards:
+      - query_name: dashboard_osm_gaps
+        title: "Registry Streets NOT in OSM (Gaps)"
+        description: "Frequent streets with zero OSM coverage"
+        chart_type: bar
+        x: name
+        y: uats
+        sort: "-uats"
+        limit: 15
+
+      - query_name: dashboard_osm_only
+        title: "OSM-Only Prominent Streets"
+        description: "Real roads in OSM with no registered voters"
+        chart_type: bar
+        x: name
+        y: importance
+        sort: "-importance"
+        limit: 15
