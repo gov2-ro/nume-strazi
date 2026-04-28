@@ -2,6 +2,7 @@
 
 Kept stdlib-only and side-effect-free so it's safe to import from anywhere.
 """
+import re
 import unicodedata
 
 DIACRITIC_FIX = str.maketrans({"ş": "ș", "ţ": "ț", "Ş": "Ș", "Ţ": "Ț"})
@@ -12,10 +13,18 @@ def fix_diacritics(s):
     return s.translate(DIACRITIC_FIX) if s else s
 
 
+_ABBR_EXPANSIONS = [
+    # G-ral / G.ral → general. Must run before diacritic stripping so case is intact.
+    (re.compile(r'\bG[-.]ral\b', re.IGNORECASE), 'General'),
+]
+
+
 def normalize_match(s):
     """Lowercase ASCII, î≡â collapsed. For grouping/joining only — never display."""
     if not s:
         return ""
+    for pattern, replacement in _ABBR_EXPANSIONS:
+        s = pattern.sub(replacement, s)
     s = s.replace("î", "â").replace("Î", "Â")
     nfkd = unicodedata.normalize("NFKD", s)
     return "".join(c for c in nfkd if not unicodedata.combining(c)).lower().strip()

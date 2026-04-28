@@ -16,12 +16,7 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [x] **`unique_names` query polluted by numbered-street names** — `:name unique_names` surfaces names like "1 1 Mai", "1 22 Decembrie 1989" from DJ — strings that parse as `is_numeric=0` but are really section-prefixed street numbers. Consider adding `WHERE is_numeric = 0 AND name NOT REGEXP '^\d'` or filtering in post-processing.
 
-- [ ] **Investigate DUMBRĂVIȚA (BV) near-zero entropy** — `uat_diversity` shows DUMBRĂVIȚA BV with entropy 0.14 on 428 streets. Investigate what name dominates and whether it's a data anomaly.
-  ```sql
-  SELECT name, COUNT(*) AS n FROM streets_dedup
-  WHERE uat = 'DUMBRĂVIȚA' AND judet = 'BV'
-  GROUP BY name_normalized ORDER BY n DESC LIMIT 10;
-  ```
+- [x] **Investigate DUMBRĂVIȚA (BV) near-zero entropy** — Was a sample artifact: the 4-județ dev sample included only 1 DUMBRĂVIȚA street. Full dataset has 10 streets, all distinct names, maximum entropy. Closed.
 
 - [ ] **Curation tooling (from CODE_SPEC P1)**
   - [x] `tools/export_unclassified.py` — top-N unclassified `core_name_norm` ordered by frequency, with sample streets/UATs

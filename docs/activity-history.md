@@ -1,5 +1,21 @@
 # Activity History
 
+## 2026-04-28 — Fix G-ral abbreviation mismatch in OSM matching
+
+### What was done
+- Identified that `normalize_match()` in `streets_lib.py` preserved hyphens, causing registry "G-ral" to normalize to `g-ral` while OSM stores "General". This blocked 85+ matches for "G-ral Eremia Grigorescu" (28 UATs) and related military-rank streets.
+- Added `_ABBR_EXPANSIONS` list to `streets_lib.py` with a case-insensitive word-boundary regex for `G[-.]ral` → `General`. Expansion runs before the NFKD/lowercase step so downstream normalization is unaffected.
+- Patched 328 affected `streets` rows in-place (UPDATE on `name_normalized` + `core_name_norm`) — no full rebuild needed since the pattern replacement is unambiguous.
+- Re-ran `osm_match.py`: fuzzy matches 56,002 → 56,087 (+85). Registry coverage 52.1% → 52.2%.
+- Re-ran `osm_score.py`: all 105,905 rows rescored.
+- Closed DUMBRĂVIȚA (BV) entropy backlog item — was a sample artifact (1 street in dev sample vs 10 in full dataset, maximum entropy).
+
+### Non-obvious decisions
+- Regex `\bG[-.]ral\b` with `re.IGNORECASE` covers both "G-ral" and "G.ral" variants. Word-boundary ensures it doesn't match inside longer tokens.
+- Expansion runs before NFKD normalization because the NFKD step lowercases; doing it after would require the regex to match only lowercase.
+- Only `g-ral` was fixed. `prof.dr.` affects only 4 UATs (trivial). `sfantul`/`sfanta` mismatches are UAT centroid precision issues, not abbreviation issues.
+- The +85 new matches were specifically for "General Eremia Grigorescu" and related streets; verified by spot-checking `streets_dedup` for `name_normalized LIKE '%general eremia%'`.
+
 ## 2026-04-28 — OSM pipeline end-to-end (ingest → match → score → sanity)
 
 ### What was done
