@@ -1,133 +1,213 @@
 {
   "title": "Romanian Street Names Analysis",
   "description": "Electoral registry + OSM enrichment + curated classification",
-  "dashboards": [
-    {
-      "name": "overview",
-      "title": "Overview: Coverage & Gap Analysis",
-      "description": "Street name classification status and overall statistics",
-      "cards": [
-        {
-          "query_name": "dashboard_coverage",
-          "title": "Classification Status",
-          "chart_type": "pie",
-          "x": "status",
-          "y": "pct"
-        },
-        {
-          "query_name": "dashboard_gender",
-          "title": "Gender Breakdown (Person-Named Streets)",
-          "chart_type": "bar",
-          "x": "gender",
-          "y": "streets"
-        },
-        {
-          "query_name": "dashboard_themes",
-          "title": "Macro Theme Composition",
-          "chart_type": "pie",
-          "x": "theme",
-          "y": "streets"
+  "plugins": {
+    "datasette-dashboards": {
+      "overview": {
+        "title": "Overview: Coverage & Gap Analysis",
+        "description": "Street name classification status and overall statistics",
+        "layout": [
+          ["classification-status", "gender-breakdown"],
+          ["macro-themes", "macro-themes"]
+        ],
+        "charts": {
+          "classification-status": {
+            "title": "Classification Status",
+            "db": "streets",
+            "query": "SELECT status, streets, pct FROM dashboard_coverage ORDER BY streets DESC",
+            "library": "vega-lite",
+            "display": {
+              "mark": {"type": "arc", "tooltip": true},
+              "encoding": {
+                "theta": {"field": "streets", "type": "quantitative"},
+                "color": {
+                  "field": "status",
+                  "type": "nominal",
+                  "title": "Status"
+                }
+              }
+            }
+          },
+          "gender-breakdown": {
+            "title": "Gender Breakdown (Person-Named Streets)",
+            "db": "streets",
+            "query": "SELECT gender, streets FROM dashboard_gender",
+            "library": "vega-lite",
+            "display": {
+              "mark": {"type": "bar", "tooltip": true},
+              "encoding": {
+                "x": {"field": "streets", "type": "quantitative", "title": "Streets"},
+                "y": {"field": "gender", "type": "nominal", "title": "Gender"},
+                "color": {"field": "gender", "type": "nominal"}
+              }
+            }
+          },
+          "macro-themes": {
+            "title": "Macro Theme Composition",
+            "db": "streets",
+            "query": "SELECT theme, streets FROM dashboard_themes ORDER BY streets DESC",
+            "library": "vega-lite",
+            "display": {
+              "mark": {"type": "arc", "tooltip": true, "innerRadius": 40},
+              "encoding": {
+                "theta": {"field": "streets", "type": "quantitative"},
+                "color": {
+                  "field": "theme",
+                  "type": "nominal",
+                  "title": "Theme"
+                }
+              }
+            }
+          }
         }
-      ]
-    },
-    {
-      "name": "people",
-      "title": "People: Gender Gap & Representation",
-      "description": "Who gets streets named after them?",
-      "cards": [
-        {
-          "query_name": "dashboard_top_people",
-          "title": "Top 30 Most-Honored People",
-          "chart_type": "bar",
-          "x": "full_name",
-          "y": "streets",
-          "sort": "-streets",
-          "limit": 15
-        },
-        {
-          "query_name": "dashboard_top_women",
-          "title": "Top 20 Most-Honored Women (THE GAP)",
-          "description": "Compare with top_people above to see the disparity",
-          "chart_type": "bar",
-          "x": "full_name",
-          "y": "streets"
-        },
-        {
-          "query_name": "dashboard_professions",
-          "title": "Professions of Honorees",
-          "chart_type": "bar",
-          "x": "profession",
-          "y": "streets",
-          "sort": "-streets",
-          "limit": 15
+      },
+      "people": {
+        "title": "People: Gender Gap & Representation",
+        "description": "Who gets streets named after them?",
+        "layout": [
+          ["top-people", "top-women"],
+          ["professions", "professions"]
+        ],
+        "charts": {
+          "top-people": {
+            "title": "Top 15 Most-Honored People",
+            "db": "streets",
+            "query": "SELECT full_name, streets FROM dashboard_top_people ORDER BY streets DESC LIMIT 15",
+            "library": "vega-lite",
+            "display": {
+              "mark": {"type": "bar", "tooltip": true},
+              "encoding": {
+                "y": {"field": "full_name", "type": "nominal", "sort": "-x", "title": "Person"},
+                "x": {"field": "streets", "type": "quantitative", "title": "Streets"}
+              }
+            }
+          },
+          "top-women": {
+            "title": "Top Women Honorees (THE GAP)",
+            "db": "streets",
+            "query": "SELECT full_name, streets FROM dashboard_top_women ORDER BY streets DESC",
+            "library": "vega-lite",
+            "display": {
+              "mark": {"type": "bar", "tooltip": true, "color": "#e74c3c"},
+              "encoding": {
+                "y": {"field": "full_name", "type": "nominal", "sort": "-x", "title": "Woman"},
+                "x": {"field": "streets", "type": "quantitative", "title": "Streets"}
+              }
+            }
+          },
+          "professions": {
+            "title": "Professions of Honorees",
+            "db": "streets",
+            "query": "SELECT profession, streets FROM dashboard_professions ORDER BY streets DESC LIMIT 12",
+            "library": "vega-lite",
+            "display": {
+              "mark": {"type": "bar", "tooltip": true},
+              "encoding": {
+                "y": {"field": "profession", "type": "nominal", "sort": "-x", "title": "Profession"},
+                "x": {"field": "streets", "type": "quantitative", "title": "Streets"}
+              }
+            }
+          }
         }
-      ]
-    },
-    {
-      "name": "regions",
-      "title": "Regional Comparison: OSM Coverage Inequality",
-      "description": "How do judete (counties) differ?",
-      "cards": [
-        {
-          "query_name": "dashboard_osm_coverage",
-          "title": "OSM Coverage by Judet",
-          "description": "Gorj 17.7%, Tulcea 87.3% — mapper distribution inequality",
-          "chart_type": "bar",
-          "x": "judet",
-          "y": "pct_osm",
-          "sort": "-pct_osm"
-        },
-        {
-          "query_name": "dashboard_judet_stats",
-          "title": "Per-Judet Statistics",
-          "chart_type": "bar",
-          "x": "judet",
-          "y": "total_streets",
-          "sort": "-total_streets",
-          "limit": 20
+      },
+      "regions": {
+        "title": "Regional Comparison: OSM Coverage Inequality",
+        "description": "How do judete (counties) differ in naming patterns and OSM coverage?",
+        "layout": [
+          ["osm-coverage", "judet-stats"]
+        ],
+        "charts": {
+          "osm-coverage": {
+            "title": "OSM Coverage by Judet (Regional Stratification: Gorj 17.7% → Tulcea 87.3%)",
+            "db": "streets",
+            "query": "SELECT judet, pct_osm FROM dashboard_osm_coverage ORDER BY pct_osm DESC",
+            "library": "vega-lite",
+            "display": {
+              "mark": {"type": "bar", "tooltip": true},
+              "encoding": {
+                "y": {"field": "judet", "type": "nominal", "sort": "-x", "title": "Judet"},
+                "x": {"field": "pct_osm", "type": "quantitative", "title": "OSM Coverage %"},
+                "color": {
+                  "field": "pct_osm",
+                  "type": "quantitative",
+                  "scale": {"scheme": "redyellowgreen"},
+                  "title": "Coverage %"
+                }
+              }
+            }
+          },
+          "judet-stats": {
+            "title": "Total Streets per Judet",
+            "db": "streets",
+            "query": "SELECT judet, total_streets FROM dashboard_judet_stats ORDER BY total_streets DESC LIMIT 20",
+            "library": "vega-lite",
+            "display": {
+              "mark": {"type": "bar", "tooltip": true},
+              "encoding": {
+                "y": {"field": "judet", "type": "nominal", "sort": "-x", "title": "Judet"},
+                "x": {"field": "total_streets", "type": "quantitative", "title": "Streets"}
+              }
+            }
+          }
         }
-      ]
-    },
-    {
-      "name": "curiosities",
-      "title": "Curiosities: Outliers & Patterns",
-      "description": "Poetic outliers and anomalies",
-      "cards": [
-        {
-          "query_name": "dashboard_longest_names",
-          "title": "Longest Street Names",
-          "chart_type": "bar",
-          "x": "name",
-          "y": "chars",
-          "sort": "-chars",
-          "limit": 15
-        },
-        {
-          "query_name": "dashboard_top_common_names",
-          "title": "Most Common Street Names Nationwide",
-          "chart_type": "bar",
-          "x": "name",
-          "y": "occurrences",
-          "sort": "-occurrences",
-          "limit": 15
+      },
+      "curiosities": {
+        "title": "Curiosities: Outliers & Patterns",
+        "description": "Poetic outliers, repetition patterns, and anomalies",
+        "layout": [
+          ["longest-names", "common-names"]
+        ],
+        "charts": {
+          "longest-names": {
+            "title": "Longest Street Names",
+            "db": "streets",
+            "query": "SELECT name, chars FROM dashboard_longest_names ORDER BY chars DESC LIMIT 15",
+            "library": "vega-lite",
+            "display": {
+              "mark": {"type": "bar", "tooltip": true},
+              "encoding": {
+                "y": {"field": "name", "type": "nominal", "sort": "-x", "title": "Name"},
+                "x": {"field": "chars", "type": "quantitative", "title": "Characters"}
+              }
+            }
+          },
+          "common-names": {
+            "title": "Most Common Street Names Nationwide",
+            "db": "streets",
+            "query": "SELECT name, occurrences FROM dashboard_top_common_names ORDER BY occurrences DESC LIMIT 15",
+            "library": "vega-lite",
+            "display": {
+              "mark": {"type": "bar", "tooltip": true},
+              "encoding": {
+                "y": {"field": "name", "type": "nominal", "sort": "-x", "title": "Name"},
+                "x": {"field": "occurrences", "type": "quantitative", "title": "Occurrences"}
+              }
+            }
+          }
         }
-      ]
-    },
-    {
-      "name": "osm",
-      "title": "OSM Integration: Coverage Gaps",
-      "description": "Electoral registry vs OpenStreetMap",
-      "cards": [
-        {
-          "query_name": "dashboard_osm_gaps",
-          "title": "Registry Streets NOT in OSM",
-          "chart_type": "bar",
-          "x": "name",
-          "y": "uats",
-          "sort": "-uats",
-          "limit": 15
+      },
+      "osm": {
+        "title": "OSM Integration: Coverage Gaps & Real Streets",
+        "description": "Electoral registry vs OpenStreetMap mapping",
+        "layout": [
+          ["osm-gaps", "osm-gaps"]
+        ],
+        "charts": {
+          "osm-gaps": {
+            "title": "Registry Streets NOT in OSM (Gaps)",
+            "db": "streets",
+            "query": "SELECT name, uats FROM dashboard_osm_gaps ORDER BY uats DESC LIMIT 15",
+            "library": "vega-lite",
+            "display": {
+              "mark": {"type": "bar", "tooltip": true},
+              "encoding": {
+                "y": {"field": "name", "type": "nominal", "sort": "-x", "title": "Street Name"},
+                "x": {"field": "uats", "type": "quantitative", "title": "UATs with No OSM Match"}
+              }
+            }
+          }
         }
-      ]
+      }
     }
-  ]
+  }
 }
