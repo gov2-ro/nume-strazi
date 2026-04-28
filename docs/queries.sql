@@ -274,3 +274,49 @@ WHERE s.title IS NOT NULL OR s.rank IS NOT NULL
 GROUP BY s.core_name_norm
 HAVING COUNT(*) = 1
 LIMIT 30;
+
+
+-- ============= VIEW 8: OSM ↔ REGISTRY COVERAGE =============
+-- Requires osm_ingest + osm_match + osm_score to have run first.
+
+-- Per-județ: what % of registry streets have an OSM match?
+-- Low pct = poor OSM mapping or systematic name-format mismatch.
+-- :name osm_judet_coverage
+SELECT sd.judet,
+       COUNT(*)                                                          AS registry_streets,
+       SUM(CASE WHEN m.street_id IS NOT NULL THEN 1 ELSE 0 END)         AS osm_matched,
+       ROUND(100.0 * SUM(CASE WHEN m.street_id IS NOT NULL THEN 1 ELSE 0 END)
+             / COUNT(*), 1)                                             AS pct_osm
+FROM streets_dedup sd
+LEFT JOIN street_osm_matches m ON m.street_id = sd.id
+GROUP BY sd.judet
+ORDER BY pct_osm DESC;
+
+-- Registry street names that are frequent (≥10 UATs) but have zero OSM matches
+-- in any UAT. Systematic gaps: likely naming convention differences or
+-- streets that exist only in the electoral database (e.g. unnumbered rural paths).
+-- :name registry_osm_gap
+SELECT sd.name,
+       COUNT(DISTINCT sd.uat)                                            AS uats_in_registry,
+       SUM(CASE WHEN m.street_id IS NOT NULL THEN 1 ELSE 0 END)         AS uats_with_osm_match
+FROM streets_dedup sd
+LEFT JOIN street_osm_matches m ON m.street_id = sd.id
+GROUP BY sd.name_normalized
+HAVING COUNT(DISTINCT sd.uat) >= 10
+   AND SUM(CASE WHEN m.street_id IS NOT NULL THEN 1 ELSE 0 END) = 0
+ORDER BY uats_in_registry DESC
+LIMIT 30;
+
+-- OSM streets not in the registry, ranked by importance score.
+-- These are real streets that have no registered voters: scenic/transit roads,
+-- new developments, industrial access roads, private roads.
+-- :name osm_only_prominent
+SELECT o.uat_siruta, o.name, o.highway_class,
+       ROUND(o.length_m)          AS length_m,
+       ROUND(o.importance_v1, 1)  AS importance
+FROM osm_streets o
+WHERE NOT EXISTS (
+    SELECT 1 FROM street_osm_matches m WHERE m.osm_street_id = o.id
+)
+ORDER BY o.importance_v1 DESC
+LIMIT 50;

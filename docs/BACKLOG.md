@@ -50,6 +50,18 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [ ] **OSM: Bucharest sector coverage is low (~31%)** — Centroid-based UAT assignment is imprecise for Bucharest's 6 sectors because their boundaries interleave. Two options: (a) parse admin_level=9 boundaries from the PBF using osmium's area assembler to get sector polygons, then re-assign ways by polygon containment; (b) accept as-is for v1 (sector-level scoring is degraded but the rest of Romania is fine). Note: `osm_sanity.py` reference UAT for Bucharest is Sector 1 (SIRUTA 179141); re-run sanity after any fix.
 
+- [ ] **Person recognition scope via Wikipedia sitelinks** — For each honoree in the `persons` table, classify their recognition as `universal` / `national` / `local` / `unknown` based on how many Wikipedia language editions have an article for them. Sitelink count is a static, auth-free Wikidata API signal that proxies international recognition well.
+
+  Tiers (to calibrate after first run): `universal` ≥50 editions (Eminescu, Trajan, Curie), `national` 5–49 (most Romanian historical figures), `local` 1–4 (obscure outside RO), `unknown` no article found.
+
+  Data path: `persons.full_name` → Wikidata SPARQL/search → QID → `wbgetentities` API → `sitelinks` count. Optionally add Romanian Wikipedia monthly page views (Wikimedia REST API) as secondary signal.
+
+  Schema: add `wikidata_qid TEXT`, `wiki_sitelinks INTEGER`, `wiki_scope TEXT` to `persons` table in `build_db.py`. Tooling: extend planned `tools/wikidata_persons.py` to output QIDs, then a separate `tools/wiki_scope.py` that batches QID lookups (50/request) and writes back counts.
+
+  Dependencies: LLM classifier first (person table coverage), then `wikidata_persons.py` for QID matching.
+
+  Story: "streets named after people known only locally vs. globally" — core editorial finding. Also surfaces surprising gaps (famous Romanians in few streets) and surprising presences (obscure local figures everywhere).
+
 ---
 
 ## P3
