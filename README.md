@@ -211,9 +211,62 @@ echo 'export ANTHROPIC_API_KEY=sk-ant-...' >> ~/.zshrc
 
 ### OSM match coverage
 
-52.1% of registry streets matched to at least one OSM way.
-53.3% of OSM streets matched to at least one registry entry.
+**Overall:** 52.2% of registry streets matched to OSM; 53.4% of OSM streets matched to registry.
+105,104 registry streets, 105,905 OSM streets ≈ same scale, different compositions.
 
-Per-reference-UAT coverage: Cluj-Napoca 75%, Sibiu 77%, Câmpulung Moldovenesc 64%,
-Cornu (rural, PH) 65%, Bucharest Sector 1 ~31% (centroid assignment less precise
-for Bucharest's interleaved sector boundaries).
+**Per-reference-UAT:**
+- Cluj-Napoca (city): 75%
+- Sibiu (city): 77%
+- Câmpulung Moldovenesc (town, SV): 64%
+- Cornu (rural, PH): 65%
+- Bucharest Sector 1: ~31% (centroid imprecision for interleaved sectors)
+
+**The 48% unmatched registry gap:**
+Three categories of unmatched registry streets:
+1. **Naming convention mismatches** — OSM omits street-type prefixes ("Mihai Eminescu" vs
+   "Strada Mihai Eminescu") or uses abbreviations differently. We've fixed the "G-ral" →
+   "General" expansion; others remain (e.g., `prof.dr.` prefix cases).
+2. **Electoral-only paths** — Rural UATs with small populations may have polling sections
+   on unnumbered or unofficial paths that OSM has never tagged.
+3. **Rural/sparse coverage** — OSM mapping in Romania concentrates in cities. Smaller villages
+   and hamlets have sparser street-level tagging.
+
+**The 47% unmatched OSM gap:**
+Mostly real streets with no registered voters:
+- Scenic/transit roads (Transalpina, Transfăgărășan)
+- New residential developments post-2021 (OSM updated, registry hasn't)
+- Industrial/private access roads, park paths
+- Roads in very low-density areas
+
+**Why not merge the datasets?**
+The registry and OSM serve different purposes: electoral authority (ground truth for voters) vs
+community mapping (geometry + road hierarchy). Forcing a 1:1 merge would either:
+- Drop ~47k useful registry streets for which no OSM exists
+- Invent fake OSM entries from electoral data (unreliable for road classification)
+- Create conflicting canonical names
+
+Instead, use `street_osm_matches` as a **link table**: registry streets can have 0, 1, or many
+OSM matches (rare). Query it to combine signals (e.g. electoral presence × road importance).
+
+**Key finding:** OSM coverage is regionally stratified. Gorj (17.7%), Dâmbovita (27.5%), Sibiu (30.8%)
+have low matches; Tulcea (87.3%), Brăila (81%), Mehedinți (75%) have high matches. The unmatched
+Gorj streets (mostly generic nature names like "Principală", "Bisericii", "Viilor") don't exist in
+OSM at all — this is sparse mapping of rural villages, not a naming-mismatch issue. Similar stratification
+likely holds for other datasets that depend on community volunteers (Wikipedia, Wikidata).
+
+**To investigate further:**
+```sql
+-- Frequent registry streets with zero OSM matches
+-- (query: registry_osm_gap)
+SELECT name, COUNT(DISTINCT uat) AS uats
+FROM streets_dedup
+WHERE NOT EXISTS (SELECT 1 FROM street_osm_matches m WHERE m.street_id = streets_dedup.id)
+GROUP BY name_normalized HAVING COUNT(*) > 10
+ORDER BY uats DESC;
+
+-- Per-judet breakdown (high variance: Gorj 17.7%, Tulcea 87.3%)
+-- (query: osm_judet_coverage)
+SELECT judet, COUNT(*) AS registry_streets,
+       SUM(CASE WHEN osm_matched THEN 1 ELSE 0 END) AS matched
+FROM streets_dedup ...
+```
