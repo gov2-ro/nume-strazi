@@ -148,6 +148,8 @@ CREATE TABLE persons (
     profession TEXT,
     nationality TEXT DEFAULT 'RO',
     wikidata_qid TEXT,
+    wiki_sitelinks INTEGER,
+    wiki_scope TEXT,
     notes TEXT
 );
 CREATE TABLE place_refs (
