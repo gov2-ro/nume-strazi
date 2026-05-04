@@ -21,9 +21,11 @@ Items detected during sessions. Each entry has enough context to act on cold.
 - [ ] **Curation tooling (from CODE_SPEC P1)**
   - [x] `tools/export_unclassified.py` — top-N unclassified `core_name_norm` ordered by frequency, with sample streets/UATs
   - [x] `tools/import_csv.py` — generic upserter for the 4 lookup tables
-  - [ ] `tools/wikidata_persons.py` — SPARQL query for top-N unmatched person candidates
+  - [x] `tools/wikidata_persons.py` — search Wikidata for QIDs for persons missing them; idempotent CSV audit trail; writes auto-matches (conf ≥ 0.95) directly to DB
   - [x] `tools/llm_classify.py` — Claude Haiku batch classifier (rate-limited, idempotent)
   - [ ] Coverage view: `streets_classified_pct`
+  - [ ] **Manual QID review** — 12 rows in `data/curation/wikidata_qids.csv` with `auto_match=False` (confidence < 0.95). Open CSV, filter `auto_match=False`, look up each on Wikidata and update `persons.wikidata_qid` by hand.
+  - [ ] **QID uniqueness guard in `wikidata_persons.py`** — Two entries (`cuza voda`, `a. i. cuza`) were assigned Michel Vorm's QID (Q208518) instead of Q294832, because the wikidata search returned a wrong top match with confidence 0.95. Fix: before writing a QID, check if it's already assigned to a *different* `core_name_norm` in `persons` and warn/skip if so. Fixed manually: `UPDATE persons SET wikidata_qid='Q294832' WHERE core_name_norm IN ('cuza voda', 'a. i. cuza')` + re-run `wiki_scope.py`.
 
 - **Classification pipeline decision (settled):** run `llm_classify.py` directly on all unclassified keys. No `rule_classify.py` pre-filter, no spaCy/RoWordNet middle tier. Rationale: full 28k-key run costs ~$2 at Haiku pricing, making rule/NLP pre-filters a complexity cost that saves nothing. LLM handles Romanian morphology and cultural context better than a lemmatizer+wordnet chain would anyway. RoWordNet remains a P3 option only if API-free reproducibility becomes a hard requirement.
 

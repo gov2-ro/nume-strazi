@@ -139,7 +139,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--db",         default="data/streets.db")
     ap.add_argument("--limit",      type=int, default=200,
-                    help="max keys to classify this run")
+                    help="max keys to classify this run (0 = all)")
     ap.add_argument("--batch-size", type=int, default=BATCH_SIZE)
     ap.add_argument("--out",        default="data/curation/llm_batch.csv")
     ap.add_argument("--import",     dest="do_import", action="store_true",
@@ -159,11 +159,15 @@ def main():
         print(f"Resuming: {len(processed)} keys already in {out_path.name}")
 
     # Fetch unclassified candidates from DB (fetch extra to cover processed overlap)
-    fetch_n = args.limit + len(processed)
+    # limit=0 means "all" — use a sentinel large enough to fetch everything
+    no_limit = args.limit == 0
+    fetch_n = 999_999 if no_limit else args.limit + len(processed)
     con = sqlite3.connect(args.db)
     all_rows = con.execute(UNCLASSIFIED_SQL, (fetch_n,)).fetchall()
     con.close()
-    candidates = [r for r in all_rows if r[0] not in processed][: args.limit]
+    candidates = [r for r in all_rows if r[0] not in processed]
+    if not no_limit:
+        candidates = candidates[: args.limit]
 
     if not candidates:
         print("Nothing to classify.")

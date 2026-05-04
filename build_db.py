@@ -150,6 +150,9 @@ CREATE TABLE persons (
     wikidata_qid TEXT,
     wiki_sitelinks INTEGER,
     wiki_scope TEXT,
+    wiki_ro_url TEXT,
+    wiki_en_url TEXT,
+    wiki_ro_views INTEGER,
     notes TEXT
 );
 CREATE TABLE place_refs (

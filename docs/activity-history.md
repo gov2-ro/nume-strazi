@@ -1,5 +1,29 @@
 # Activity History
 
+## 2026-05-04 — Wikidata QID matching + Wikipedia scope/pageview enrichment
+
+### What was done
+- **`tools/wikidata_persons.py`** — major rewrite of the previously non-functional tool:
+  - Fixed CSV quoting (was bare f-string concatenation; names with commas broke the output)
+  - Added resume support: reads existing output CSV at startup, skips already-processed keys
+  - Added direct DB write-back for auto-matched results (conf ≥ 0.95); no longer orphaned in CSV
+  - Added 429 retry with exponential backoff (5 / 10 / 20s); API errors no longer written as "no match" (entry stays out of CSV to be retried next run)
+  - Increased base sleep to 2s
+  - Added `--db`, `--out`, `--dry-run` args
+  - Run produced 183 QIDs written to DB from 248 missing persons; 12 rows need manual review (conf < 0.95)
+- **`tools/wiki_scope.py`** — extended with three new signals:
+  - `wiki_ro_url` / `wiki_en_url` — Wikipedia article URLs for Romanian and English editions, extracted from sitelinks (no extra API calls)
+  - `wiki_ro_views` — average monthly Romanian Wikipedia pageviews (last 12 months) via Wikimedia REST API
+  - Fixed URL encoding (`safe="_:/"` not `safe=""`)
+- **`build_db.py`** — added `wiki_ro_url TEXT`, `wiki_en_url TEXT`, `wiki_ro_views INTEGER` to `persons` schema
+- **`tools/llm_classify.py`** — fixed `--limit 0` bug (was interpreted as SQL `LIMIT 0`, fetched nothing; now treated as "all")
+- Ran full LLM classification of remaining 306 unclassified keys: 292 classified, 14 skipped; coverage moved from 56.9% → 60.1%
+
+### Non-obvious decisions
+- Romanian pageviews added over other signals (edit count, article age, article length) because they directly measure *living cultural memory* — how much Romanians actively read about a person today. Sitelinks = breadth; ro_views = depth of local recognition.
+- API errors in `wikidata_persons.py` are intentionally *not* written to the CSV so that re-running automatically retries them. Only definitive results (found or genuinely not found) are recorded.
+- Known data issue: `cuza voda` and `a. i. cuza` were assigned Michel Vorm's QID (Q208518) — a false positive from the wikidata search. Fixed manually; QID uniqueness guard added to BACKLOG.
+
 ## 2026-04-28 — Fix G-ral abbreviation mismatch in OSM matching
 
 ### What was done

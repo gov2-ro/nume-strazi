@@ -2,30 +2,35 @@
 """
 Search Wikidata for persons in the persons table who lack a wikidata_qid.
 
-Outputs a CSV with search results for manual review and matching, or direct insertion if high-confidence.
+Outputs a CSV audit trail and writes matched QIDs directly to the DB for
+high-confidence matches. Idempotent: re-running skips already-processed keys.
 
 Usage:
-    python3 tools/wikidata_persons.py [--limit N] [--output file.csv] [--confidence THRESHOLD]
+    python3 tools/wikidata_persons.py [--limit N] [--out FILE] [--confidence THRESHOLD] [--db PATH]
 
 Options:
-    --limit N            Only process first N rows without a QID (default: all)
-    --output FILE        Write results to FILE instead of stdout (default: stdout)
-    --confidence THRESH  Only auto-match if confidence ≥ THRESH (0.0–1.0, default: 0.95)
-                         Below threshold, output is CSV for manual review.
+    --limit N            Only process first N unmatched persons (default: all)
+    --out FILE           Audit CSV path (default: data/curation/wikidata_qids.csv)
+    --confidence THRESH  Auto-match threshold (0.0–1.0, default: 0.95)
+    --db PATH            SQLite DB path (default: data/streets.db)
+    --dry-run            Print matches without writing to DB
 """
 
+import csv
 import sqlite3
 import sys
 import argparse
 import json
+import urllib.error
 import urllib.request
 import urllib.parse
 import time
-from typing import Optional, Tuple, List
+from pathlib import Path
+from typing import Optional, Tuple
 
-DB_PATH = "data/streets.db"
 WIKIDATA_API = "https://www.wikidata.org/w/api.php"
-WIKIDATA_SPARQL = "https://query.wikidata.org/sparql"
+HEADER = ["core_name_norm", "full_name", "wikidata_qid", "confidence", "auto_match"]
+
 
 def search_wikidata(name: str, gender: Optional[str], birth_year: Optional[int], death_year: Optional[int]) -> Optional[Tuple[str, float]]:
     """
@@ -46,14 +51,25 @@ def search_wikidata(name: str, gender: Optional[str], birth_year: Optional[int],
         "format": "json",
     }
 
-    try:
-        url = f"{WIKIDATA_API}?{urllib.parse.urlencode(params)}"
-        req = urllib.request.Request(url, headers={"User-Agent": "RomanianStreetsAnalysis/1.0"})
-        with urllib.request.urlopen(req, timeout=5) as response:
-            data = json.loads(response.read().decode())
-    except Exception as e:
-        print(f"  ⚠ API error searching '{name}': {e}", file=sys.stderr)
-        return None
+    url = f"{WIKIDATA_API}?{urllib.parse.urlencode(params)}"
+    req = urllib.request.Request(url, headers={"User-Agent": "RomanianStreetsAnalysis/1.0"})
+    data = None
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=10) as response:
+                data = json.loads(response.read().decode())
+            break
+        except urllib.error.HTTPError as e:
+            if e.code == 429:
+                wait = 5 * (2 ** attempt)
+                print(f"\n  ⚠ 429 rate limit, waiting {wait}s …", file=sys.stderr)
+                time.sleep(wait)
+            else:
+                raise
+        except Exception:
+            raise
+    if data is None:
+        raise RuntimeError(f"429 retries exhausted for '{name}'")
 
     results = data.get("search", [])
     if not results:
@@ -69,7 +85,6 @@ def search_wikidata(name: str, gender: Optional[str], birth_year: Optional[int],
 
         # Exact label match
         if result_label == name.lower():
-            # Verify against gender/dates if available
             confidence = 0.95 if (gender or birth_year or death_year) else 0.85
             if confidence > best_confidence:
                 best_confidence = confidence
@@ -85,6 +100,7 @@ def search_wikidata(name: str, gender: Optional[str], birth_year: Optional[int],
     if best_match:
         return (best_match, best_confidence)
     return None
+
 
 def get_entity_details(qid: str) -> Optional[dict]:
     """Fetch full entity details from Wikidata to verify gender/dates."""
@@ -105,100 +121,122 @@ def get_entity_details(qid: str) -> Optional[dict]:
         print(f"  ⚠ API error fetching {qid}: {e}", file=sys.stderr)
         return None
 
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--limit", type=int, default=None, help="Only process first N unmatched persons")
-    parser.add_argument("--output", type=str, default=None, help="Write results to file (default: stdout)")
-    parser.add_argument("--confidence", type=float, default=0.95, help="Auto-match threshold (default: 0.95)")
+    parser.add_argument("--limit",      type=int,   default=None,                            help="Only process first N unmatched persons")
+    parser.add_argument("--out",        default="data/curation/wikidata_qids.csv",           help="Audit CSV path")
+    parser.add_argument("--confidence", type=float, default=0.95,                            help="Auto-match threshold (default: 0.95)")
+    parser.add_argument("--db",         default="data/streets.db",                           help="SQLite DB path")
+    parser.add_argument("--dry-run",    action="store_true",                                 help="Print matches without writing to DB")
     args = parser.parse_args()
 
-    if args.confidence < 0 or args.confidence > 1:
+    if not 0.0 <= args.confidence <= 1.0:
         print("Error: --confidence must be 0.0–1.0", file=sys.stderr)
         sys.exit(1)
 
-    conn = sqlite3.connect(DB_PATH)
+    out_path = Path(args.out)
+
+    # Resume support: skip keys already written to the audit CSV
+    processed: set[str] = set()
+    if out_path.exists():
+        with open(out_path, newline="", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                processed.add(row["core_name_norm"])
+        print(f"Resuming: {len(processed)} persons already processed in {out_path.name}")
+
+    conn = sqlite3.connect(args.db)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    # Fetch persons without a QID
-    query = "SELECT core_name_norm, full_name, gender, birth_year, death_year FROM persons WHERE wikidata_qid IS NULL ORDER BY full_name"
+    query = """
+        SELECT core_name_norm, full_name, gender, birth_year, death_year
+        FROM persons
+        WHERE wikidata_qid IS NULL
+        ORDER BY full_name
+    """
     if args.limit:
         query += f" LIMIT {args.limit}"
 
-    cursor.execute(query)
-    persons = cursor.fetchall()
+    persons = [r for r in cursor.execute(query).fetchall() if r["core_name_norm"] not in processed]
+    total = len(persons)
 
-    results = []
+    if not total:
+        print("Nothing to process.")
+        conn.close()
+        return
 
-    for i, person in enumerate(persons, 1):
-        sys.stdout.write(f"\r[{i}/{len(persons)}] Searching '{person['full_name']}'...")
-        sys.stdout.flush()
+    print(f"Persons to search: {total}")
 
-        match = search_wikidata(person["full_name"], person["gender"], person["birth_year"], person["death_year"])
+    is_new = not out_path.exists()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
 
-        if match:
-            qid, confidence = match
-            results.append({
-                "core_name_norm": person["core_name_norm"],
-                "full_name": person["full_name"],
-                "gender": person["gender"],
-                "birth_year": person["birth_year"],
-                "death_year": person["death_year"],
-                "wikidata_qid": qid,
-                "confidence": confidence,
-                "auto_match": confidence >= args.confidence
-            })
-        else:
-            results.append({
-                "core_name_norm": person["core_name_norm"],
-                "full_name": person["full_name"],
-                "gender": person["gender"],
-                "birth_year": person["birth_year"],
-                "death_year": person["death_year"],
-                "wikidata_qid": None,
-                "confidence": 0.0,
-                "auto_match": False
-            })
+    n_matched = n_unmatched = n_written = 0
 
-        # Rate limit: 1 request per second to be polite to Wikidata
-        time.sleep(1)
+    with open(out_path, "a", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=HEADER)
+        if is_new:
+            writer.writeheader()
 
-    sys.stdout.write("\n")
+        for i, person in enumerate(persons, 1):
+            print(f"[{i:>3}/{total}] {person['full_name']}", end=" … ", flush=True)
 
-    # Output CSV
-    output_file = sys.stdout if not args.output else open(args.output, "w")
+            try:
+                match = search_wikidata(
+                    person["full_name"], person["gender"],
+                    person["birth_year"], person["death_year"]
+                )
+            except Exception as e:
+                # API error — skip CSV write so this entry is retried next run
+                print(f"ERROR: {e}", file=sys.stderr)
+                continue
 
-    # Write header
-    output_file.write("core_name_norm,full_name,gender,birth_year,death_year,wikidata_qid,confidence,auto_match\n")
+            if match:
+                qid, confidence = match
+                auto = confidence >= args.confidence
+                print(f"{qid}  conf={confidence:.2f}  {'✓ auto' if auto else 'manual'}")
+                n_matched += 1
 
-    # Write rows
-    for result in results:
-        output_file.write(
-            f"{result['core_name_norm']},"
-            f"{result['full_name']},"
-            f"{result['gender'] or ''},"
-            f"{result['birth_year'] or ''},"
-            f"{result['death_year'] or ''},"
-            f"{result['wikidata_qid'] or ''},"
-            f"{result['confidence']:.2f},"
-            f"{result['auto_match']}\n"
-        )
+                writer.writerow({
+                    "core_name_norm": person["core_name_norm"],
+                    "full_name":      person["full_name"],
+                    "wikidata_qid":   qid,
+                    "confidence":     f"{confidence:.2f}",
+                    "auto_match":     auto,
+                })
+                f.flush()
 
-    if args.output:
-        output_file.close()
-        print(f"\n✓ Results written to {args.output}")
+                if auto and not args.dry_run:
+                    cursor.execute(
+                        "UPDATE persons SET wikidata_qid=? WHERE core_name_norm=?",
+                        (qid, person["core_name_norm"])
+                    )
+                    conn.commit()
+                    n_written += 1
+            else:
+                print("no match")
+                n_unmatched += 1
+                writer.writerow({
+                    "core_name_norm": person["core_name_norm"],
+                    "full_name":      person["full_name"],
+                    "wikidata_qid":   "",
+                    "confidence":     "0.00",
+                    "auto_match":     False,
+                })
+                f.flush()
 
-    # Summary
-    auto_matched = sum(1 for r in results if r["auto_match"])
-    manual_review = sum(1 for r in results if r["wikidata_qid"] and not r["auto_match"])
-    unmatched = sum(1 for r in results if not r["wikidata_qid"])
-
-    print(f"\nSummary:")
-    print(f"  Auto-matched (confidence ≥ {args.confidence:.2f}): {auto_matched}")
-    print(f"  Manual review required: {manual_review}")
-    print(f"  No match found: {unmatched}")
+            time.sleep(2)
 
     conn.close()
+
+    print(f"\nDone — matched: {n_matched}, unmatched: {n_unmatched}")
+    if not args.dry_run:
+        print(f"QIDs written to DB (conf ≥ {args.confidence:.2f}): {n_written}")
+    print(f"Audit CSV: {out_path}")
+
+    if n_matched - n_written:
+        print(f"Manual review needed ({n_matched - n_written} rows): open {out_path} and filter auto_match=False")
+
 
 if __name__ == "__main__":
     main()
