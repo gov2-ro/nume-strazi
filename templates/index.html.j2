@@ -9,19 +9,214 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400;1,8..60,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
-    /* Design system — will be expanded in Task 2 */
-    :root {
-      --bg: #FAF8F3;
-      --ink: #15171A;
-      --muted: #6E6E70;
-      --rule: #DDDCD7;
-      --wash: #EEEAE0;
-      --accent: #C04F35;
-    }
-    body { margin: 0; background: var(--bg); color: var(--ink); }
+:root {
+  --bg: #FAF8F3;
+  --ink: #15171A;
+  --muted: #6E6E70;
+  --rule: #DDDCD7;
+  --wash: #EEEAE0;
+  --accent: #C04F35;
+  --serif: 'Source Serif 4', Georgia, serif;
+  --sans: 'Inter', system-ui, sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--serif);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Nav */
+.site-nav {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--bg);
+  border-bottom: 1px solid var(--rule);
+  padding: 14px 36px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--sans);
+  font-size: 11.5px;
+  letter-spacing: .06em;
+}
+.site-nav .brand {
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+.site-nav nav { display: flex; gap: 22px; }
+.site-nav nav a { color: var(--muted); text-decoration: none; }
+.site-nav nav a:hover { color: var(--ink); }
+
+/* Section wrapper */
+.section {
+  padding: 64px 80px 48px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.section + .section { border-top: 1px solid var(--rule); }
+
+/* Section source footer */
+.section-source {
+  font-family: var(--sans);
+  font-size: 11px;
+  color: var(--muted);
+  border-top: 1px solid var(--rule);
+  padding: 14px 80px;
+  display: flex;
+  justify-content: space-between;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Typography */
+.kicker {
+  font-family: var(--sans);
+  font-size: 11px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 500;
+  margin-bottom: 22px;
+}
+h1, h2, h3 { font-weight: 500; letter-spacing: -.012em; }
+h1 { font-size: 56px; line-height: 1.1; margin-bottom: 28px; }
+h2 { font-size: 42px; line-height: 1.1; margin-bottom: 20px; }
+h3 { font-size: 26px; line-height: 1.15; margin-bottom: 14px; }
+.accent { color: var(--accent); }
+
+.lede {
+  font-size: 18px;
+  line-height: 1.55;
+  font-style: italic;
+  color: #3A3A3D;
+  max-width: 680px;
+  margin-bottom: 40px;
+}
+
+/* Chip toggles */
+.chip-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 24px; padding-bottom: 18px;
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--sans); font-size: 11px;
+}
+.chip-row .label {
+  letter-spacing: .12em; text-transform: uppercase;
+  font-weight: 500; color: var(--muted);
+}
+.chip {
+  font-family: var(--sans); font-size: 12px;
+  color: var(--muted);
+  padding: 5px 13px;
+  border: 1px solid var(--rule); border-radius: 999px;
+  background: transparent; cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.chip:hover, .chip.active {
+  color: var(--bg); background: var(--ink); border-color: var(--ink);
+}
+
+/* Tag pills */
+.tag {
+  font-family: var(--sans); font-size: 10px;
+  color: var(--muted); background: var(--wash);
+  padding: 2px 7px; border-radius: 999px;
+  margin-left: 8px; vertical-align: middle;
+}
+.tag.person { background: #F4E8E5; color: #B8432F; }
+
+/* Rank list */
+.rank-list { display: flex; flex-direction: column; }
+.rank-header {
+  display: grid;
+  grid-template-columns: 36px 1fr 220px 56px;
+  gap: 14px; align-items: center;
+  padding-bottom: 10px;
+  border-bottom: 1.5px solid var(--ink);
+  font-family: var(--sans); font-size: 10px;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--muted); font-weight: 500;
+}
+.rank-row {
+  display: grid;
+  grid-template-columns: 36px 1fr 220px 56px;
+  align-items: center; gap: 14px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--wash);
+}
+.rank-row:last-child { border-bottom: none; }
+.rank-num {
+  font-family: var(--sans); font-size: 11px;
+  color: var(--muted); text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.rank-name { font-family: var(--serif); font-size: 16px; }
+.rank-count {
+  font-family: var(--sans); font-size: 12px;
+  color: var(--muted); text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Bar */
+.bar-wrap {
+  height: 6px; background: var(--wash);
+  border-radius: 1px; position: relative;
+}
+.bar {
+  position: absolute; left: 0; top: 0;
+  height: 100%; border-radius: 1px;
+  background: var(--ink); opacity: .4;
+}
+.bar.accent { background: var(--accent); opacity: .65; }
+.bar.female { background: var(--accent); opacity: .5; }
+
+/* Callout box */
+.callout {
+  border-left: 3px solid var(--accent);
+  padding: 12px 18px;
+  margin-bottom: 28px;
+  font-family: var(--serif); font-size: 14px;
+  font-style: italic; color: #3A3A3D;
+}
+.callout strong { font-style: normal; color: var(--ink); }
+
+/* Mobile */
+@media (max-width: 768px) {
+  .section { padding: 48px 24px 36px; }
+  .section-source { padding: 12px 24px; }
+  .site-nav { padding: 12px 20px; }
+  .site-nav nav { display: none; }
+  h1 { font-size: 34px; }
+  h2 { font-size: 28px; }
+  .lede { font-size: 16px; }
+}
   </style>
 </head>
 <body>
-  <p>Scaffold OK — {{ section1.total_streets }} adrese</p>
+
+<nav class="site-nav">
+  <a href="#acasa" class="brand">Cum ne numim străzile</a>
+  <nav>
+    <a href="#acasa">Acasă</a>
+    <a href="#cele-mai-intalnite">Cele mai întâlnite</a>
+    <a href="#pe-cine-onoram">Pe cine onorăm</a>
+    <a href="#recunoastere">Recunoaștere</a>
+    <a href="#tematica">Tematică</a>
+    <a href="#harta">Harta</a>
+    <a href="#renumiri">Renumiri</a>
+    <a href="#curiozitati">Curiozități</a>
+  </nav>
+</nav>
+
+<p style="padding:40px 80px;font-family:var(--sans);color:var(--muted)">
+  Build scaffold · {{ section1.total_streets }} adrese
+</p>
+
 </body>
 </html>
