@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 # build_site.py
 import argparse
-import json
-import os
 import shutil
-import sqlite3
 from pathlib import Path
 
 import jinja2

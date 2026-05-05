@@ -13,7 +13,4 @@ def test_build_runs_and_produces_output():
     assert Path("dist/index.html").exists()
     html = Path("dist/index.html").read_text(encoding="utf-8")
     assert "adrese" in html
-
-
-def test_counties_geojson_copied():
     assert Path("dist/ro-counties.geojson").exists()
