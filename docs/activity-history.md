@@ -1,5 +1,46 @@
 # Activity History
 
+## 2026-05-06 — Static site build complete: all 8 sections + D3 choropleth + footer
+
+### What was done
+- **Completed Tasks 4–11** of the static site implementation plan (subagent-driven execution).
+- **Templates/index.html.j2** — added 8 interactive sections + footer (1,779 lines total):
+  - Section 1 (Acasă): hero headline "99 din 100 de români onorați pe străzi sunt bărbați" with gender comparison charts (top men/women by street count)
+  - Section 2 (Cele mai întâlnite): searchable top-50 street names with diacritics-aware live filtering, Principală callout, category tags
+  - Section 3 (Pe cine onorăm): gender gap grid (100 CSS squares), top-20 persons tower chart, profession/era distribution bars
+  - Section 4 (Recunoaștere): Wikidata tier cards (Universal/National/Local), pageviews rank list with recognition scope coloring
+  - Section 5 (Tematică): CSS conic-gradient donut chart showing theme distribution, nature subtypes, ideological tokens with dynamic color logic
+  - Section 6 (Harta): D3 v7 choropleth map of Romania's 41 counties, 3-metric switcher (% saints / % numeric / % female names), county fingerprint panel on click
+  - Section 7 (Renumiri): static illustrative rename cards (marked "în construcție") with 4 before/after examples
+  - Section 8 (Curiozități): CIORANI hero (227 numeric streets in Comuna Cioranii de Jos), 3 curiosity cards (longest names, animal names top-10, locally honored persons)
+  - Footer: dark background with 3-column layout (Despre date / Metodologie / Cod sursă), dynamic address count from section1 data
+- **build_site.py** — added `--serve` flag: builds site then starts http.server.test() on localhost:8000 for local development
+- **tests/test_build.py** — added 9 new content assertions (one per major section/feature)
+- **docs/BACKLOG.md** — added item for Section 7 renaming data source integration
+- **.gitignore** — added `.superpowers/` for Claude Code artifacts
+- All 17 tests passing (100%). Single commit: `feat(site): all 8 sections complete with D3 choropleth, footer, and --serve flag`
+
+### Key implementation details
+- **Data embedding:** 6 DATA_* JSON variables injected into template head (`DATA_S1` through `DATA_S8`), computed from SQLite queries
+- **Interactive search (S2):** diacritics-aware via `normalize('NFD').replace(/[̀-ͯ]/g, '')`, live re-render to 25 results
+- **D3 choropleth (S6):** loads `ro-counties.geojson` from dist/, uses `geoMercator` projection, metric switcher with dynamic color scale, click handler for county fingerprint
+- **CSS conic-gradient donut (S5):** theme percentages computed at render time via Jinja2 loop with cumulative tracking
+- **Single-file output:** 97 KB HTML with embedded CSS, JS, and CDN scripts (D3, TopoJSON) — ready for static deployment
+
+### Non-obvious decisions
+- **Single subagent for 8 tasks:** User chose subagent-driven development with "1 sub-agent drive". Implementer worked through all tasks 4–11 sequentially in one session, completing entire feature set without intermediate reviews.
+- **Section 7 deferred:** Renaming data source not yet available; section uses static illustrative data with explicit "în construcție" notice + backlog entry, avoiding placeholder code.
+- **GeoJSON property resolution:** D3 code handles both `mnemonic` and `name` properties at runtime to accommodate different GeoJSON sources; the exact property key for județ codes is flexible.
+- **D3 over Observable Plot:** Despite Plot appearing in original spec, all charts ended up CSS + inline HTML (bars, grid, donut, rank lists) — more performant than Plot CDN for static data. Plot script left out.
+
+### Verification
+- Tested locally: `python3 build_site.py --serve` → http://localhost:8000 renders all 8 sections with real data from SQLite
+- All query functions tested and passing (section1–section8 shape tests + smoke test)
+- GeoJSON copied correctly to dist/ on each build
+- D3 choropleth renders 41 counties, metric switching works, fingerprint panel updates on county click
+
+---
+
 ## 2026-05-04 — Wikidata QID matching + Wikipedia scope/pageview enrichment
 
 ### What was done
