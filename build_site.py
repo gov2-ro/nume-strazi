@@ -50,8 +50,15 @@ def build(db_path: str = DB_PATH) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build street names static site")
     parser.add_argument("--db", default=DB_PATH)
+    parser.add_argument("--serve", action="store_true", help="Build then serve on localhost:8000")
     args = parser.parse_args()
     build(db_path=args.db)
+    if args.serve:
+        import http.server
+        import os
+        os.chdir("dist")
+        print("Serving at http://localhost:8000 …")
+        http.server.test(HandlerClass=http.server.SimpleHTTPRequestHandler, port=8000, bind="127.0.0.1")
 
 
 if __name__ == "__main__":

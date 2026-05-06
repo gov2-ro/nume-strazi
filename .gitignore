@@ -24,3 +24,6 @@ __pycache__/
 
 # Static site build output
 dist/
+
+# Claude Code superpowers
+.superpowers/
