@@ -1,5 +1,6 @@
 _obsolete
 */_obsolete*
+.playwright-mcp/*
 data
 data/*
 # Generated database — rebuild with build_db.py
