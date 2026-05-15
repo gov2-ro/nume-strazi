@@ -7,13 +7,21 @@ high-confidence matches. Idempotent: re-running skips already-processed keys.
 
 Usage:
     python3 tools/wikidata_persons.py [--limit N] [--out FILE] [--confidence THRESHOLD] [--db PATH]
+    python3 tools/wikidata_persons.py --replay-csv [--out FILE] [--db PATH] [--dry-run]
 
-Options:
+Search mode options:
     --limit N            Only process first N unmatched persons (default: all)
     --out FILE           Audit CSV path (default: data/curation/wikidata_qids.csv)
     --confidence THRESH  Auto-match threshold (0.0–1.0, default: 0.95)
     --db PATH            SQLite DB path (default: data/streets.db)
     --dry-run            Print matches without writing to DB
+
+Replay mode (--replay-csv):
+    Reads all auto_match=True rows from the CSV and applies them to the DB.
+    Use this after a full rebuild to restore manually curated QIDs without
+    re-running the Wikidata search. Skips rows already set correctly.
+    Warns and skips on QID conflicts by default; use --force to overwrite
+    (needed after rebuild because seed scripts may load stale QIDs).
 """
 
 import csv
@@ -122,8 +130,94 @@ def get_entity_details(qid: str) -> Optional[dict]:
         return None
 
 
+def replay_from_csv(csv_path: Path, conn: sqlite3.Connection, cursor: sqlite3.Cursor,
+                    dry_run: bool, force: bool) -> None:
+    """
+    Apply all auto_match=True rows from the audit CSV to the DB.
+    Idempotent: rows already set to the correct QID are silently skipped.
+
+    force=False (default): warn and skip when the DB already holds a different QID.
+    force=True: overwrite conflicts — use after a rebuild when seed scripts may
+                have loaded stale/unverified QIDs that the CSV should supersede.
+                Still skips duplicate-QID collisions (two keys → same QID).
+    """
+    if not csv_path.exists():
+        print(f"Error: {csv_path} not found", file=sys.stderr)
+        sys.exit(1)
+
+    confirmed = [
+        row for row in csv.DictReader(open(csv_path, newline="", encoding="utf-8"))
+        if row["auto_match"] == "True" and row["wikidata_qid"]
+    ]
+
+    print(f"Replaying {len(confirmed)} confirmed QIDs from {csv_path.name}…")
+    if force:
+        print("  (--force: will overwrite conflicting QIDs)")
+
+    applied = already_set = skipped_conflict = skipped_missing = overwrote = 0
+
+    for row in confirmed:
+        key = row["core_name_norm"]
+        qid = row["wikidata_qid"]
+
+        # LIKE is case-insensitive for ASCII in SQLite; guards against manual
+        # CSV edits that introduced wrong capitalisation for the lookup key.
+        current = cursor.execute(
+            "SELECT core_name_norm, wikidata_qid FROM persons WHERE core_name_norm LIKE ?", (key,)
+        ).fetchone()
+
+        if current is None:
+            skipped_missing += 1
+            continue
+
+        # Use the DB's canonical key for the UPDATE so it always hits.
+        key = current[0]
+        db_qid = current[1]
+
+        if db_qid == qid:
+            already_set += 1
+            continue
+
+        if db_qid is not None and db_qid != qid:
+            if not force:
+                print(f"  ⚠ conflict — DB has {db_qid}, CSV has {qid}: {key}")
+                skipped_conflict += 1
+                continue
+            # force mode: overwrite, but still run uniqueness guard below
+            print(f"  ~ overwrite {db_qid} → {qid}: {key}")
+            overwrote += 1
+
+        # Uniqueness guard: reject if QID is already owned by a different key
+        dupe = cursor.execute(
+            "SELECT core_name_norm FROM persons WHERE wikidata_qid = ? AND core_name_norm != ?",
+            (qid, key)
+        ).fetchone()
+        if dupe:
+            print(f"  ⚠ duplicate QID {qid} already on '{dupe[0]}', skipping: {key}")
+            skipped_conflict += 1
+            continue
+
+        if db_qid is None:
+            print(f"  {key} → {qid}")
+        if not dry_run:
+            cursor.execute("UPDATE persons SET wikidata_qid=? WHERE core_name_norm=?", (qid, key))
+        applied += 1
+
+    if not dry_run and applied:
+        conn.commit()
+
+    label = "[dry-run] would apply" if dry_run else "Applied"
+    parts = [f"{label}: {applied}", f"already set: {already_set}"]
+    if overwrote:
+        parts.append(f"overwrote: {overwrote}")
+    parts.append(f"skipped (conflict/missing): {skipped_conflict + skipped_missing}")
+    print(f"\n{'  |  '.join(parts)}")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--replay-csv", action="store_true",                                 help="Apply confirmed CSV rows to DB (rebuild restore mode)")
+    parser.add_argument("--force",      action="store_true",                                 help="With --replay-csv: overwrite conflicting QIDs (use after rebuild)")
     parser.add_argument("--limit",      type=int,   default=None,                            help="Only process first N unmatched persons")
     parser.add_argument("--out",        default="data/curation/wikidata_qids.csv",           help="Audit CSV path")
     parser.add_argument("--confidence", type=float, default=0.95,                            help="Auto-match threshold (default: 0.95)")
@@ -136,6 +230,13 @@ def main():
         sys.exit(1)
 
     out_path = Path(args.out)
+
+    if args.replay_csv:
+        conn = sqlite3.connect(args.db)
+        conn.row_factory = sqlite3.Row
+        replay_from_csv(out_path, conn, conn.cursor(), args.dry_run, args.force)
+        conn.close()
+        return
 
     # Resume support: skip keys already written to the audit CSV
     processed: set[str] = set()

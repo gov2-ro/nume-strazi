@@ -79,6 +79,12 @@ python3 seed_lookups.py
 python3 tools/seed_top500.py
 python3 tools/seed_batch2.py
 
+# Restore manually curated QIDs after rebuild (authoritative: data/curation/wikidata_qids.csv)
+python3 tools/wikidata_persons.py --replay-csv --force
+
+# Restore wiki scope/sitelinks (run in batches of ~40 to avoid rate limiting; see wiki_scope.py)
+python3 tools/wiki_scope.py --limit 40   # repeat until no output
+
 # Run all named queries from docs/queries.sql
 python3 run_queries.py
 
