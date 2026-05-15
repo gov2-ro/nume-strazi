@@ -848,11 +848,19 @@ h3 { font-size: 26px; line-height: 1.15; margin-bottom: 14px; }
     // Remove old rows (keep header)
     while (list.children.length > 1) list.removeChild(list.lastChild);
 
+    const CAT_RO = {
+      'persoană':'persoană','natură':'natură','religios':'religios','dată':'dată',
+      'religious':'religios','ideological':'ideologic','abstract':'abstract',
+      'institutional':'instituțional','trade':'meșteșug','occupational':'ocupațional',
+      'commemorative':'comemorativ','mythology':'mitologie','infrastructure':'infrastructură',
+      'place':'loc','category':'categorie',
+    };
     filtered.slice(0, 25).forEach((row, i) => {
       const pct = Math.round(row.street_count / maxCount * 100);
       const isPerson = row.category === 'persoană';
+      const catLabel = CAT_RO[row.category] || row.category;
       const tag = row.category !== 'altele'
-        ? `<span class="tag${isPerson ? ' person' : ''}">${row.category}</span>` : '';
+        ? `<span class="tag${isPerson ? ' person' : ''}">${catLabel}</span>` : '';
       const barClass = isPerson ? 'bar accent' : 'bar';
       list.insertAdjacentHTML('beforeend', `
         <div class="rank-row">
