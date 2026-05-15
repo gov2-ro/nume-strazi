@@ -1,5 +1,20 @@
 # Activity History
 
+## 2026-05-15 — Manual QID review: 300 persons now matched to Wikidata
+
+### What was done
+- **Committed QID uniqueness guard** in `tools/wikidata_persons.py` — before writing a QID auto-match, the tool now checks if that QID is already assigned to a different `core_name_norm`. Duplicate is logged, written to CSV with `auto_match=False` and blank QID, and skipped.
+- **Resolved all 43 `auto_match=False` rows** from `data/curation/wikidata_qids.csv`. Prior count was 248 matched; now 300 out of 310 persons have verified Wikidata QIDs. 10 remain without (folklore/legendary figures with no Wikidata entity, disambiguation cases, and hyper-local persons).
+- **Corrected two wrong QIDs from the tool's 0.70-confidence suggestions:** `c.i. parhon` (was Q52452470 = a scientific article, corrected to Q612177 = Constantin Ion Parhon) and `Ioan ratiu` (was Q12723573 = a memorial house, corrected to Q14543073 = Ioan Rațiu the politician).
+- **Updated `data/curation/wikidata_qids.csv`** with all confirmed QIDs set to `auto_match=True, confidence=1.00`, so they can be replayed after a DB rebuild (pending `--replay-csv` flag in `wikidata_persons.py`).
+- **Backlog:** marked manual QID review as done, marked uniqueness guard as done, added `--replay-csv` flag as next tooling task for rebuild persistence.
+
+### Non-obvious decisions
+- `horia,closca si crisan` (collective street entry): assigned Horea's QID (Q1656593) as the primary figure. Cloșca and Crișan have no dedicated Wikidata entity separate from disambiguation pages.
+- `george baritiu` and `gheorghe baritiu` are stored as separate `core_name_norm` keys but refer to the same person (George Barițiu, Q445042). Both assigned the same QID. Deduplication of person identities is a separate future task.
+- 10 final no-QID persons: `closca`, `banu maracine`, `voinicului`, `brates`, `nicovalei`, `iosif sarbu`, `ion arion`, `eugen hulea`, `aleea sf. eugeniu`, `mos ion roata`. These are genuinely not findable on Wikidata or are multi-meaning disambiguation targets.
+- Used Wikipedia API (`wbpageprops` endpoint) to get QIDs for persons the Wikidata search couldn't find due to name collisions with Romanian communes (Avram Iancu, Cloșca).
+
 ## 2026-05-06 — Static site build complete: all 8 sections + D3 choropleth + footer
 
 ### What was done
