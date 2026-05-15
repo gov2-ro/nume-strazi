@@ -228,7 +228,9 @@ h3 { font-size: 26px; line-height: 1.15; margin-bottom: 14px; }
 <section id="acasa">
   <div class="section">
     <div class="kicker">Un portret al memoriei naționale</div>
-    <h1><span class="accent">99 din 100</span> de români onorați pe străzi sunt bărbați.</h1>
+    {% set total_gendered = section1.total_persons_m + section1.total_persons_f %}
+    {% set male_pct = (section1.total_persons_m / total_gendered * 100) | round | int if total_gendered else 99 %}
+    <h1><span class="accent">{{ male_pct }} din 100</span> de români onorați pe străzi sunt bărbați.</h1>
     <p class="lede">
       Asta arată registrul electoral al țării — {{ "{:,.0f}".format(section1.total_streets).replace(",", ".") }} de adrese, în 41 de județe.
       Cine sunt acei bărbați, ce profesii au, în ce epoci au trăit? Și cine sunt cele {{ section1.total_persons_f }} de femei? Să vedem.
@@ -391,10 +393,20 @@ h3 { font-size: 26px; line-height: 1.15; margin-bottom: 14px; }
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:56px;border-top:1px solid var(--rule);padding-top:36px;margin-top:36px;">
       <div>
         <div class="kicker" style="margin-bottom:18px;">Profesia persoanei onorate</div>
+        {% set prof_ro = {
+          'writer':'scriitor','poet':'poet','politician':'politician',
+          'voievod':'voievod','revolutionary':'revoluționar','military':'militar',
+          'royalty':'rege / regină','scientist':'om de știință','painter':'pictor',
+          'ruler':'conducător','historian':'istoric','composer':'compozitor',
+          'engineer':'inginer','educator':'pedagog','clergy':'cleric',
+          'philosopher':'filosof','actor':'actor','architect':'arhitect',
+          'doctor':'medic','economist':'economist','jurist':'jurist',
+          'linguist':'lingvist','mathematician':'matematician','lawyer':'avocat'
+        } %}
         {% set max_prof = section3.profession_dist[0].n if section3.profession_dist else 1 %}
         {% for row in section3.profession_dist %}
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:9px;">
-          <span style="font-family:var(--serif);font-size:15px;flex:1;">{{ row.profession }}</span>
+          <span style="font-family:var(--serif);font-size:15px;flex:1;">{{ prof_ro.get(row.profession, row.profession) }}</span>
           <div class="bar-wrap" style="width:140px;height:5px;">
             <div class="bar" style="width:{{ (row.n / max_prof * 100)|int }}%"></div>
           </div>
@@ -404,10 +416,15 @@ h3 { font-size: 26px; line-height: 1.15; margin-bottom: 14px; }
       </div>
       <div>
         <div class="kicker" style="margin-bottom:18px;">Epoca în care a trăit</div>
+        {% set era_ro = {
+          'ancient':'antichitate','medieval':'medieval','premodern':'premodern (1700–1900)',
+          '1848':'generația de la 1848','interwar':'interbelic (1900–1947)',
+          'communist':'comunism (1947–1989)'
+        } %}
         {% set max_era = section3.era_dist[0].n if section3.era_dist else 1 %}
         {% for row in section3.era_dist %}
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:9px;">
-          <span style="font-family:var(--serif);font-size:15px;flex:1;">{{ row.era or 'necunoscută' }}</span>
+          <span style="font-family:var(--serif);font-size:15px;flex:1;">{{ era_ro.get(row.era, row.era or 'necunoscută') }}</span>
           <div class="bar-wrap" style="width:140px;height:5px;">
             <div class="bar" style="width:{{ (row.n / max_era * 100)|int }}%"></div>
           </div>
@@ -427,7 +444,7 @@ h3 { font-size: 26px; line-height: 1.15; margin-bottom: 14px; }
 <section id="recunoastere">
   <div class="section">
     <div class="kicker">Recunoaștere</div>
-    <h2>Unii sunt cunoscută în toată lumea. Alții, doar în sat.</h2>
+    <h2>Unii sunt cunoscuți în toată lumea. Alții, doar în sat.</h2>
     <p class="lede">
       Wikidata arată câte limbi vorbesc despre fiecare persoană onorată.
       Din {{ section4.tier_counts.universal + section4.tier_counts.national + section4.tier_counts.local }} persoane cu date Wikidata,
@@ -528,10 +545,18 @@ h3 { font-size: 26px; line-height: 1.15; margin-bottom: 14px; }
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:56px;border-top:1px solid var(--rule);padding-top:36px;">
       <div>
         <div class="kicker" style="margin-bottom:18px;">Subtipuri · Natură</div>
+        {% set nature_ro = {
+          'flower':'flori','tree':'copaci','water':'apă','plant':'plante',
+          'bird':'păsări','sky':'cer','geography':'geografie','forest':'pădure',
+          'meadow':'câmpie','season':'anotimpuri','animal':'animale',
+          'weather':'vreme','fruit':'fructe','field':'câmp','hill':'deal',
+          'orchard':'livadă','valley':'vale','peak':'vârf','mountain':'munte',
+          'mountain_peak':'vârf de munte'
+        } %}
         {% set max_n = section5.nature_subtypes[0].n if section5.nature_subtypes else 1 %}
         {% for row in section5.nature_subtypes %}
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:9px;">
-          <span style="font-family:var(--serif);font-size:15px;flex:1;">{{ row.nature_type }}</span>
+          <span style="font-family:var(--serif);font-size:15px;flex:1;">{{ nature_ro.get(row.nature_type, row.nature_type) }}</span>
           <div class="bar-wrap" style="width:160px;height:5px;"><div class="bar" style="width:{{ (row.n / max_n * 100)|int }}%;background:#A0826A;opacity:.7;"></div></div>
           <span style="font-family:var(--sans);font-size:11px;color:var(--muted);width:30px;text-align:right;">{{ row.n }}</span>
         </div>
@@ -539,10 +564,21 @@ h3 { font-size: 26px; line-height: 1.15; margin-bottom: 14px; }
       </div>
       <div>
         <div class="kicker" style="margin-bottom:14px;">Tokeni ideologici</div>
+        {% set ideo_ro = {
+          'victory':'victorie','national_day':'zi națională','brotherhood':'frăție',
+          'youth':'tinerețe','workers':'muncitori','unification':'unire',
+          'triumph':'triumf','solidarity':'solidaritate','revolution':'revoluție',
+          'republic':'republică','rebirth':'renaștere','progress':'progres',
+          'peace':'pace','liberation':'eliberare','labor':'muncă',
+          'independence':'independență','homeland':'patrie','glory':'glorie',
+          'freedom':'libertate','fraternity':'frăternitate','equality':'egalitate',
+          'emancipation':'emancipare','democracy':'democrație','cooperative':'cooperativă',
+          'communist_press':'presă comunistă','commemorative':'comemorativ'
+        } %}
         <div style="display:flex;flex-wrap:wrap;gap:8px;">
           {% for tok in section5.ideo_tokens %}
           <span style="font-family:var(--sans);font-size:12.5px;padding:5px 13px;border:1px solid {{ 'var(--accent)' if tok.n > 30 else 'var(--rule)' }};border-radius:3px;color:{{ '#B8432F' if tok.n > 30 else 'var(--ink)' }};background:{{ '#FDF4F2' if tok.n > 30 else 'transparent' }};">
-            {{ tok.token }} <span style="color:var(--muted);font-size:10.5px;margin-left:6px;">{{ tok.n }}</span>
+            {{ ideo_ro.get(tok.token, tok.token) }} <span style="color:var(--muted);font-size:10.5px;margin-left:6px;">{{ tok.n }}</span>
           </span>
           {% endfor %}
         </div>
@@ -768,7 +804,7 @@ h3 { font-size: 26px; line-height: 1.15; margin-bottom: 14px; }
     <div>
       <div style="font-family:var(--sans);font-size:10px;letter-spacing:.18em;text-transform:uppercase;font-weight:600;color:var(--accent);margin-bottom:14px;">Metodologie</div>
       <p style="font-family:var(--serif);font-size:14px;line-height:1.65;color:#C9C9CB;">
-        Clasificarea persoanelor și temelor: curation manual și LLM batch (Claude Sonnet).
+        Clasificarea persoanelor și temelor: curation manual și LLM batch (Claude Haiku + Gemini).
         Recunoaștere: Wikidata + Wikipedia pageviews.
         Harta: GeoJSON județe din surse publice.
       </p>
@@ -877,7 +913,7 @@ h3 { font-size: 26px; line-height: 1.15; margin-bottom: 14px; }
     document.getElementById('s6-scale-label').textContent = metricLabels[metric];
 
     d3.selectAll('.judet-path').attr('fill', d => {
-      const code = d.properties?.mnemonic || d.properties?.name;
+      const code = d.properties?.cod;
       const row = byJudet[code];
       return row ? colorScale(row[metric] || 0) : '#EEEAE0';
     });
@@ -920,7 +956,7 @@ h3 { font-size: 26px; line-height: 1.15; margin-bottom: 14px; }
     });
 
   function renderFingerprint(feature) {
-    const code = feature.properties?.mnemonic || feature.properties?.name;
+    const code = feature.properties?.cod;
     const row = byJudet[code] || {};
     const fp = document.getElementById('s6-fingerprint');
     fp.innerHTML = `
