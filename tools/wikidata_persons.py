@@ -194,25 +194,44 @@ def main():
             if match:
                 qid, confidence = match
                 auto = confidence >= args.confidence
-                print(f"{qid}  conf={confidence:.2f}  {'✓ auto' if auto else 'manual'}")
-                n_matched += 1
 
-                writer.writerow({
-                    "core_name_norm": person["core_name_norm"],
-                    "full_name":      person["full_name"],
-                    "wikidata_qid":   qid,
-                    "confidence":     f"{confidence:.2f}",
-                    "auto_match":     auto,
-                })
-                f.flush()
+                # Uniqueness guard: check if this QID is already assigned to a different person
+                cursor.execute(
+                    "SELECT core_name_norm FROM persons WHERE wikidata_qid = ? AND core_name_norm != ?",
+                    (qid, person["core_name_norm"])
+                )
+                existing = cursor.fetchone()
+                if existing:
+                    print(f"{qid}  conf={confidence:.2f}  ⚠ DUPLICATE QID (already assigned to '{existing[0]}')")
+                    n_matched += 1
+                    writer.writerow({
+                        "core_name_norm": person["core_name_norm"],
+                        "full_name":      person["full_name"],
+                        "wikidata_qid":   "",
+                        "confidence":     f"{confidence:.2f}",
+                        "auto_match":     False,
+                    })
+                    f.flush()
+                else:
+                    print(f"{qid}  conf={confidence:.2f}  {'✓ auto' if auto else 'manual'}")
+                    n_matched += 1
 
-                if auto and not args.dry_run:
-                    cursor.execute(
-                        "UPDATE persons SET wikidata_qid=? WHERE core_name_norm=?",
-                        (qid, person["core_name_norm"])
-                    )
-                    conn.commit()
-                    n_written += 1
+                    writer.writerow({
+                        "core_name_norm": person["core_name_norm"],
+                        "full_name":      person["full_name"],
+                        "wikidata_qid":   qid,
+                        "confidence":     f"{confidence:.2f}",
+                        "auto_match":     auto,
+                    })
+                    f.flush()
+
+                    if auto and not args.dry_run:
+                        cursor.execute(
+                            "UPDATE persons SET wikidata_qid=? WHERE core_name_norm=?",
+                            (qid, person["core_name_norm"])
+                        )
+                        conn.commit()
+                        n_written += 1
             else:
                 print("no match")
                 n_unmatched += 1
