@@ -1,5 +1,18 @@
 # Activity History
 
+## 2026-05-15 — Multi-provider LLM classifier + convergence tool
+
+### What was done
+- Refactored `tools/llm_classify.py` to support three providers via `--model MODEL` flag. Provider auto-detected from model name: `claude-*` → Anthropic SDK, `gemini-*` → Google REST API (raw urllib, no extra SDK), `<org>/<model>` → OpenRouter (urllib). Default unchanged (`claude-haiku-4-5-20251001`).
+- `--out` now defaults to `data/curation/llm_<model-slug>.csv` (slug strips org prefix and YYYYMMDD date suffix), so parallel runs with different models write to separate files automatically.
+- Added `--sleep` flag for rate-limit control (Google free tier needs ~4s between batches).
+- Added `tools/llm_compare.py`: loads two output CSVs, reports agreement rate on the `table` field, lists disagreements sorted by frequency, and shows keys only in one file.
+- Updated CLAUDE.md layout and common commands sections.
+
+### Non-obvious decisions
+- Used raw urllib for Google (Gemini REST API) instead of `google-generativeai` SDK — the SDK isn't installed and the REST API is simple enough. Avoids a new dependency.
+- Kept Anthropic on the native SDK (not OpenRouter) so existing `ANTHROPIC_API_KEY` workflows require no changes.
+
 ## 2026-05-15 — Fix wrong QIDs; add --replay-csv to wikidata_persons.py
 
 ### What was done

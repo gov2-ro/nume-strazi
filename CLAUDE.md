@@ -39,7 +39,9 @@ If asked to do something not covered by the above, ask before improvising.
 │   ├── import_csv.py           # upsert classified CSV into lookup tables
 │   ├── seed_top500.py          # batch 1 curation (top-500 keys)
 │   ├── seed_batch2.py          # batch 2 curation
-│   ├── osm_ingest.py           # PBF → osm_streets (needs pyrosm + shapely)
+│   ├── llm_classify.py         # LLM batch classifier (Anthropic/Google/OpenRouter)
+│   ├── llm_compare.py          # compare two llm_classify CSVs for convergence
+│   ├── osm_ingest.py           # PBF → osm_streets (needs osmium + shapely)
 │   ├── osm_match.py            # streets_dedup ↔ osm_streets join
 │   ├── osm_score.py            # importance_v1 = highway × log(length) + ref bonus
 │   └── osm_sanity.py           # top-10 / coverage report for reference UATs
@@ -87,6 +89,14 @@ python3 tools/wiki_scope.py --limit 40   # repeat until no output
 
 # Run all named queries from docs/queries.sql
 python3 run_queries.py
+
+# LLM classification (provider auto-detected from model name)
+# ANTHROPIC_API_KEY / GOOGLE_API_KEY / OPENROUTER_API_KEY must be set
+python3 tools/llm_classify.py --limit 500                              # Haiku (default)
+python3 tools/llm_classify.py --model gemini-2.0-flash-lite --limit 500  # Google
+python3 tools/llm_classify.py --model google/gemini-flash-1.5-8b --limit 500  # OpenRouter
+python3 tools/llm_compare.py data/curation/llm_claude-haiku-4-5.csv \
+                              data/curation/llm_gemini-2.0-flash-lite.csv
 
 # Export top-N unclassified keys for manual curation
 python3 tools/export_unclassified.py --limit 500
