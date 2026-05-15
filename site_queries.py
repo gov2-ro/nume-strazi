@@ -294,10 +294,45 @@ def section6(conn: sqlite3.Connection) -> dict:
             rare_map[j] = []
         rare_map[j].append({"n": r["display_name"], "j": r["judet_count"]})
 
+    persons_rows = _rows(conn, """
+        WITH ranked AS (
+          SELECT sd.judet,
+                 p.full_name,
+                 MAX(p.gender) AS gender,
+                 MAX(p.wiki_scope) AS wiki_scope,
+                 COUNT(*) AS cnt,
+                 ROW_NUMBER() OVER (
+                   PARTITION BY sd.judet ORDER BY COUNT(*) DESC
+                 ) AS rn
+          FROM streets_dedup sd
+          JOIN persons p ON p.core_name_norm = sd.core_name_norm
+          WHERE sd.is_numeric = 0
+          GROUP BY sd.judet, p.full_name
+        )
+        SELECT judet, full_name, gender, wiki_scope, cnt FROM ranked WHERE rn <= 5
+        ORDER BY judet, cnt DESC
+    """)
+    persons_map: dict[str, list] = {}
+    for r in persons_rows:
+        j = r["judet"]
+        if j not in persons_map:
+            persons_map[j] = []
+        persons_map[j].append({
+            "n": r["full_name"],
+            "g": r["gender"],
+            "s": r["wiki_scope"],
+            "c": r["cnt"],
+        })
+
     for row in by_judet:
         row["modal_name"] = modal_map.get(row["judet"], "—")
 
-    return {"by_judet": by_judet, "top_per_judet": top_map, "rare_per_judet": rare_map}
+    return {
+        "by_judet": by_judet,
+        "top_per_judet": top_map,
+        "rare_per_judet": rare_map,
+        "persons_per_judet": persons_map,
+    }
 
 
 def section8(conn: sqlite3.Connection) -> dict:

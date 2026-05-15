@@ -722,6 +722,7 @@ body {
   DATA_S6.by_judet.forEach(d => { byJudet[d.judet] = d; });
   const topPerJudet = DATA_S6.top_per_judet || {};
   const rarePerJudet = DATA_S6.rare_per_judet || {};
+  const personsPerJudet = DATA_S6.persons_per_judet || {};
 
   let activeMetric = 'saint_pct';
   const metricLabels = {
@@ -792,11 +793,25 @@ body {
     const row = byJudet[code] || {};
     const top = topPerJudet[code] || [];
     const rare = rarePerJudet[code] || [];
+    const persons = personsPerJudet[code] || [];
+
+    const scopeDot = s => ({ universal: '🌍', national: '🇷🇴', local: '·' }[s] || '·');
+    const genderDot = g => g === 'F' ? '<span style="color:#C05E8A;">●</span>' : '<span style="color:#4A7FA5;">●</span>';
 
     const topRows = top.map((s, i) =>
       `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--rule);">
         <span style="color:var(--ink);font-weight:${i===0?'600':'400'}">${s.n}</span>
         <span style="color:var(--muted);font-size:11px;">${s.c}</span>
+      </div>`
+    ).join('');
+
+    const personsRows = persons.map((p, i) =>
+      `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--rule);">
+        <span style="display:flex;align-items:center;gap:5px;">
+          ${genderDot(p.g)}
+          <span style="color:var(--ink);font-weight:${i===0?'600':'400'}">${p.n}</span>
+        </span>
+        <span style="color:var(--muted);font-size:11px;">${p.c} ${p.s ? scopeDot(p.s) : ''}</span>
       </div>`
     ).join('');
 
@@ -815,6 +830,9 @@ body {
 
       <div class="kicker" style="margin-bottom:6px;">Cele mai frecvente</div>
       <div style="font-family:var(--sans);font-size:12px;margin-bottom:16px;">${topRows || '<span style="color:var(--muted)">—</span>'}</div>
+
+      <div class="kicker" style="margin-bottom:6px;">Persoane omagiate</div>
+      <div style="font-family:var(--sans);font-size:12px;margin-bottom:16px;">${personsRows || '<span style="color:var(--muted)">—</span>'}</div>
 
       <div class="kicker" style="margin-bottom:6px;">Cele mai rare (unice național)</div>
       <div style="font-family:var(--sans);font-size:12px;">${rareRows || '<span style="color:var(--muted)">—</span>'}</div>
