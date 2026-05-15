@@ -1,5 +1,22 @@
 # Activity History
 
+## 2026-05-15 — streets_classified_pct view + coverage queries
+
+### What was done
+- Added `CREATE VIEW streets_classified_pct` to `build_db.py` (right after `streets_dedup`). One row per distinct `core_name_norm`; columns: `core_name_norm`, `street_count`, `classification` (first matching bucket: numeric/date/saint/person/nature/category/place, or NULL for unclassified).
+- Applied the view to the current DB without a full rebuild (`DROP VIEW IF EXISTS` + `CREATE VIEW`).
+- Added two named queries to `docs/queries.sql`: `classification_coverage` (breakdown by category with street-weighted %) and `classification_coverage_summary` (single-row totals).
+- Marked P1 backlog item as done.
+
+### Coverage numbers at this point
+- 29,302 distinct classified-eligible keys; 1,450 classified (4.9% of keys)
+- 104,236 total streets; 62,382 classified (59.8% by frequency)
+- Largest unclassified mass: 27,852 unique name-keys representing 41,854 streets (the long tail of rare or local street names)
+
+### Non-obvious decisions
+- View uses `MAX(is_numeric/is_date/is_saint)` over the `streets_dedup` group so the flags aggregate correctly across UATs sharing a `core_name_norm`.
+- Priority order in CASE: numeric/date/saint flags first, then lookup table joins. A street flagged `is_saint=1` that also appears in `persons` is counted as `saint`.
+
 ## 2026-05-15 — wiki_scope.py run: recognition scope and pageviews populated for all 300 persons
 
 ### What was done

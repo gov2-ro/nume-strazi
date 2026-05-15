@@ -215,6 +215,40 @@ SELECT MIN(id) AS id, judet, uat, siruta, street_type, name, name_normalized,
 FROM streets
 WHERE name_normalized != ''
 GROUP BY uat, name_normalized;
+
+CREATE VIEW streets_classified_pct AS
+-- One row per distinct core_name_norm (non-null).
+-- classification: first matching bucket; NULL means unclassified.
+-- street_count: number of (uat, name) pairs sharing this core_name_norm.
+-- Query this view grouped by classification for curation coverage reports.
+WITH base AS (
+  SELECT core_name_norm,
+    MAX(is_numeric) AS is_numeric,
+    MAX(is_date)    AS is_date,
+    MAX(is_saint)   AS is_saint,
+    COUNT(*)        AS street_count
+  FROM streets_dedup
+  WHERE core_name_norm IS NOT NULL
+  GROUP BY core_name_norm
+)
+SELECT
+  b.core_name_norm,
+  b.street_count,
+  CASE
+    WHEN b.is_numeric  = 1             THEN 'numeric'
+    WHEN b.is_date     = 1             THEN 'date'
+    WHEN b.is_saint    = 1             THEN 'saint'
+    WHEN p.core_name_norm  IS NOT NULL THEN 'person'
+    WHEN n.core_name_norm  IS NOT NULL THEN 'nature'
+    WHEN c.core_name_norm  IS NOT NULL THEN 'category'
+    WHEN pr.core_name_norm IS NOT NULL THEN 'place'
+    ELSE NULL
+  END AS classification
+FROM base b
+LEFT JOIN persons         p  ON p.core_name_norm  = b.core_name_norm
+LEFT JOIN nature_terms    n  ON n.core_name_norm  = b.core_name_norm
+LEFT JOIN name_categories c  ON c.core_name_norm  = b.core_name_norm
+LEFT JOIN place_refs      pr ON pr.core_name_norm = b.core_name_norm;
 """)
 
 # ---------- ingest ----------

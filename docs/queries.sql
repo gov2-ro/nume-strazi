@@ -320,3 +320,29 @@ WHERE NOT EXISTS (
 )
 ORDER BY o.importance_v1 DESC
 LIMIT 50;
+
+-- Curation coverage: how many distinct core_name_norm keys are classified,
+-- and what percentage of streets (weighted by frequency) they represent.
+-- :name classification_coverage
+SELECT
+  COALESCE(classification, 'unclassified')      AS category,
+  COUNT(*)                                       AS key_count,
+  SUM(street_count)                              AS street_count,
+  ROUND(100.0 * SUM(street_count) /
+    SUM(SUM(street_count)) OVER (), 1)           AS pct_of_streets
+FROM streets_classified_pct
+GROUP BY classification
+ORDER BY street_count DESC;
+
+-- Single-row summary: classified keys and street-weighted coverage %.
+-- :name classification_coverage_summary
+SELECT
+  COUNT(*)                                                               AS total_keys,
+  SUM(CASE WHEN classification IS NOT NULL THEN 1 ELSE 0 END)           AS classified_keys,
+  ROUND(100.0 * SUM(CASE WHEN classification IS NOT NULL THEN 1 ELSE 0 END)
+    / COUNT(*), 1)                                                       AS pct_keys_classified,
+  SUM(street_count)                                                      AS total_streets,
+  SUM(CASE WHEN classification IS NOT NULL THEN street_count ELSE 0 END) AS classified_streets,
+  ROUND(100.0 * SUM(CASE WHEN classification IS NOT NULL THEN street_count ELSE 0 END)
+    / SUM(street_count), 1)                                              AS pct_streets_classified
+FROM streets_classified_pct;
