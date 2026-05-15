@@ -196,6 +196,19 @@ h3 { font-size: 26px; line-height: 1.15; margin-bottom: 14px; }
 }
 .callout strong { font-style: normal; color: var(--ink); }
 
+/* Section note — demoted lede, appears below chart */
+.section-note {
+  font-family: var(--serif);
+  font-size: 14px;
+  line-height: 1.6;
+  font-style: italic;
+  color: var(--muted);
+  max-width: 680px;
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid var(--rule);
+}
+
 /* Mobile */
 @media (max-width: 768px) {
   .section { padding: 48px 24px 36px; }
@@ -297,9 +310,6 @@ h3 { font-size: 26px; line-height: 1.15; margin-bottom: 14px; }
   <div class="section">
     <div class="kicker">Cele mai întâlnite</div>
     <h2>Principala stradă a oricărui sat.</h2>
-    <p class="lede">
-      În aproape orice sat, un drum se cheamă „Principală". În aproape orice oraș, una „Eminescu". Românilor le plac florile, școlile, bisericile — și un anumit poet din Botoșani.
-    </p>
 
     <div style="position:relative;margin-bottom:22px;">
       <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:15px;pointer-events:none;">⌕</span>
@@ -324,6 +334,9 @@ h3 { font-size: 26px; line-height: 1.15; margin-bottom: 14px; }
       {# Populated by JS #}
     </div>
     <div style="font-family:var(--sans);font-size:12px;font-style:italic;color:var(--muted);padding:16px 0 0;" id="s2-footer"></div>
+    <p class="section-note">
+      În aproape orice sat, un drum se cheamă „Principală". În aproape orice oraș, una „Eminescu". Românilor le plac florile, școlile, bisericile — și un anumit poet din Botoșani.
+    </p>
   </div>
   <div class="section-source">
     <span>Sursă · Registrul Secțiilor de Vot, 14.05.2025</span>
@@ -336,10 +349,6 @@ h3 { font-size: 26px; line-height: 1.15; margin-bottom: 14px; }
   <div class="section">
     <div class="kicker">Pe cine onorăm</div>
     <h2><span class="accent">{{ section3.total_m }}/{{ section3.total_m + section3.total_f }}</span> persoane onorate pe stradă sunt bărbați.</h2>
-    <p class="lede">
-      Din cele {{ section3.total_m + section3.total_f }} persoane clasificate în registru,
-      {{ section3.total_m }} sunt bărbați și {{ section3.total_f }} sunt femei.
-    </p>
 
     {# Gender gap grid #}
     <div style="display:grid;grid-template-columns:auto 1fr;gap:48px;align-items:start;border-top:1px solid var(--rule);padding-top:36px;margin-bottom:56px;">
@@ -433,6 +442,10 @@ h3 { font-size: 26px; line-height: 1.15; margin-bottom: 14px; }
         {% endfor %}
       </div>
     </div>
+    <p class="section-note">
+      Din cele {{ section3.total_m + section3.total_f }} persoane clasificate în registru,
+      {{ section3.total_m }} sunt bărbați și {{ section3.total_f }} sunt femei.
+    </p>
   </div>
   <div class="section-source">
     <span>Sursă · Registrul Secțiilor de Vot · n = {{ section3.top_persons | length }} persoane clasificate</span>
@@ -445,11 +458,6 @@ h3 { font-size: 26px; line-height: 1.15; margin-bottom: 14px; }
   <div class="section">
     <div class="kicker">Recunoaștere</div>
     <h2>Unii sunt cunoscuți în toată lumea. Alții, doar în sat.</h2>
-    <p class="lede">
-      Wikidata arată câte limbi vorbesc despre fiecare persoană onorată.
-      Din {{ section4.tier_counts.universal + section4.tier_counts.national + section4.tier_counts.local }} persoane cu date Wikidata,
-      {{ section4.tier_counts.universal }} sunt universal recunoscute.
-    </p>
 
     {# Tier cards #}
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--rule);border:1px solid var(--rule);margin-bottom:56px;">
@@ -495,6 +503,11 @@ h3 { font-size: 26px; line-height: 1.15; margin-bottom: 14px; }
       </div>
       {% endfor %}
     </div>
+    <p class="section-note">
+      Wikidata arată câte limbi vorbesc despre fiecare persoană onorată.
+      Din {{ section4.tier_counts.universal + section4.tier_counts.national + section4.tier_counts.local }} persoane cu date Wikidata,
+      {{ section4.tier_counts.universal }} sunt universal recunoscute (≥ 50 ediții Wikipedia).
+    </p>
   </div>
   <div class="section-source">
     <span>Sursă · Wikidata sitelinks + Wikimedia Pageview API · medie 12 luni</span>
@@ -507,7 +520,6 @@ h3 { font-size: 26px; line-height: 1.15; margin-bottom: 14px; }
   <div class="section">
     <div class="kicker">Tematică</div>
     <h2>O treime din străzi onorează oameni. Restul onoară tot ce e în jur.</h2>
-    <p class="lede">Florile, pădurile, apele și munții dau mai multe nume decât toți voievozii la un loc.</p>
 
     {# Compute total and percentages for conic-gradient #}
     {% set theme_total = section5.theme_dist | sum(attribute='count') %}
@@ -587,6 +599,7 @@ h3 { font-size: 26px; line-height: 1.15; margin-bottom: 14px; }
         {% endif %}
       </div>
     </div>
+    <p class="section-note">Florile, pădurile, apele și munții dau mai multe nume decât toți voievozii la un loc.</p>
   </div>
   <div class="section-source">
     <span>Sursă · Registrul Secțiilor de Vot · curation manual + LLM batch</span>
@@ -599,9 +612,6 @@ h3 { font-size: 26px; line-height: 1.15; margin-bottom: 14px; }
   <div class="section">
     <div class="kicker">Geografia memoriei</div>
     <h2>Maramureș nu sună ca Dobrogea.</h2>
-    <p class="lede">
-      Numele care se repetă cel mai des într-un județ ne spun ceva despre cine s-a stabilit acolo și cui a vrut comunitatea să-i dea o stradă.
-    </p>
 
     <div class="chip-row" id="s6-metric-row">
       <span class="label">Vedeți după</span>
@@ -627,6 +637,7 @@ h3 { font-size: 26px; line-height: 1.15; margin-bottom: 14px; }
         </p>
       </div>
     </div>
+    <p class="section-note">Numele care se repetă cel mai des într-un județ ne spun ceva despre cine s-a stabilit acolo și cui a vrut comunitatea să-i dea o stradă.</p>
   </div>
   <div class="section-source">
     <span>Sursă · romania-counties.geojson + Registrul Secțiilor de Vot</span>
@@ -697,7 +708,6 @@ h3 { font-size: 26px; line-height: 1.15; margin-bottom: 14px; }
   <div class="section">
     <div class="kicker">Curiozități</div>
     <h2>Datele care nu se încadrează nicăieri.</h2>
-    <p class="lede">Nu toate poveștile din registru au o categorie. Unele sunt pur și simplu ciudate, amuzante sau inexplicabile.</p>
 
     {# CIORANI hero #}
     <div style="border:1px solid var(--rule);padding:64px 72px;margin-bottom:48px;display:grid;grid-template-columns:1fr auto;gap:72px;align-items:center;">
@@ -784,6 +794,7 @@ h3 { font-size: 26px; line-height: 1.15; margin-bottom: 14px; }
       </div>
 
     </div>
+    <p class="section-note">Nu toate poveștile din registru au o categorie. Unele sunt pur și simplu ciudate, amuzante sau inexplicabile.</p>
   </div>
   <div class="section-source">
     <span>Sursă · Registrul Secțiilor de Vot, 14.05.2025</span>
