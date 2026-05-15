@@ -1,5 +1,18 @@
 # Activity History
 
+## 2026-05-15 — wiki_scope.py run: recognition scope and pageviews populated for all 300 persons
+
+### What was done
+- Ran `tools/wiki_scope.py` to populate `wiki_sitelinks`, `wiki_scope`, `wiki_ro_views`, and Wikipedia URLs for the 55 newly-QID-matched persons (previous sessions had covered the other 245).
+- Final scope distribution across all 300 QID-matched persons: **32 universal, 210 national, 48 local, 10 unknown**.
+- Notable highs: Vlad Tepes (90 langs, 14k ro_views/month), Stefan cel Mare (53 langs, 15.7k ro_views/month), Matei Corvin (70 langs).
+- Handled a 429 rate-limit error that falsely marked 5 persons as `unknown` (Vlad Tepes, Stefan cel Mare, etc.): reset them to NULL and re-ran.
+- Site builds cleanly with real Section 4 data (tier counts: 32 universal / 210 national / 58 local+unknown).
+
+### Non-obvious decisions
+- Re-run strategy for rate-limited rows: reset `wiki_scope=NULL` so the tool's `WHERE wiki_scope IS NULL` filter re-picks them up. No `--force` flag needed.
+- Known data artifact: persons with multiple `core_name_norm` variants (e.g., 'mihai eminescu' and 'eminescu') appear as duplicate rows in the section4 query. This is the identity-deduplication gap acknowledged in CLAUDE.md as out-of-scope for this phase.
+
 ## 2026-05-15 — Manual QID review: 300 persons now matched to Wikidata
 
 ### What was done
