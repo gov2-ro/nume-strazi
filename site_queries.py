@@ -251,10 +251,53 @@ def section6(conn: sqlite3.Connection) -> dict:
     """)
     modal_map = {r["judet"]: r["name_normalized"] for r in modal_names}
 
+    top_rows = _rows(conn, """
+        SELECT judet, MIN(name) AS display_name, COUNT(*) AS cnt
+        FROM streets_dedup
+        WHERE is_numeric = 0 AND core_name IS NOT NULL
+        GROUP BY judet, name_normalized
+        ORDER BY judet, cnt DESC
+    """)
+    top_map: dict[str, list] = {}
+    for r in top_rows:
+        j = r["judet"]
+        if j not in top_map:
+            top_map[j] = []
+        if len(top_map[j]) < 5:
+            top_map[j].append({"n": r["display_name"], "c": r["cnt"]})
+
+    rare_rows = _rows(conn, """
+        WITH global_rarity AS (
+          SELECT name_normalized, COUNT(DISTINCT judet) AS judet_count
+          FROM streets_dedup
+          WHERE is_numeric = 0 AND core_name IS NOT NULL
+          GROUP BY name_normalized
+        ),
+        ranked AS (
+          SELECT sd.judet, MIN(sd.name) AS display_name, gr.judet_count,
+                 ROW_NUMBER() OVER (
+                   PARTITION BY sd.judet
+                   ORDER BY gr.judet_count ASC, MIN(sd.name)
+                 ) AS rn
+          FROM streets_dedup sd
+          JOIN global_rarity gr ON gr.name_normalized = sd.name_normalized
+          WHERE sd.is_numeric = 0 AND sd.core_name IS NOT NULL
+          GROUP BY sd.judet, sd.name_normalized, gr.judet_count
+        )
+        SELECT judet, display_name, judet_count FROM ranked WHERE rn <= 5
+        ORDER BY judet, judet_count
+    """)
+    rare_map: dict[str, list] = {}
+    for r in rare_rows:
+        j = r["judet"]
+        if j not in rare_map:
+            rare_map[j] = []
+        rare_map[j].append({"n": r["display_name"], "j": r["judet_count"]})
+
     for row in by_judet:
         row["modal_name"] = modal_map.get(row["judet"], "—")
 
-    return {"by_judet": by_judet}
+    return {"by_judet": by_judet, "top_per_judet": top_map, "rare_per_judet": rare_map}
 
 
 def section8(conn: sqlite3.Connection) -> dict:

@@ -720,6 +720,8 @@ body {
 (function() {
   const byJudet = {};
   DATA_S6.by_judet.forEach(d => { byJudet[d.judet] = d; });
+  const topPerJudet = DATA_S6.top_per_judet || {};
+  const rarePerJudet = DATA_S6.rare_per_judet || {};
 
   let activeMetric = 'saint_pct';
   const metricLabels = {
@@ -788,18 +790,34 @@ body {
   function renderFingerprint(feature) {
     const code = feature.properties?.cod;
     const row = byJudet[code] || {};
+    const top = topPerJudet[code] || [];
+    const rare = rarePerJudet[code] || [];
+
+    const topRows = top.map((s, i) =>
+      `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--rule);">
+        <span style="color:var(--ink);font-weight:${i===0?'600':'400'}">${s.n}</span>
+        <span style="color:var(--muted);font-size:11px;">${s.c}</span>
+      </div>`
+    ).join('');
+
+    const rareRows = rare.map(s =>
+      `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--rule);">
+        <span style="color:var(--ink)">${s.n}</span>
+        <span style="color:var(--muted);font-size:11px;">${s.j === 1 ? 'unic' : s.j + ' județe'}</span>
+      </div>`
+    ).join('');
+
     const fp = document.getElementById('s6-fingerprint');
     fp.innerHTML = `
       <div class="kicker">Amprenta județului · selectat</div>
-      <h3 style="font-family:var(--serif);font-weight:500;font-size:26px;margin:0 0 4px;">${feature.properties?.name || code}</h3>
-      <div style="font-family:var(--sans);font-size:12px;color:var(--muted);margin-bottom:24px;">${(row.total_streets || 0).toLocaleString('ro-RO')} de străzi</div>
-      <div class="kicker" style="margin-bottom:8px;">Statistici cheie</div>
-      <div style="font-family:var(--serif);font-size:15px;line-height:1.7;color:var(--muted);">
-        <div>· Sfinți: <strong style="color:var(--ink)">${(row.saint_pct || 0).toFixed(1)}%</strong></div>
-        <div>· Numere (anonime): <strong style="color:var(--ink)">${(row.numeric_pct || 0).toFixed(1)}%</strong></div>
-        <div>· Feminin: <strong style="color:var(--ink)">${(row.female_pct || 0).toFixed(2)}%</strong></div>
-        <div>· Cel mai frecvent: <strong style="color:var(--ink)">${row.modal_name || '—'}</strong></div>
-      </div>
+      <div style="font-family:var(--serif);font-weight:500;font-size:22px;margin:2px 0 2px;">${feature.properties?.name || code}</div>
+      <div style="font-family:var(--sans);font-size:11px;color:var(--muted);margin-bottom:18px;">${(row.total_streets || 0).toLocaleString('ro-RO')} de străzi · Sfinți ${(row.saint_pct || 0).toFixed(1)}% · Feminin ${(row.female_pct || 0).toFixed(1)}%</div>
+
+      <div class="kicker" style="margin-bottom:6px;">Cele mai frecvente</div>
+      <div style="font-family:var(--sans);font-size:12px;margin-bottom:16px;">${topRows || '<span style="color:var(--muted)">—</span>'}</div>
+
+      <div class="kicker" style="margin-bottom:6px;">Cele mai rare (unice național)</div>
+      <div style="font-family:var(--sans);font-size:12px;">${rareRows || '<span style="color:var(--muted)">—</span>'}</div>
     `;
   }
 })();
