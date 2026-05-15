@@ -75,5 +75,5 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 ## Misc ideas
 
-Go wild.
-The people, how old, what are the occupations? Reason of death?
+- [ ] UI - more of a compact dashboard,  raw numbers. Leave the story telling / editorialisation to another medium, move that to Jupyter notebooks.
+- [ ] Go wild, nerdy, quirky. The people, how old, what are the occupations? Reason of death?
