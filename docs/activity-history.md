@@ -1,5 +1,18 @@
 # Activity History
 
+## 2026-05-15 — Fix wrong QIDs; add --replay-csv to wikidata_persons.py
+
+### What was done
+- Added `--replay-csv` and `--force` flags to `tools/wikidata_persons.py`. Reads all `auto_match=True` rows from `data/curation/wikidata_qids.csv` and re-applies QIDs to the DB — canonical post-rebuild restoration step. `--force` overwrites conflicts (needed because seed scripts load unverified QIDs that the curated CSV should supersede).
+- Fixed 6 wrong QIDs in seed scripts (seed_top500.py, seed_batch2.py) that had been seeded with stale or commune-matching QIDs. Affected persons: Gheorghe Lazăr (×2), Traian Vuia, Tudor Vianu, Gábor Áron.
+- Fixed 2 wrong QIDs in `data/curation/wikidata_qids.csv`: Simion Bărnuțiu (Q136671938→Q701594), Traian/Emperor (Q105974734→Q1425). Added 5 missing CSV entries for the seed-only persons (no row existed in CSV for gabor aron, gheorghe lazar, lazar gheorghe, traian vuia, tudor vianu).
+- Re-ran `tools/wiki_scope.py` for the 7 corrected persons. All now resolved (were returning 0 sitelinks due to stale QIDs). Final scope: 19 local / 168 national / 19 universal / 0 unknown.
+- Updated CLAUDE.md with canonical post-rebuild sequence including `--replay-csv --force` and `wiki_scope.py` batch guidance.
+
+### Non-obvious decisions
+- Wrong QIDs for these 6 persons traced to training-data hallucinations in the original seed scripts — numbers that looked plausible (Q647xxx range) but pointed to deleted/redirected entities with 0 sitelinks. The `--replay-csv --force` pattern was specifically designed to survive this: the curated CSV overwrites seed-script values after every rebuild.
+- `simion barnutiu` CSV entry had a high-numbered QID (Q136671938) that existed on Wikidata but had 0 sitelinks — a different item with the same name. Correct QID is Q701594 (the well-known Romanian academic with 13 language editions).
+
 ## 2026-05-15 — streets_classified_pct view + coverage queries
 
 ### What was done
