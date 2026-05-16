@@ -75,8 +75,13 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 ## Misc ideas
 
-- [ ] UI - more of a compact dashboard,  raw numbers. Leave the story telling / editorialisation to another medium, move that to Jupyter notebooks. *(partly done 2026-05-16 — the dense layout has been restyled bolder/denser with IBM Plex, dark statbar, larger numbers, leader-row highlights. Editorial-mode page already lives separately at `dist/index-v1.html` via `--variant v1`. Remaining: Jupyter notebooks for the editorial/story side.)*
+- [x] UI - more of a compact dashboard,  raw numbers. Leave the story telling / editorialisation to another medium, move that to Jupyter notebooks. *(partly done 2026-05-16 — the dense layout has been restyled bolder/denser with IBM Plex, dark statbar, larger numbers, leader-row highlights. Editorial-mode page already lives separately at `dist/index-v1.html` via `--variant v1`. Remaining: Jupyter notebooks for the editorial/story side.)*
+
+- [ ] UI make emojis larger/icons, slightly larger than the text
+
 - [ ] Go wild, nerdy, quirky. The people, how old, what are the occupations? Reason of death?
+
+- [ ] Norm to population, street length, lanes, centrality 
 
 - [ ] **Replace placeholder emojis with proper monoline SVG icons.** Current dashboard uses emojis (🔝 🧭 🌿 🚩 🎓 ⏳ 👥 🌍 📈 🗺️ 🧬 📜 🔎 🏟️ 📝, + per-row category emojis in nature subtypes / professions / eras / contests) as category cues. They render inconsistently across OSes (Apple Color Emoji vs Noto vs Segoe) and clash with the otherwise refined typography. Plan: inline SVG sprite of ~30 Lucide/Phosphor icons, swap each `<span class="emo">…</span>` to `<svg class="icon">…</svg>`. The `.icon` CSS class already exists in the stylesheet for this. Wait until icon set is curated — don't dribble in one-off SVGs.
 
@@ -95,3 +100,4 @@ Items detected during sessions. Each entry has enough context to act on cold.
 - [ ] cel mai scurt mihai eminescu
 
 - [ ] look at where else we might find srteet names, as coduri poștale. see what's missing from which dataset (sectii vot, cod postal, osm)
+
