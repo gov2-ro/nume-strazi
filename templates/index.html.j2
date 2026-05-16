@@ -791,9 +791,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
     <a href="#cele-mai-intalnite">Cele mai întâlnite</a>
     <a href="#tematica">Tematică</a>
     <a href="#pe-cine-onoram">Pe cine onorăm</a>
-    <a href="#recunoastere">Recunoaștere</a>
     <a href="#harta">Harta</a>
-    <a href="#renumiri">Renumiri</a>
     <a href="#curiozitati">Curiozități</a>
     <a href="metodologie.html">Metodologie</a>
   </nav>
@@ -961,8 +959,8 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       <div style="display:flex;align-items:center;gap:8px;">
         <div style="width:10px;height:10px;border-radius:2px;background:{{ theme_colors[loop.index0 % theme_colors|length] }};flex-shrink:0;"></div>
         <span class="emo md">{{ theme_emoji.get(t.category, '·') }}</span>
-        <span style="font-family:var(--sans);font-size:12px;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ t.category }}</span>
-        <span style="font-family:var(--sans);font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.01em;">{{ pct }}%</span>
+        <span style="font-family:var(--sans);font-size:22px;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ t.category }}</span>
+        <span style="font-family:var(--sans);font-size:24px;font-weight:500;font-variant-numeric:tabular-nums;letter-spacing:-.01em;">{{ pct }}%</span>
       </div>
       {% endfor %}
     </div>
@@ -992,9 +990,9 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
   {% for row in section5.nature_subtypes %}
   <div style="display:flex;align-items:center;gap:8px;padding:3px 0;{% if not loop.first %}border-top:1px solid var(--hairline);{% endif %}">
     <span class="emo md" style="width:14px;text-align:center;">{{ nature_emoji.get(row.nature_type, '·') }}</span>
-    <span style="font-family:var(--sans);font-size:12px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ nature_ro.get(row.nature_type, row.nature_type) }}</span>
+    <span style="font-family:var(--sans);font-size:22px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ nature_ro.get(row.nature_type, row.nature_type) }}</span>
     <div class="bar-wrap" style="width:90px;"><div class="bar olive" style="width:{{ (row.n / max_n * 100)|int }}%;"></div></div>
-    <span style="font-family:var(--sans);font-size:12px;font-weight:700;color:var(--ink);width:30px;text-align:right;font-variant-numeric:tabular-nums;letter-spacing:-.005em;">{{ row.n }}</span>
+    <span style="font-family:var(--sans);font-size:22px;font-weight:500;color:var(--ink);width:56px;text-align:right;font-variant-numeric:tabular-nums;letter-spacing:-.005em;">{{ row.n }}</span>
   </div>
   {% endfor %}
 </div>
@@ -1017,12 +1015,12 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
   </div>
   <div style="display:flex;flex-wrap:wrap;gap:6px;">
     {% for tok in section5.ideo_tokens %}
-    <span style="font-family:var(--sans);font-size:11.5px;font-weight:600;padding:3px 9px;border:1.5px solid {{ 'var(--accent)' if tok.n > 30 else 'var(--rule-strong)' }};border-radius:2px;color:{{ 'var(--accent-dark)' if tok.n > 30 else 'var(--ink)' }};background:{{ '#FFF1ED' if tok.n > 30 else 'var(--bg)' }};">
-      {{ ideo_ro.get(tok.token, tok.token) }} <span style="color:var(--muted);font-size:10px;margin-left:3px;font-variant-numeric:tabular-nums;font-weight:500;">{{ tok.n }}</span>
+    <span style="font-family:var(--sans);font-size:20px;font-weight:500;padding:7px 14px;border:1.5px solid {{ 'var(--accent)' if tok.n > 30 else 'var(--rule-strong)' }};border-radius:3px;color:{{ 'var(--accent-dark)' if tok.n > 30 else 'var(--ink)' }};background:{{ '#FFF1ED' if tok.n > 30 else 'var(--bg)' }};">
+      {{ ideo_ro.get(tok.token, tok.token) }} <span style="color:var(--muted);font-size:16px;margin-left:6px;font-variant-numeric:tabular-nums;font-weight:500;">{{ tok.n }}</span>
     </span>
     {% endfor %}
     {% if not section5.ideo_tokens %}
-    <span style="font-family:var(--sans);font-size:11.5px;font-style:italic;color:var(--muted);">Subcategorii în curs de completare.</span>
+    <span style="font-family:var(--sans);font-size:20px;font-style:italic;color:var(--muted);">Subcategorii în curs de completare.</span>
     {% endif %}
   </div>
 </div>
@@ -1035,22 +1033,22 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
   </div>
   <div style="display:flex;gap:16px;align-items:start;">
     <div>
-      <div style="font-family:var(--sans);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Fiecare pătrat = 1 persoană</div>
+      <div style="font-family:var(--sans);font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">Fiecare pătrat = 1 persoană</div>
       <div id="s3-gap-grid" style="display:grid;grid-template-columns:repeat(10,11px);gap:2px;width:130px;"></div>
-      <div style="display:flex;gap:10px;margin-top:8px;font-family:var(--sans);font-size:10px;">
-        <div style="display:flex;align-items:center;gap:5px;">
-          <div style="width:8px;height:8px;border-radius:1px;background:var(--ink)"></div><span style="color:var(--muted)">Bărbat</span>
+      <div style="display:flex;gap:14px;margin-top:10px;font-family:var(--sans);font-size:16px;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div style="width:10px;height:10px;border-radius:1px;background:var(--ink)"></div><span style="color:var(--muted)">Bărbat</span>
         </div>
-        <div style="display:flex;align-items:center;gap:5px;">
-          <div style="width:8px;height:8px;border-radius:1px;background:var(--accent)"></div><span style="color:var(--muted)">Femeie</span>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div style="width:10px;height:10px;border-radius:1px;background:var(--accent)"></div><span style="color:var(--muted)">Femeie</span>
         </div>
       </div>
     </div>
     <div>
-      <div class="display-num" style="font-size:36px;margin-bottom:2px;">
-        {{ section3.total_m }}<span style="font-size:20px;color:var(--muted);font-weight:500;">/{{ section3.total_m + section3.total_f }}</span>
+      <div class="display-num" style="font-size:64px;margin-bottom:6px;">
+        {{ section3.total_m }}<span style="font-size:32px;color:var(--muted);font-weight:500;">/{{ section3.total_m + section3.total_f }}</span>
       </div>
-      <div style="font-family:var(--sans);font-size:10.5px;color:var(--muted);">bărbați din total</div>
+      <div style="font-family:var(--sans);font-size:18px;color:var(--muted);">bărbați din total</div>
     </div>
   </div>
 </div>
@@ -1082,11 +1080,11 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
   {% for row in section3.profession_dist %}
   <div style="display:flex;align-items:center;gap:8px;padding:3px 0;{% if not loop.first %}border-top:1px solid var(--hairline);{% endif %}">
     <span class="emo md" style="width:14px;text-align:center;">{{ prof_emoji.get(row.profession, '·') }}</span>
-    <span style="font-family:var(--sans);font-size:12px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ prof_ro.get(row.profession, row.profession) }}</span>
+    <span style="font-family:var(--sans);font-size:22px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ prof_ro.get(row.profession, row.profession) }}</span>
     <div class="bar-wrap" style="width:90px;">
       <div class="bar" style="width:{{ (row.n / max_prof * 100)|int }}%"></div>
     </div>
-    <span style="font-family:var(--sans);font-size:12px;font-weight:700;color:var(--ink);width:26px;text-align:right;font-variant-numeric:tabular-nums;letter-spacing:-.005em;">{{ row.n }}</span>
+    <span style="font-family:var(--sans);font-size:22px;font-weight:500;color:var(--ink);width:48px;text-align:right;font-variant-numeric:tabular-nums;letter-spacing:-.005em;">{{ row.n }}</span>
   </div>
   {% endfor %}
 </div>
@@ -1109,52 +1107,16 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
   {% for row in section3.era_dist %}
   <div style="display:flex;align-items:center;gap:8px;padding:3px 0;{% if not loop.first %}border-top:1px solid var(--hairline);{% endif %}">
     <span class="emo md" style="width:14px;text-align:center;">{{ era_emoji.get(row.era, '·') }}</span>
-    <span style="font-family:var(--sans);font-size:12px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ era_ro.get(row.era, row.era or 'necunoscută') }}</span>
+    <span style="font-family:var(--sans);font-size:22px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ era_ro.get(row.era, row.era or 'necunoscută') }}</span>
     <div class="bar-wrap" style="width:90px;">
       <div class="bar" style="width:{{ (row.n / max_era * 100)|int }}%"></div>
     </div>
-    <span style="font-family:var(--sans);font-size:12px;font-weight:700;color:var(--ink);width:26px;text-align:right;font-variant-numeric:tabular-nums;letter-spacing:-.005em;">{{ row.n }}</span>
+    <span style="font-family:var(--sans);font-size:22px;font-weight:500;color:var(--ink);width:48px;text-align:right;font-variant-numeric:tabular-nums;letter-spacing:-.005em;">{{ row.n }}</span>
   </div>
   {% endfor %}
 </div>
 
 {# (Top persoane panel removed — moved up to sit beside #cele-mai-intalnite as an s6 cluster cloud.) #}
-
-{# PANEL: RECUNOAȘTERE GLOBALĂ (s6) #}
-<div class="panel s6" id="recunoastere">
-  <div class="panel-header">
-    <span class="panel-label"><span class="emo md">🌍</span> Recunoaștere globală · Wikidata</span>
-    <span class="panel-meta">{{ wikidata_total }} persoane</span>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--rule-strong);border:1px solid var(--rule-strong);">
-    <div style="background:var(--ink-band);color:#FFFFFF;padding:14px 14px;position:relative;">
-      <div style="position:absolute;top:10px;right:12px;font-size:18px;line-height:1;opacity:.85;">🌍</div>
-      <div style="font-family:var(--sans);font-size:10px;letter-spacing:.2em;text-transform:uppercase;font-weight:700;color:var(--gold);margin-bottom:8px;">Universal</div>
-      <div class="display-num" style="font-size:38px;margin-bottom:4px;">{{ section4.tier_counts.universal }}</div>
-      <div style="font-family:var(--sans);font-size:10.5px;color:rgba(255,255,255,.65);font-weight:500;">≥ 50 limbi Wikipedia</div>
-    </div>
-    <div style="background:var(--surface-1);padding:14px 14px;position:relative;">
-      <div style="position:absolute;top:10px;right:12px;font-size:18px;line-height:1;">🇷🇴</div>
-      <div style="font-family:var(--sans);font-size:10px;letter-spacing:.2em;text-transform:uppercase;font-weight:700;color:var(--ink);margin-bottom:8px;">Național</div>
-      <div class="display-num" style="font-size:38px;margin-bottom:4px;">{{ section4.tier_counts.national }}</div>
-      <div style="font-family:var(--sans);font-size:10.5px;color:var(--muted);font-weight:500;">5–49 limbi</div>
-    </div>
-    <div style="background:var(--bg);padding:14px 14px;position:relative;">
-      <div style="position:absolute;top:10px;right:12px;font-size:18px;line-height:1;">📍</div>
-      <div style="font-family:var(--sans);font-size:10px;letter-spacing:.2em;text-transform:uppercase;font-weight:700;color:var(--ink);margin-bottom:8px;">Local</div>
-      <div class="display-num" style="font-size:38px;margin-bottom:4px;">{{ section4.tier_counts.local }}</div>
-      <div style="font-family:var(--sans);font-size:10.5px;color:var(--muted);font-weight:500;">sub 5 limbi</div>
-    </div>
-  </div>
-</div>
-
-{# PANEL: RENUMIRI placeholder (s6) #}
-<div class="panel s6" id="renumiri">
-  <div class="panel-header">
-    <span class="panel-label"><span class="emo md">📝</span> Renumiri</span>
-  </div>
-  <div class="panel-caption">Secțiune în construcție — date indisponibile.</div>
-</div>
 
 {# PANEL: NOTORIETATE WIKIPEDIA (s12, 2-col internal) #}
 <div class="panel s12">
@@ -1175,6 +1137,42 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
     </div>
     {% endfor %}
   </div>
+</div>
+
+{# PANEL: RECUNOAȘTERE GLOBALĂ (s6) #}
+<div class="panel s6" id="recunoastere" style="display:none;">
+  <div class="panel-header">
+    <span class="panel-label"><span class="emo md">🌍</span> Recunoaștere globală · Wikidata</span>
+    <span class="panel-meta">{{ wikidata_total }} persoane</span>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--rule-strong);border:1px solid var(--rule-strong);">
+    <div style="background:var(--ink-band);color:#FFFFFF;padding:14px 14px;position:relative;">
+      <div style="position:absolute;top:10px;right:12px;font-size:18px;line-height:1;opacity:.85;">🌍</div>
+      <div style="font-family:var(--sans);font-size:12px;letter-spacing:.2em;text-transform:uppercase;font-weight:700;color:var(--gold);margin-bottom:8px;">Universal</div>
+      <div class="display-num" style="font-size:44px;margin-bottom:4px;">{{ section4.tier_counts.universal }}</div>
+      <div style="font-family:var(--sans);font-size:13px;color:rgba(255,255,255,.65);font-weight:500;">≥ 50 limbi Wikipedia</div>
+    </div>
+    <div style="background:var(--surface-1);padding:14px 14px;position:relative;">
+      <div style="position:absolute;top:10px;right:12px;font-size:18px;line-height:1;">🇷🇴</div>
+      <div style="font-family:var(--sans);font-size:12px;letter-spacing:.2em;text-transform:uppercase;font-weight:700;color:var(--ink);margin-bottom:8px;">Național</div>
+      <div class="display-num" style="font-size:44px;margin-bottom:4px;">{{ section4.tier_counts.national }}</div>
+      <div style="font-family:var(--sans);font-size:13px;color:var(--muted);font-weight:500;">5–49 limbi</div>
+    </div>
+    <div style="background:var(--bg);padding:14px 14px;position:relative;">
+      <div style="position:absolute;top:10px;right:12px;font-size:18px;line-height:1;">📍</div>
+      <div style="font-family:var(--sans);font-size:12px;letter-spacing:.2em;text-transform:uppercase;font-weight:700;color:var(--ink);margin-bottom:8px;">Local</div>
+      <div class="display-num" style="font-size:44px;margin-bottom:4px;">{{ section4.tier_counts.local }}</div>
+      <div style="font-family:var(--sans);font-size:13px;color:var(--muted);font-weight:500;">sub 5 limbi</div>
+    </div>
+  </div>
+</div>
+
+{# PANEL: RENUMIRI placeholder (s6) #}
+<div class="panel s6" id="renumiri" style="display:none;">
+  <div class="panel-header">
+    <span class="panel-label"><span class="emo md">📝</span> Renumiri</span>
+  </div>
+  <div class="panel-caption" style="font-size:14px;">Secțiune în construcție — date indisponibile.</div>
 </div>
 
 {# PANEL: HARTA (s12, internal 8/4) #}
