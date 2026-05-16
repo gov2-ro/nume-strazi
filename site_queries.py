@@ -182,7 +182,7 @@ def section3(conn: sqlite3.Connection) -> dict:
 
     # Gender-specific top lists for the split Bărbați / Femei sub-panels.
     top_men = _rows(conn, """
-        SELECT p.full_name, p.gender, COUNT(*) AS street_count
+        SELECT p.full_name, p.gender, p.wikidata_qid, COUNT(*) AS street_count
         FROM streets_dedup sd
         JOIN persons p ON p.core_name_norm = sd.core_name_norm
         WHERE p.gender = 'M'
@@ -191,7 +191,7 @@ def section3(conn: sqlite3.Connection) -> dict:
         LIMIT 15
     """)
     top_women = _rows(conn, """
-        SELECT p.full_name, p.gender, COUNT(*) AS street_count
+        SELECT p.full_name, p.gender, p.wikidata_qid, COUNT(*) AS street_count
         FROM streets_dedup sd
         JOIN persons p ON p.core_name_norm = sd.core_name_norm
         WHERE p.gender = 'F'
@@ -207,9 +207,10 @@ def section3(conn: sqlite3.Connection) -> dict:
                 CASE WHEN sd.judet LIKE 'BUCURESTI%%' OR sd.judet = 'B' THEN 'B'
                      ELSE sd.judet END AS judet,
                 p.core_name_norm,
-                MAX(p.full_name) AS full_name,
-                MAX(p.gender)    AS gender,
-                COUNT(*)         AS street_count
+                MAX(p.full_name)       AS full_name,
+                MAX(p.gender)          AS gender,
+                MAX(p.wikidata_qid)    AS wikidata_qid,
+                COUNT(*)               AS street_count
               FROM streets_dedup sd
               JOIN persons p ON p.core_name_norm = sd.core_name_norm
               WHERE sd.is_numeric = 0
@@ -217,19 +218,20 @@ def section3(conn: sqlite3.Connection) -> dict:
               GROUP BY 1, 2
             ),
             ranked AS (
-              SELECT judet, full_name, gender, street_count,
+              SELECT judet, full_name, gender, wikidata_qid, street_count,
                      ROW_NUMBER() OVER (PARTITION BY judet ORDER BY street_count DESC) AS rn
               FROM per_judet
             )
-            SELECT judet, full_name, gender, street_count
+            SELECT judet, full_name, gender, wikidata_qid, street_count
             FROM ranked WHERE rn <= 10
             ORDER BY judet, street_count DESC
         """)
         out: dict[str, list[dict]] = {}
         for r in rows:
             out.setdefault(r["judet"], []).append({
-                "full_name": r["full_name"],
-                "gender": r["gender"],
+                "full_name":    r["full_name"],
+                "gender":       r["gender"],
+                "wikidata_qid": r["wikidata_qid"],
                 "street_count": r["street_count"],
             })
         return out
