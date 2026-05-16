@@ -122,7 +122,7 @@ def section2(conn: sqlite3.Connection) -> dict:
         )
         SELECT judet, name_normalized, core_name, category, street_count
         FROM ranked
-        WHERE rn <= 30
+        WHERE rn <= 50
         ORDER BY judet, street_count DESC
     """)
     by_judet: dict[str, list[dict]] = {}

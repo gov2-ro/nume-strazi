@@ -818,7 +818,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 <div class="statbar">
 
   <div class="group">
-    <div class="group-label"><span class="emo md">📊</span> Scară</div>
+    <div class="group-label"><span class="emo lg">📊</span> Scară</div>
     <div class="scale-stack">
       <div class="item">
         <div class="v">{{ "{:,.0f}".format(section1.total_streets).replace(",", ".") }}</div>
@@ -832,7 +832,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
   </div>
 
   <div class="group">
-    <div class="group-label"><span class="emo md">🏷️</span> Tematică</div>
+    <div class="group-label"><span class="emo lg">🏷️</span> Tematică</div>
     <div class="tema-row">
       <div class="v">{{ lead_pct }}<span class="u">% {{ theme_ro[lead.category] | default(lead.category) }}</span></div>
     </div>
@@ -855,7 +855,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
   </div>
 
   <div class="group">
-    <div class="group-label"><span class="emo md">⚥</span> Repartiție pe gen</div>
+    <div class="group-label"><span class="emo lg">⚥</span> Repartiție pe gen</div>
     <div class="gen-row">
       <div class="v">{{ male_pct }}<span class="u">% B</span></div>
       <div class="frac">/ <span class="accent" style="font-weight:600;">{{ female_pct }}% F</span></div>
@@ -868,7 +868,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
   </div>
 
   <div class="group">
-    <div class="group-label"><span class="emo md">🏆</span> Cei mai des onorați</div>
+    <div class="group-label"><span class="emo lg">🏆</span> Cei mai des onorați</div>
     <div class="top-pair">
       {% if section1.top_men %}
       <div class="row">
@@ -894,7 +894,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 {# PANEL: CELE MAI FRECVENTE (s6, cluster cloud) #}
 <div class="panel s6 cluster-panel" id="cele-mai-intalnite">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo md">🔝</span> Cele mai frecvente · Top 30</span>
+    <span class="panel-label"><span class="emo xl">🔝</span> Cele mai frecvente · Top 50</span>
     <div class="s2-judet-pick">
       <label for="s2-judet-select">Județ</label>
       <select id="s2-judet-select">
@@ -913,7 +913,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
    Split into stacked Bărbați / Femei sub-sections so women have their own top. #}
 <div class="panel s6 cluster-panel" id="top-persoane">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo md">👥</span> Top persoane onorate</span>
+    <span class="panel-label"><span class="emo xl">👥</span> Top persoane onorate</span>
     <span class="panel-meta">filtrat de județ ↑</span>
   </div>
   <div class="sub-section">
@@ -936,7 +936,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 {% set ns = namespace(cumulative=0) %}
 <div class="panel s4" id="tematica">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo md">🧭</span> Repartiție tematică</span>
+    <span class="panel-label"><span class="emo xl">🧭</span> Repartiție tematică</span>
     <span class="panel-meta">{{ "{:,.0f}".format(theme_total).replace(",", ".") }} clasif.</span>
   </div>
   <div style="display:flex;gap:18px;align-items:center;">
@@ -958,7 +958,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       {% set pct = (t.count / theme_total * 100) | round(1) %}
       <div style="display:flex;align-items:center;gap:8px;">
         <div style="width:10px;height:10px;border-radius:2px;background:{{ theme_colors[loop.index0 % theme_colors|length] }};flex-shrink:0;"></div>
-        <span class="emo md">{{ theme_emoji.get(t.category, '·') }}</span>
+        <span class="emo xxl">{{ theme_emoji.get(t.category, '·') }}</span>
         <span style="font-family:var(--sans);font-size:22px;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ t.category }}</span>
         <span style="font-family:var(--sans);font-size:24px;font-weight:500;font-variant-numeric:tabular-nums;letter-spacing:-.01em;">{{ pct }}%</span>
       </div>
@@ -984,12 +984,12 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 } %}
 <div class="panel s4">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo md">🌿</span> Subtipuri · Natură</span>
+    <span class="panel-label"><span class="emo xl">🌿</span> Subtipuri · Natură</span>
   </div>
   {% set max_n = section5.nature_subtypes[0].n if section5.nature_subtypes else 1 %}
   {% for row in section5.nature_subtypes %}
   <div style="display:flex;align-items:center;gap:8px;padding:3px 0;{% if not loop.first %}border-top:1px solid var(--hairline);{% endif %}">
-    <span class="emo md" style="width:14px;text-align:center;">{{ nature_emoji.get(row.nature_type, '·') }}</span>
+    <span class="emo xxl" style="width:24px;text-align:center;">{{ nature_emoji.get(row.nature_type, '·') }}</span>
     <span style="font-family:var(--sans);font-size:22px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ nature_ro.get(row.nature_type, row.nature_type) }}</span>
     <div class="bar-wrap" style="width:90px;"><div class="bar olive" style="width:{{ (row.n / max_n * 100)|int }}%;"></div></div>
     <span style="font-family:var(--sans);font-size:22px;font-weight:500;color:var(--ink);width:56px;text-align:right;font-variant-numeric:tabular-nums;letter-spacing:-.005em;">{{ row.n }}</span>
@@ -1011,7 +1011,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 } %}
 <div class="panel s4">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo md">🚩</span> Tokeni ideologici</span>
+    <span class="panel-label"><span class="emo xl">🚩</span> Tokeni ideologici</span>
   </div>
   <div style="display:flex;flex-wrap:wrap;gap:6px;">
     {% for tok in section5.ideo_tokens %}
@@ -1028,7 +1028,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 {# PANEL: ECART DE GEN (s4) #}
 <div class="panel s4" id="pe-cine-onoram">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo md">⚥</span> Ecart de gen</span>
+    <span class="panel-label"><span class="emo xl">⚥</span> Ecart de gen</span>
     <span class="panel-meta">{{ section3.total_m + section3.total_f }} pers.</span>
   </div>
   <div style="display:flex;gap:16px;align-items:start;">
@@ -1074,12 +1074,12 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 } %}
 <div class="panel s4">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo md">🎓</span> Profesia persoanei onorate</span>
+    <span class="panel-label"><span class="emo xl">🎓</span> Profesia persoanei onorate</span>
   </div>
   {% set max_prof = section3.profession_dist[0].n if section3.profession_dist else 1 %}
   {% for row in section3.profession_dist %}
   <div style="display:flex;align-items:center;gap:8px;padding:3px 0;{% if not loop.first %}border-top:1px solid var(--hairline);{% endif %}">
-    <span class="emo md" style="width:14px;text-align:center;">{{ prof_emoji.get(row.profession, '·') }}</span>
+    <span class="emo xxl" style="width:24px;text-align:center;">{{ prof_emoji.get(row.profession, '·') }}</span>
     <span style="font-family:var(--sans);font-size:22px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ prof_ro.get(row.profession, row.profession) }}</span>
     <div class="bar-wrap" style="width:90px;">
       <div class="bar" style="width:{{ (row.n / max_prof * 100)|int }}%"></div>
@@ -1101,12 +1101,12 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 } %}
 <div class="panel s4">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo md">⏳</span> Epoca în care a trăit</span>
+    <span class="panel-label"><span class="emo xl">⏳</span> Epoca în care a trăit</span>
   </div>
   {% set max_era = section3.era_dist[0].n if section3.era_dist else 1 %}
   {% for row in section3.era_dist %}
   <div style="display:flex;align-items:center;gap:8px;padding:3px 0;{% if not loop.first %}border-top:1px solid var(--hairline);{% endif %}">
-    <span class="emo md" style="width:14px;text-align:center;">{{ era_emoji.get(row.era, '·') }}</span>
+    <span class="emo xxl" style="width:24px;text-align:center;">{{ era_emoji.get(row.era, '·') }}</span>
     <span style="font-family:var(--sans);font-size:22px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ era_ro.get(row.era, row.era or 'necunoscută') }}</span>
     <div class="bar-wrap" style="width:90px;">
       <div class="bar" style="width:{{ (row.n / max_era * 100)|int }}%"></div>
@@ -1121,7 +1121,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 {# PANEL: NOTORIETATE WIKIPEDIA (s12, 2-col internal) #}
 <div class="panel s12">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo md">📈</span> Notorietate Wikipedia · vizualizări lunare medii · ro.wikipedia.org · 12 luni</span>
+    <span class="panel-label"><span class="emo xl">📈</span> Notorietate Wikipedia · vizualizări lunare medii · ro.wikipedia.org · 12 luni</span>
   </div>
   <div class="rank-list rank-2col s4-list">
     {% set max_pv = section4.top_pageviews[0].wiki_ro_views if section4.top_pageviews else 1 %}
@@ -1142,7 +1142,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 {# PANEL: RECUNOAȘTERE GLOBALĂ (s6) #}
 <div class="panel s6" id="recunoastere" style="display:none;">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo md">🌍</span> Recunoaștere globală · Wikidata</span>
+    <span class="panel-label"><span class="emo xl">🌍</span> Recunoaștere globală · Wikidata</span>
     <span class="panel-meta">{{ wikidata_total }} persoane</span>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--rule-strong);border:1px solid var(--rule-strong);">
@@ -1170,7 +1170,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 {# PANEL: RENUMIRI placeholder (s6) #}
 <div class="panel s6" id="renumiri" style="display:none;">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo md">📝</span> Renumiri</span>
+    <span class="panel-label"><span class="emo xl">📝</span> Renumiri</span>
   </div>
   <div class="panel-caption" style="font-size:14px;">Secțiune în construcție — date indisponibile.</div>
 </div>
@@ -1178,7 +1178,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 {# PANEL: HARTA (s12, internal 8/4) #}
 <div class="panel s12" id="harta">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo md">🗺️</span> Harta · statistici pe județ</span>
+    <span class="panel-label"><span class="emo xl">🗺️</span> Harta · statistici pe județ</span>
     <div class="chip-row" id="s6-metric-row" style="margin:0;padding:0;border:none;">
       <span class="label">Vedeți după</span>
       <button class="chip active" data-metric="saint_pct">% sfinți</button>
@@ -1197,7 +1197,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       </div>
     </div>
     <div class="fingerprint" id="s6-fingerprint">
-      <div class="kicker"><span class="emo md">🧬</span> Amprenta județului</div>
+      <div class="kicker"><span class="emo lg">🧬</span> Amprenta județului</div>
       <p style="font-family:var(--sans);font-size:12.5px;color:var(--muted);padding-top:20px;line-height:1.55;">
         Selectați un județ pe hartă.
       </p>
@@ -1208,13 +1208,13 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 {# PANEL: AMPRENTE JUDEȚENE (s12, internal 3-col) #}
 <div class="panel s12">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo md">🧬</span> Amprente județene · trei caractere</span>
+    <span class="panel-label"><span class="emo xl">🧬</span> Amprente județene · trei caractere</span>
   </div>
   <div class="subgrid-3">
 
     {# Most "exclusivist" - judete with most names found nowhere else #}
     <div style="background:var(--bg);padding:14px 16px;">
-      <div class="panel-label" style="margin-bottom:6px;"><span class="emo md">💎</span> Cele mai exclusiviste</div>
+      <div class="panel-label" style="margin-bottom:6px;"><span class="emo xl">💎</span> Cele mai exclusiviste</div>
       <div class="panel-caption" style="margin:0 0 8px;">Județe cu cele mai multe nume găsite doar acolo · ≥3 străzi local</div>
       {% set max_d = section8.judet_distinctive[0].n if section8.judet_distinctive else 1 %}
       {% for row in section8.judet_distinctive %}
@@ -1229,7 +1229,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 
     {# Most "rural-poetic" - highest nature % #}
     <div style="background:var(--bg);padding:14px 16px;">
-      <div class="panel-label" style="margin-bottom:6px;"><span class="emo md">🌾</span> Cele mai «rurale-poetice»</div>
+      <div class="panel-label" style="margin-bottom:6px;"><span class="emo xl">🌾</span> Cele mai «rurale-poetice»</div>
       <div class="panel-caption" style="margin:0 0 8px;">Cota de străzi cu nume din natură (flori, copaci, ape, animale…)</div>
       {% set max_r = section8.judet_rural[0].pct if section8.judet_rural else 1 %}
       {% for row in section8.judet_rural %}
@@ -1244,7 +1244,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 
     {# Most ideological #}
     <div style="background:var(--bg);padding:14px 16px;">
-      <div class="panel-label" style="margin-bottom:6px;"><span class="emo md">🚩</span> Cele mai «ideologice»</div>
+      <div class="panel-label" style="margin-bottom:6px;"><span class="emo xl">🚩</span> Cele mai «ideologice»</div>
       <div class="panel-caption" style="margin:0 0 8px;">Cota de străzi cu nume ideologic (libertate, victorie, unire…)</div>
       {% set max_i = section8.judet_ideo[0].pct if section8.judet_ideo else 1 %}
       {% for row in section8.judet_ideo %}
@@ -1263,7 +1263,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 {# PANEL: SEMNĂTURI REGIONALE (s6) + CURIOZITĂȚI UNICE NAȚIONALE (s6) #}
 <div class="panel s6">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo md">📜</span> Semnături regionale · ≥80% concentrare într-un județ</span>
+    <span class="panel-label"><span class="emo xl">📜</span> Semnături regionale · ≥80% concentrare într-un județ</span>
     <span class="panel-meta">{{ section8.regional_signatures | length }} nume</span>
   </div>
   <div class="rank-list">
@@ -1279,7 +1279,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 
 <div class="panel s6" id="curiozitati">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo md">🔎</span> Curiozități unice naționale · doar într-un singur UAT</span>
+    <span class="panel-label"><span class="emo xl">🔎</span> Curiozități unice naționale · doar într-un singur UAT</span>
     <span class="panel-meta">selecție · geografice</span>
   </div>
   <div class="rank-list">
@@ -1312,13 +1312,13 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 {% set contest_order = ['flowers', 'trees', 'birds', 'animals', 'sky', 'trades'] %}
 <div class="panel s12">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo md">🏟️</span> Conteste tematice · top 7 din fiecare familie</span>
+    <span class="panel-label"><span class="emo xl">🏟️</span> Conteste tematice · top 7 din fiecare familie</span>
   </div>
   <div class="subgrid-3">
     {% for key in contest_order %}
     {% set entries = section8.contests[key] %}
     <div style="background:var(--bg);padding:14px 16px;">
-      <div class="panel-label" style="margin-bottom:8px;"><span class="emo md">{{ contest_emoji.get(key, '·') }}</span> {{ contest_labels[key] }}</div>
+      <div class="panel-label" style="margin-bottom:8px;"><span class="emo xl">{{ contest_emoji.get(key, '·') }}</span> {{ contest_labels[key] }}</div>
       {% if entries %}
         {% set max_e = entries[0].n %}
         {% for row in entries %}
@@ -1374,7 +1374,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 {# JavaScript: flat cloud render — both panels share the județ filter #}
 <script>
 (function() {
-  const LIMIT_STREETS = 30;
+  const LIMIT_STREETS = 50;
   const OVERALL_LEADERS = 3;
   const FONT_MIN = 17, FONT_MAX = 28;
 
@@ -1602,17 +1602,17 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 
     const fp = document.getElementById('s6-fingerprint');
     fp.innerHTML = `
-      <div class="kicker"><span class="emo md">🧬</span> Amprenta județului</div>
+      <div class="kicker"><span class="emo lg">🧬</span> Amprenta județului</div>
       <div style="font-family:var(--sans);font-weight:700;font-size:20px;margin:2px 0 4px;letter-spacing:-.015em;color:var(--ink);">${feature.properties?.name || code}</div>
       <div style="font-family:var(--sans);font-size:11px;color:var(--muted);margin-bottom:14px;font-variant-numeric:tabular-nums;font-weight:500;">${(row.total_streets || 0).toLocaleString('ro-RO')} de străzi · Sfinți ${(row.saint_pct || 0).toFixed(1)}% · Feminin ${(row.female_pct || 0).toFixed(1)}%</div>
 
-      <div class="kicker" style="margin-bottom:6px;"><span class="emo md">🔝</span> Cele mai frecvente</div>
+      <div class="kicker" style="margin-bottom:6px;"><span class="emo lg">🔝</span> Cele mai frecvente</div>
       <div style="margin-bottom:14px;">${topRows || '<span style="color:var(--muted)">—</span>'}</div>
 
-      <div class="kicker" style="margin-bottom:6px;"><span class="emo md">👤</span> Persoane omagiate</div>
+      <div class="kicker" style="margin-bottom:6px;"><span class="emo lg">👤</span> Persoane omagiate</div>
       <div style="margin-bottom:14px;">${personsRows || '<span style="color:var(--muted)">—</span>'}</div>
 
-      <div class="kicker" style="margin-bottom:6px;"><span class="emo md">💎</span> Cele mai rare (unice național)</div>
+      <div class="kicker" style="margin-bottom:6px;"><span class="emo lg">💎</span> Cele mai rare (unice național)</div>
       <div>${rareRows || '<span style="color:var(--muted)">—</span>'}</div>
     `;
   }

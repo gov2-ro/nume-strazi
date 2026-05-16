@@ -1,5 +1,30 @@
 # Activity History
 
+## 2026-05-16 — Emoji size bumps + Top 50 expansion
+
+### What was done
+- **Bumped emoji sizes** across the dashboard to match the larger row text introduced in the prior commit (12px → 22px on panel rows). Cascade:
+  - **Row emojis** (nature subtypes, professions, eras, theme dist): `.emo.md` (12px) → `.emo.xxl` (22px); container width `14px → 24px`.
+  - **Panel header labels** (16 panels): `.emo.md` → `.emo.xl` (12px → 18px).
+  - **Sub-panel labels** (s8 fingerprint sub-headers, contest family headers): `.emo.md` → `.emo.xl`.
+  - **Kicker labels** (map sidebar, fingerprint sub-blocks): `.emo.md` → `.emo.lg` (12px → 14px).
+  - **Statbar group labels** (Scară / Tematică / Gen / Onorați): `.emo.md` → `.emo.lg`.
+  - **Footer column labels** kept at `.emo.md` — text is 10px there; bumping unbalances the small uppercase headers.
+- **Top 50 instead of Top 30** in the left cluster-cloud panel to fill the vertical space alongside the gender-split persons panel on the right. JS `LIMIT_STREETS = 30 → 50`; per-județ SQL `rn <= 30 → 50` in `site_queries.section2()`; panel label updated to "Cele mai frecvente · Top 50".
+
+### Why
+- The previous commit (`8fdfb62`, msg "-") bumped row text from 12px → 22px without touching emoji sizes; emojis ended up visually puny next to the new text. User asked to "bump also the emoji/icon size accordingly. make them stand out a bit."
+- Left widget was top-30 plaques (~7 rows), right widget showed gender-split persons spanning ~10 rows — vertical mismatch. Bumping to 50 fills the parity.
+
+### Files touched
+- `templates/index.html.j2` — emoji class bumps + `LIMIT_STREETS=50` + label text
+- `site_queries.py` — `section2` per-județ `rn <= 50`
+- `dist/index.html` rebuilt (~490 KB, up from ~400 KB; growth is the extra 20 plaque entries × 42 județe)
+
+### Verification
+- `python3 build_site.py --variant default` → clean
+- `python3 -m pytest tests/test_build.py -q` → 12/12 pass
+
 ## 2026-05-16 — Cluster cloud promoted to primary (`dist/index.html`)
 
 ### What was done
