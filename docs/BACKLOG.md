@@ -83,3 +83,15 @@ Items detected during sessions. Each entry has enough context to act on cold.
 - [ ] **Wire real portraits into the Top Persoane list.** The dense dashboard now has a `.portrait` CSS class on each row of the s12 "Top persoane onorate" list, currently filled with parsed initials. When portrait images are available (Wikimedia thumbnails via `wikidata_persons.qid` is the obvious path), replace the initials with `<img>`. Layout already accommodates 26px circles without reflow. Wikimedia API: `https://commons.wikimedia.org/w/api.php?action=query&titles=File:<P18-value>&prop=imageinfo&iiprop=url&iiurlwidth=64`. Cache hashed thumbnails to `dist/portraits/<qid>.jpg` so the static site stays portable.
 
 - [ ] **Validate dark-statbar direction with stakeholders.** The bold-restyle pass moved the stats band from a light cream to dark ink (Bloomberg-feel). User brief said "white background" — interpreted as the main panels, with the statbar as a structural masthead. If user pushes back, flip `.statbar` to `background: var(--bg)` + `color: var(--ink)` and the rest of the design holds (panels, leader highlights, type scale all read fine on white-on-white as well).
+
+## Later
+
+- [ ] Create analysis for each județ. also bigger cities, capitale de județ.. Compare regions. Have a look at the data and write the text.
+
+- [ ] draw city map filtering out or with colored street names. militari vs femei. see [osm-poster](https://baditaflorin.github.io/osm-poster)
+
+- [ ] create clusters of street similar ctg names in cities, detect neighbourhoods
+
+- [ ] cel mai scurt mihai eminescu
+
+- [ ] look at where else we might find srteet names, as coduri poștale. see what's missing from which dataset (sectii vot, cod postal, osm)

@@ -1,0 +1,769 @@
+{# templates/metodologie.html.j2 — methodology / "how it works" page.
+   Romanian copy [Revizuire editorială RO în curs]: written by a non-native
+   pipeline. Sense and structure should be correct; tone and word-choice
+   benefit from a native Romanian editorial pass. #}
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Metodologie · Cum ne numim străzile</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&family=Barlow+Semi+Condensed:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+:root {
+  --bg: #FFFFFF;
+  --surface-1: #F7F9FC;
+  --surface-2: #ECF1F8;
+  --warn-1: #FFF7CC;
+  --ink-band: #0B1118;
+  --ink: #0B1118;
+  --ink-2: #2A313B;
+  --muted: #5A6573;
+  --muted-2: #8B95A2;
+  --rule: #E2E6EC;
+  --rule-strong: #BFC7D2;
+  --hairline: #EEF1F5;
+  --plaque: #0E4D92;
+  --accent: #C04F35;
+  --gold: #E8AE00;
+  --gold-soft: #F7D777;
+  --olive: #5F7A4E;
+  --sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --mono: 'IBM Plex Mono', monospace;
+  --street: 'Barlow Semi Condensed', 'IBM Plex Sans', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Nav — identical look to the dashboard */
+.site-nav {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--bg);
+  border-bottom: 1px solid var(--ink);
+  padding: 10px 24px;
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: var(--sans); font-size: 11.5px; letter-spacing: .06em;
+}
+.site-nav .brand {
+  font-weight: 700; color: var(--ink);
+  letter-spacing: .14em; text-transform: uppercase;
+  text-decoration: none; font-size: 12.5px;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.site-nav .brand::before {
+  content: '◆'; color: var(--gold); font-size: 10px; line-height: 1;
+}
+.site-nav nav { display: flex; gap: 22px; }
+.site-nav nav a {
+  color: var(--muted); text-decoration: none;
+  font-weight: 600; text-transform: uppercase;
+  letter-spacing: .1em; font-size: 10.5px;
+  padding-bottom: 2px; border-bottom: 2px solid transparent;
+  transition: color .12s ease, border-color .12s ease;
+}
+.site-nav nav a:hover { color: var(--ink); border-bottom-color: var(--gold); }
+.site-nav nav a.current { color: var(--ink); border-bottom-color: var(--gold); }
+
+/* Hero strip — narrow dark band echoing the dashboard's statbar
+   without competing with it. */
+.hero {
+  background: var(--ink-band);
+  color: #FFFFFF;
+  border-bottom: 3px solid var(--gold);
+  padding: 36px 28px 32px;
+}
+.hero .wrap { max-width: 880px; margin: 0 auto; }
+.hero .eyebrow {
+  font-family: var(--sans);
+  font-size: 10.5px; letter-spacing: .26em;
+  text-transform: uppercase; font-weight: 700;
+  color: var(--gold); margin-bottom: 14px;
+}
+.hero h1 {
+  font-family: var(--sans);
+  font-weight: 700; font-size: 30px; line-height: 1.15;
+  letter-spacing: -.005em;
+  margin-bottom: 10px;
+}
+.hero .sub {
+  font-family: var(--sans); font-size: 14.5px; line-height: 1.55;
+  color: rgba(255,255,255,.78);
+  max-width: 640px;
+}
+.hero .stat-row {
+  margin-top: 24px;
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  border-top: 1px solid rgba(255,255,255,.12);
+  padding-top: 18px;
+}
+.hero .stat-row .it { padding: 0 16px; border-right: 1px solid rgba(255,255,255,.10); }
+.hero .stat-row .it:first-child { padding-left: 0; }
+.hero .stat-row .it:last-child { border-right: 0; padding-right: 0; }
+.hero .stat-row .lbl {
+  font-size: 9.5px; letter-spacing: .22em; text-transform: uppercase;
+  font-weight: 700; color: var(--gold); margin-bottom: 6px;
+}
+.hero .stat-row .num {
+  font-family: var(--sans); font-feature-settings: 'tnum' 1, 'lnum' 1;
+  font-variant-numeric: tabular-nums;
+  font-size: 28px; font-weight: 700; line-height: 1;
+}
+.hero .stat-row .meta {
+  font-size: 11px; color: rgba(255,255,255,.55); margin-top: 4px;
+}
+.editorial-flag {
+  margin-top: 22px;
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 11px;
+  background: rgba(232,174,0,.14); color: var(--gold-soft);
+  border: 1px solid rgba(232,174,0,.35);
+  padding: 5px 10px; border-radius: 3px;
+  letter-spacing: .02em;
+}
+.editorial-flag::before { content: '⚠'; }
+
+/* Article column */
+.article {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 44px 28px 60px;
+}
+.article section { margin-bottom: 44px; scroll-margin-top: 70px; }
+.article h2 {
+  font-family: var(--sans);
+  font-size: 18px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .14em;
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 8px; margin-bottom: 18px;
+  display: flex; align-items: baseline; gap: 10px;
+}
+.article h2 .num {
+  font-family: var(--mono); font-size: 12.5px;
+  color: var(--gold); letter-spacing: .04em;
+}
+.article h3 {
+  font-family: var(--sans);
+  font-size: 13px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .12em;
+  color: var(--ink-2);
+  margin: 18px 0 10px;
+}
+.article p {
+  font-size: 14.5px; line-height: 1.65;
+  color: var(--ink-2);
+  margin-bottom: 12px;
+}
+.article p strong { color: var(--ink); font-weight: 700; }
+.article ul, .article ol {
+  padding-left: 22px; margin: 8px 0 14px;
+  font-size: 14.5px; line-height: 1.6; color: var(--ink-2);
+}
+.article ul li, .article ol li { margin-bottom: 6px; }
+.article a {
+  color: var(--plaque); text-decoration: underline; text-underline-offset: 2px;
+  text-decoration-thickness: 1px; text-decoration-color: var(--rule-strong);
+}
+.article a:hover { text-decoration-color: var(--plaque); }
+.article code {
+  font-family: var(--mono); font-size: 12.5px;
+  background: var(--surface-1);
+  padding: 1px 5px; border-radius: 2px;
+  color: var(--ink);
+  border: 1px solid var(--rule);
+}
+.article .callout {
+  background: var(--surface-1);
+  border-left: 3px solid var(--gold);
+  padding: 14px 18px;
+  margin: 16px 0;
+  font-size: 13.5px; line-height: 1.6;
+  color: var(--ink-2);
+}
+.article .callout strong { color: var(--ink); }
+.article .demo {
+  font-family: var(--mono); font-size: 12.5px;
+  background: var(--ink-band); color: #E8EDF5;
+  border-radius: 3px;
+  padding: 14px 18px;
+  margin: 14px 0;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+.article .demo .arrow { color: var(--gold); }
+.article .demo .label { color: var(--muted-2); font-size: 10.5px; letter-spacing: .15em; text-transform: uppercase; }
+.article .coverage-table {
+  width: 100%; border-collapse: collapse; margin: 12px 0 16px;
+  font-size: 13px;
+}
+.article .coverage-table th, .article .coverage-table td {
+  text-align: left; padding: 7px 10px;
+  border-bottom: 1px solid var(--hairline);
+  font-variant-numeric: tabular-nums;
+}
+.article .coverage-table th {
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: .14em;
+  color: var(--muted); font-weight: 700;
+  border-bottom: 1.5px solid var(--ink);
+}
+.article .coverage-table td.n { text-align: right; }
+
+/* In-page table of contents */
+.toc {
+  background: var(--surface-1);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 16px 20px;
+  margin-bottom: 36px;
+}
+.toc .lbl {
+  font-size: 10px; letter-spacing: .22em; text-transform: uppercase;
+  font-weight: 700; color: var(--muted); margin-bottom: 10px;
+}
+.toc ol {
+  list-style: none; padding: 0; margin: 0;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px 18px;
+}
+.toc ol li {
+  font-size: 13px; margin: 0;
+  display: flex; align-items: baseline; gap: 8px;
+}
+.toc ol li::before {
+  content: counter(toci, decimal-leading-zero);
+  counter-increment: toci;
+  font-family: var(--mono); font-size: 10px;
+  color: var(--gold); font-weight: 700;
+  letter-spacing: .04em;
+}
+.toc ol { counter-reset: toci; }
+.toc a { color: var(--ink-2); text-decoration: none; }
+.toc a:hover { color: var(--plaque); text-decoration: underline; }
+
+/* Timeline */
+.timeline {
+  position: relative;
+  margin: 20px 0 0;
+  padding-left: 0;
+  list-style: none;
+}
+.timeline::before {
+  content: ''; position: absolute;
+  left: 7px; top: 8px; bottom: 8px;
+  width: 2px; background: var(--ink);
+}
+.timeline > li {
+  position: relative;
+  padding: 0 0 20px 32px;
+}
+.timeline > li::before {
+  content: ''; position: absolute;
+  left: 2px; top: 6px;
+  width: 12px; height: 12px;
+  background: var(--gold);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+}
+.timeline .date {
+  font-family: var(--mono);
+  font-size: 11px; letter-spacing: .06em;
+  background: var(--ink-band); color: var(--gold);
+  padding: 2px 8px; border-radius: 2px;
+  font-weight: 600;
+  display: inline-block;
+  margin-bottom: 6px;
+}
+.timeline .what {
+  font-size: 14px; line-height: 1.5; color: var(--ink);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.timeline .why {
+  font-size: 12.5px; line-height: 1.55;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* Footer — same band as dashboard */
+.site-footer {
+  background: var(--ink-band);
+  color: #FFFFFF;
+  padding: 24px 28px;
+}
+.site-footer .wrap {
+  max-width: 1640px; margin: 0 auto;
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 36px;
+}
+.site-footer .col .lbl {
+  font-family: var(--sans);
+  font-size: 10px; letter-spacing: .22em;
+  text-transform: uppercase; font-weight: 700;
+  color: var(--gold); margin-bottom: 8px;
+  display: inline-flex; align-items: center; gap: 7px;
+}
+.site-footer .col p {
+  font-family: var(--sans); font-size: 12.5px; line-height: 1.6;
+  color: rgba(255,255,255,.72);
+}
+.site-footer .col a { color: var(--gold-soft); text-decoration: underline; text-underline-offset: 2px; }
+.site-footer .meta {
+  max-width: 1640px; margin: 18px auto 0;
+  border-top: 1px solid rgba(255,255,255,.10);
+  padding-top: 12px;
+  font-family: var(--sans); font-size: 11px;
+  color: rgba(255,255,255,.5); letter-spacing: .04em;
+}
+
+@media (max-width: 720px) {
+  .hero h1 { font-size: 24px; }
+  .hero .stat-row { grid-template-columns: 1fr 1fr; gap: 14px 0; }
+  .hero .stat-row .it:nth-child(2) { border-right: 0; }
+  .hero .stat-row .it:nth-child(3) { padding-left: 0; }
+  .toc ol { grid-template-columns: 1fr; }
+  .site-footer .wrap { grid-template-columns: 1fr; gap: 18px; }
+}
+  </style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <a href="index.html" class="brand">Cum ne numim străzile</a>
+  <nav>
+    <a href="index.html#cele-mai-intalnite">Cele mai întâlnite</a>
+    <a href="index.html#tematica">Tematică</a>
+    <a href="index.html#pe-cine-onoram">Pe cine onorăm</a>
+    <a href="index.html#harta">Harta</a>
+    <a href="index.html#curiozitati">Curiozități</a>
+    <a href="metodologie.html" class="current">Metodologie</a>
+  </nav>
+</nav>
+
+<section class="hero">
+  <div class="wrap">
+    <div class="eyebrow">Metodologie · cum funcționează</div>
+    <h1>De la un registru electoral la un atlas al numelor de stradă</h1>
+    <p class="sub">
+      Un proiect de cercetare deschisă despre cum își numesc românii străzile.
+      Pagina aceasta explică sursa datelor, transformările aplicate și deciziile
+      din spatele cifrelor pe care le vedeți în restul site-ului.
+    </p>
+    <div class="stat-row">
+      <div class="it">
+        <div class="lbl">Adrese</div>
+        <div class="num">105.107</div>
+        <div class="meta">străzi distincte după deduplicare</div>
+      </div>
+      <div class="it">
+        <div class="lbl">UAT-uri</div>
+        <div class="num">1.155</div>
+        <div class="meta">42 județe (41 + 6 sectoare B)</div>
+      </div>
+      <div class="it">
+        <div class="lbl">Clasificate</div>
+        <div class="num">~57%</div>
+        <div class="meta">din străzi, după ponderea apariției</div>
+      </div>
+      <div class="it">
+        <div class="lbl">Persoane</div>
+        <div class="num">310</div>
+        <div class="meta">onorați curați, 300 cu QID Wikidata</div>
+      </div>
+    </div>
+    <div class="editorial-flag">Revizuire editorială RO în curs</div>
+  </div>
+</section>
+
+<article class="article">
+
+<div class="toc">
+  <div class="lbl">Pe această pagină</div>
+  <ol>
+    <li><a href="#de-ce">De ce acest proiect</a></li>
+    <li><a href="#sursa">Sursa datelor</a></li>
+    <li><a href="#schema">Cum se transformă datele</a></li>
+    <li><a href="#clasificare">Cum sunt clasificate numele</a></li>
+    <li><a href="#recunoastere">Recunoaștere prin Wikidata</a></li>
+    <li><a href="#osm">Geometrie via OSM</a></li>
+    <li><a href="#limite">Limite și capcane</a></li>
+    <li><a href="#ce-urmeaza">Ce urmează</a></li>
+    <li><a href="#cronologie">Cronologie</a></li>
+    <li><a href="#cod">Cod și surse</a></li>
+  </ol>
+</div>
+
+<section id="de-ce">
+  <h2><span class="num">01</span> De ce acest proiect</h2>
+  <p>
+    Numele de stradă sunt una dintre cele mai aproape de cotidian forme de memorie publică.
+    Le citim pe semne, le tastăm în formulare, le repetăm la telefon — fără să ne mai întrebăm
+    de ce o stradă se cheamă <em>Florilor</em>, <em>1 Mai</em> sau <em>Mihai Eminescu</em>.
+    Puse cap la cap, sutele de mii de nume formează un atlas al valorilor pe care comunele și
+    orașele alegeau, la un moment dat, să le facă vizibile.
+  </p>
+  <p>
+    Proiectul își propune să transforme acest atlas implicit într-unul explicit:
+    care sunt cele mai întâlnite nume, pe cine onorăm cel mai des, cum diferă județele între ele,
+    ce categorii tematice predomină. Răspunsurile vin din date — nu din intuiție.
+  </p>
+  <p>
+    Suntem în <strong>faza de prototip</strong>: nucleul de date este aproape complet, dashboardul
+    funcționează cu date reale, dar partea editorială — publicația interactivă în limba română — urmează.
+  </p>
+</section>
+
+<section id="sursa">
+  <h2><span class="num">02</span> Sursa datelor</h2>
+  <p>
+    Sursa primară este <strong>Registrul Secțiilor de Vot</strong> publicat de
+    Autoritatea Electorală Permanentă (AEP). Un fișier xlsx cu aproximativ
+    141.000 de rânduri, fiecare descriind o adresă cu alegători înregistrați
+    (stradă · numere · secție de votare · localitate · județ). Snapshot folosit: 14.05.2025.
+  </p>
+  <p>Ce conține registrul:</p>
+  <ul>
+    <li>Numele străzii așa cum este scris oficial (cu diacritice, cu prefixe de tip — <em>Strada</em>, <em>Bulevardul</em>, <em>Calea</em>)</li>
+    <li>UAT-ul (Unitatea Administrativ-Teritorială) și codul SIRUTA</li>
+    <li>Intervale de numere acoperite de fiecare secție de votare</li>
+  </ul>
+  <p>Ce <em>nu</em> conține:</p>
+  <ul>
+    <li>Geometrie sau coordonate (le luăm separat din OpenStreetMap)</li>
+    <li>Numele anterioare ale străzii (renumirile sunt o sursă separată — vezi <a href="#ce-urmeaza">Ce urmează</a>)</li>
+    <li>Detalii despre persoana onorată — doar numele așa cum apare pe placă</li>
+  </ul>
+  <p>
+    Registrul este public, dar nu este versionat ca dataset deschis: ediții succesive se publică
+    fără un changelog formal. Diferențele între snapshot-uri se calculează manual, ceea ce face
+    analiza de renumiri să fie un capitol separat.
+  </p>
+</section>
+
+<section id="schema">
+  <h2><span class="num">03</span> Cum se transformă datele</h2>
+  <p>
+    Pipeline-ul este intenționat simplu: xlsx → SQLite, totul rulează din <code>build_db.py</code>,
+    fără pandas și fără ORM. Stdlib + <code>openpyxl</code>. Construcția DB-ului este
+    <strong>idempotentă</strong> — îl putem reconstrui de la zero ori de câte ori e nevoie.
+  </p>
+
+  <h3>Cele două chei de normalizare</h3>
+  <p>
+    Două coloane fac muncă diferită și nu trebuie confundate:
+  </p>
+  <ul>
+    <li><code>name_normalized</code> — pentru a grupa aceeași stradă scrisă diferit în UAT-uri diferite (același nume, aceeași intrare).</li>
+    <li><code>core_name_norm</code> — extrage doar nucleul semantic (fără <em>Strada</em>, <em>Regele</em>, <em>Bulevardul</em>) ca să poată face <em>join</em> cu tabelele curate de persoane, categorii, locuri.</li>
+  </ul>
+  <p>Exemplu pe un caz frecvent:</p>
+  <div class="demo">
+<span class="label">Original</span>      Bulevardul Regele Carol I
+<span class="label">name_normalized</span>  bulevardul regele carol i
+<span class="label">core_name_norm</span>   carol i      <span class="arrow">→</span> match în <code style="background:transparent;color:#E8AE00;border:0;">persons</code>
+  </div>
+
+  <h3>Diacritice: păstrăm la afișare, colapsăm la chei</h3>
+  <p>
+    Coloana <code>name</code> păstrează ortografia originală (inclusiv <em>î</em> vs <em>â</em>).
+    Cheile de potrivire colapsează <code>î ≡ â</code> ca să nu pierdem corespondențe între ortografia
+    pre-1993 (încă prezentă în registru) și cea actuală. Cedilele <em>ş</em>/<em>ţ</em> sunt corectate
+    automat la ingestie în <em>ș</em>/<em>ț</em> conform standardului post-1993.
+  </p>
+
+  <h3>Deduplicare: capcana sectiilor de votare</h3>
+  <p>
+    O singură stradă poate apărea de mai multe ori în registru pentru că este împărțită
+    între secții de votare. Tabela brută <code>streets</code> reflectă această repetiție.
+    Pentru orice analiză folosim <code>streets_dedup</code> — o vedere care unifică
+    aceeași stradă în același UAT într-un singur rând.
+  </p>
+  <div class="callout">
+    <strong>Concret:</strong> 127.364 rânduri ingerate din registru → 105.107 străzi unice după
+    deduplicare. Diferența de ~22.000 sunt repetițiile generate de secții. Orice query care numără
+    direct din <code>streets</code> supraestimează.
+  </div>
+</section>
+
+<section id="clasificare">
+  <h2><span class="num">04</span> Cum sunt clasificate numele</h2>
+  <p>
+    Patru tabele curate găzduiesc clasificarea: <code>persons</code> (persoane onorate),
+    <code>nature_terms</code> (flori, copaci, păsări, animale, peisaj), <code>name_categories</code>
+    (categorii tematice — religios, ideologic, abstract, instituțional, comemorativ, etc.) și
+    <code>place_refs</code> (orașe românești, regiuni, țări, ape, munți). Toate se leagă de străzi
+    prin <code>core_name_norm</code>.
+  </p>
+
+  <h3>Acoperire actuală</h3>
+  <table class="coverage-table">
+    <thead>
+      <tr><th>Status</th><th class="n">Străzi</th><th class="n">%</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Neclasificate</td><td class="n">45.286</td><td class="n">43,1%</td></tr>
+      <tr><td>Natură (flori, peisaj, animale)</td><td class="n">27.356</td><td class="n">26,0%</td></tr>
+      <tr><td>Persoane</td><td class="n">11.297</td><td class="n">10,7%</td></tr>
+      <tr><td>Locuri (orașe, regiuni, ape)</td><td class="n">4.343</td><td class="n">4,1%</td></tr>
+      <tr><td>Abstract</td><td class="n">3.483</td><td class="n">3,3%</td></tr>
+      <tr><td>Instituțional</td><td class="n">3.197</td><td class="n">3,0%</td></tr>
+      <tr><td>Ideologic</td><td class="n">2.806</td><td class="n">2,7%</td></tr>
+      <tr><td>Restul (meșteșug, religios, dată, etc.)</td><td class="n">7.339</td><td class="n">7,1%</td></tr>
+    </tbody>
+  </table>
+  <p>
+    Cifra de ~57% acoperire ascunde o paradoxală asimetrie: din cele aproximativ 30.000 de
+    nume <em>distincte</em> sunt clasificate doar circa 5%. Cele câteva mii curate acoperă
+    însă majoritatea străzilor — pentru că numele frecvente (Florilor, Eminescu, 1 Mai) revin
+    în sute de UAT-uri. <strong>Lista lungă de nume rare</strong> rămâne grosul muncii viitoare.
+  </p>
+
+  <h3>Strategia de curatare</h3>
+  <p>
+    În patru pași, fiecare construind peste precedentul:
+  </p>
+  <ol>
+    <li><strong>Seed manual</strong> — câteva zeci de intrări de bază, scrise direct în <code>seed_lookups.py</code>.</li>
+    <li><strong>Top-500 hand-curat</strong> — cele mai frecvente 500 de nume neclasificate, revizuite manual. Acoperirea sare de la 16% la 47%.</li>
+    <li><strong>Batch 2</strong> — încă ~500 de intrări, în special persoane minoritare (maghiari) și termeni de natură rari. Acoperirea ajunge la ~57%.</li>
+    <li><strong>Clasificator LLM</strong> — pentru coada lungă rulăm un clasificator batch (Claude Haiku / Gemini Flash Lite) care propune <em>table</em> + metadată pentru fiecare nume. Două modele rulate în paralel; rezultatele se compară pentru convergență.</li>
+  </ol>
+  <div class="callout">
+    <strong>De ce LLM și nu reguli + WordNet?</strong> Am evaluat un pre-filtru cu reguli și
+    un strat NLP cu lemmatizer/RoWordNet. Decizia (documentată în <code>BACKLOG.md</code>):
+    rularea LLM pe tot setul costă în jur de 2 USD la prețuri Haiku. Pre-filtrarea ar fi
+    însemnat 3× mai mult cod care economisește practic nimic, iar morfologia română (genitivele,
+    formele articulate) e tratată mai bine de un LLM modern decât de un lanț lemmatizer + wordnet.
+  </div>
+</section>
+
+<section id="recunoastere">
+  <h2><span class="num">05</span> Recunoaștere prin Wikidata</h2>
+  <p>
+    Pentru fiecare persoană din tabela <code>persons</code> căutăm un identificator Wikidata
+    (QID). Pornind de la QID extragem două semnale:
+  </p>
+  <ul>
+    <li><strong>Sitelinks</strong> — câte ediții de Wikipedia au un articol despre persoană. Proxy pentru recunoaștere internațională.</li>
+    <li><strong>Vizualizări Wikipedia RO</strong> — media lunară de pageviews în ultimele 12 luni. Proxy pentru memorie culturală activă în România.</li>
+  </ul>
+  <p>
+    Combinate, ne dau o ierarhie cu trei nivele:
+    <strong>universal</strong> (≥50 ediții — Eminescu, Curie, Traian),
+    <strong>național</strong> (5–49 ediții — majoritatea figurilor istorice românești),
+    <strong>local</strong> (1–4 ediții — recunoscut mai ales acasă).
+  </p>
+  <p>
+    La momentul actual sunt potriviți <strong>300 din 310</strong> onorați curați. Cei 10
+    rămași sunt fie figuri folclorice fără entitate Wikidata (Cloșca singular, Banu Mărăcine,
+    Voinicului), fie cazuri de dezambiguare pentru care nu există încă o variantă unică verificată.
+  </p>
+  <div class="callout">
+    <strong>De ce avem un <em>QID uniqueness guard</em>.</strong> La un moment dat tool-ul de
+    matching a atribuit acelaşi QID (Q208518 — Michel Vorm, portar olandez) atât pentru
+    <em>cuza voda</em> cât şi pentru <em>a. i. cuza</em>, pentru că primul rezultat returnat
+    de căutarea Wikidata era cel greşit. Acum, înainte de a scrie un QID, verificăm că
+    nu este deja atribuit unei alte persoane şi semnalăm conflictul în CSV.
+  </div>
+</section>
+
+<section id="osm">
+  <h2><span class="num">06</span> Geometrie via OpenStreetMap</h2>
+  <p>
+    Registrul nu conţine geometrie. Pentru a putea răspunde la întrebări de tip
+    „cât de importantă e o stradă în interiorul oraşului?" îmbinăm registrul cu OpenStreetMap.
+    Folosim snapshot-ul Geofabrik pentru România (≈300 MB, ~4 milioane de căi) procesat cu
+    <code>osmium</code> + <code>shapely</code>.
+  </p>
+  <p>Pipeline-ul OSM:</p>
+  <ol>
+    <li><strong>Ingest</strong> — grupăm căile OSM cu <code>highway=*</code> pe perechi <code>(UAT, nume normalizat)</code>. Rezultă ~106.000 de „străzi OSM".</li>
+    <li><strong>Match</strong> — join cu <code>streets_dedup</code> în două treceri: <em>exact</em> pe <code>name_normalized</code>, apoi <em>fuzzy</em> pe <code>core_name_norm</code>.</li>
+    <li><strong>Scor de importanță</strong> — <code>highway_weight × log(1 + length_m) + ref_bonus</code>, apoi z-score în interiorul UAT-ului. Bucureștiul nu mai zdrobeşte ierarhia.</li>
+  </ol>
+
+  <h3>Acoperire şi sincere ei limite</h3>
+  <p>
+    Match-ul reuşit pentru ~52% din străzile din registru. Distribuţia însă este puternic
+    <strong>stratificată regional</strong>:
+  </p>
+  <ul>
+    <li>Cele mai bine acoperite: Tulcea (87%), Brăila (81%), Mehedinţi (75%).</li>
+    <li>Cele mai slabe: Gorj (18%), Dâmboviţa (28%), Sibiu (31%).</li>
+  </ul>
+  <p>
+    Cauza nu este o problemă de potrivire de nume, ci densitatea cartografierii OSM în
+    zone rurale. Numele generice din satele Gorjului („Principală", „Bisericii", „Viilor")
+    pur şi simplu nu există încă în OSM. Aceeaşi stratificare se va vedea probabil şi în
+    alte surse care depind de comunitatea de voluntari (Wikipedia, Wikidata).
+  </p>
+  <p>
+    <strong>Două opţiuni de scop pe care le-am luat conştient:</strong> autostrăzile şi drumurile
+    naţionale (<code>highway=motorway/trunk</code>) sunt excluse — analiza priveşte mediul construit,
+    nu transportul inter-urban. Şi nu folosim numărul de POI-uri ca semnal de importanţă: ar măsura
+    entuziasmul cartografilor pentru o zonă, nu importanţa străzii.
+  </p>
+</section>
+
+<section id="limite">
+  <h2><span class="num">07</span> Limite şi capcane</h2>
+  <p>Câteva avertismente importante pentru oricine vrea să folosească datele:</p>
+  <ul>
+    <li><strong>Genul este sub-documentat.</strong> Foarte puţine femei onorate sunt clasificate ca atare. Diferenţa „99 din 100" pe care o vedeţi în dashboard este reală ca direcţie, dar magnitudinea exactă depinde de o rundă viitoare de curatare orientată pe onorate.</li>
+    <li><strong>„Comunist" e un detector de tokeni, nu o dovadă de datare.</strong> Putem identifica numele care conţin marcatori ideologici (1 Mai, 23 August, Republicii, Independenţei). Nu putem demonstra când au fost atribuite şi nici dacă au fost redenumiri după 1989, fără surse externe.</li>
+    <li><strong>Identitatea persoanelor nu este încă deduplicată.</strong> <em>mihai eminescu</em> şi <em>eminescu</em> sunt cheie diferite în <code>core_name_norm</code> şi apar separat în statistici. Rezolvarea identităţii este o etapă viitoare făcută cu grijă, nu o normalizare automată.</li>
+    <li><strong>Bucureştiul are dublă identitate.</strong> Cele 6 sectoare sunt UAT-uri separate în registru. Pentru hărţi pe judeţe le agregăm sub eticheta <em>B</em>; pentru clasamente per-UAT le păstrăm separat. Atenţie la query-urile care fac join pe judeţ.</li>
+    <li><strong>Faza de prototip ≠ adevărul universal.</strong> În iterările timpurii am lucrat pe un eşantion de 4 judeţe care era ~75% rural-Prahova. Frecvenţele relative din acea fază nu trebuie generalizate. Toate cifrele de pe site sunt acum din build-ul complet.</li>
+  </ul>
+</section>
+
+<section id="ce-urmeaza">
+  <h2><span class="num">08</span> Ce urmează</h2>
+  <p>Prioritatea pentru fazele următoare:</p>
+  <ul>
+    <li><strong>Renumiri (Secţiunea 7 din dashboard).</strong> Are nevoie de o sursă de perechi „nume vechi → nume nou". Candidaţi: diff între două ediţii ale registrului, curatare manuală, sau un dataset extern de străzi redenumite. Până atunci, secţiunea afişează exemple ilustrative cu eticheta „în construcţie".</li>
+    <li><strong>Curatare orientată pe onorate.</strong> Rundă dedicată pentru a îmbunătăţi acoperirea femeilor în tabela <code>persons</code>.</li>
+    <li><strong>Dedup de identitate.</strong> O persoană = un singur identificator, chiar dacă numele apare în forme multiple în registru.</li>
+    <li><strong>Portrete reale</strong> pentru topul de persoane onorate, prin <em>thumbnail</em>-uri Wikimedia legate de QID-uri.</li>
+    <li><strong>Set de iconiţe SVG</strong> care să înlocuiască emoji-urile actuale (rendering inconsistent între sisteme de operare).</li>
+    <li><strong>Importance v2 pentru OSM</strong> — adăugarea unui scor de <em>betweenness centrality</em> per UAT, util în interiorul oraşelor unde ierarhia de tipuri de drum se aplatizează.</li>
+    <li><strong>Publicaţia editorială.</strong> Dashboardul este suport de explorare; partea narativă, în limba română, urmează ca medium separat (probabil notebook-uri Jupyter şi un text publicat).</li>
+  </ul>
+</section>
+
+<section id="cronologie">
+  <h2><span class="num">09</span> Cronologie</h2>
+  <p>
+    Cum a evoluat proiectul, în paşi principali. Distilată din jurnalul de activitate
+    (<code>docs/activity-history.md</code>) şi istoricul de commit-uri.
+  </p>
+
+  <ol class="timeline">
+    <li>
+      <div class="date">2026-04-26</div>
+      <div class="what">Pipeline ETL complet — 141.643 de rânduri din registru, 105.107 străzi unice.</div>
+      <div class="why">Prima construcţie reală. SQLite + Python stdlib + openpyxl. Idempotent prin design — îl putem rula iar şi iar.</div>
+    </li>
+    <li>
+      <div class="date">2026-04-26</div>
+      <div class="what">Curatare top-500: acoperirea sare de la 16,6% la 47,6%.</div>
+      <div class="why">Câteva sute de intrări atent alese dezbat câteva zeci de mii de străzi. Distribuţia frecvenţelor este puternic asimetrică.</div>
+    </li>
+    <li>
+      <div class="date">2026-04-27</div>
+      <div class="what">Batch 2 de curatare: 47,6% → 56,9%. Acum includem şi onoraţi din minorităţi (maghiari).</div>
+    </li>
+    <li>
+      <div class="date">2026-04-27</div>
+      <div class="what">Clasificator LLM (Claude Haiku) pentru coada lungă de nume rare.</div>
+      <div class="why">Decizie documentată: nu construim un pre-filtru cu reguli sau un strat NLP. LLM-ul direct este mai ieftin şi tratează mai bine morfologia română.</div>
+    </li>
+    <li>
+      <div class="date">2026-04-28</div>
+      <div class="what">Schelet pentru îmbogăţire cu OSM — patru tool-uri: ingest, match, score, sanity.</div>
+      <div class="why">pyrosm nu se construia pe Python 3.12; am rescris ingestia pe osmium + shapely. Atribuirea la UAT prin <em>nearest centroid</em>, nu prin <em>polygon containment</em>.</div>
+    </li>
+    <li>
+      <div class="date">2026-04-28</div>
+      <div class="what">Rulare OSM end-to-end. Match-ul reuşit pentru 52% din străzi, dar stratificat regional: Gorj 17,7% versus Tulcea 87,3%.</div>
+      <div class="why">Nu e un bug — reflectă densitatea reală a cartografierii OSM în zonele rurale. Devine o constatare de povestit.</div>
+    </li>
+    <li>
+      <div class="date">2026-04-28</div>
+      <div class="what">Fix mic dar important: expansiunea abrevierii <em>G-ral</em> → <em>General</em>. +85 de match-uri noi pentru străzi militare.</div>
+    </li>
+    <li>
+      <div class="date">2026-05-04</div>
+      <div class="what">Îmbogăţire Wikidata: QID-uri pentru persoane, sitelinks ca proxy de recunoaştere, pageviews RO ca proxy de memorie culturală activă.</div>
+    </li>
+    <li>
+      <div class="date">2026-05-06</div>
+      <div class="what">Site static, prima versiune: toate cele 8 secţiuni, choropleth D3 pentru hartă, footer cu date dinamice.</div>
+      <div class="why">Construit într-o singură sesiune cu „subagent-driven development". 17 teste, toate trec.</div>
+    </li>
+    <li>
+      <div class="date">2026-05-15</div>
+      <div class="what">Clasificator LLM multi-provider — Anthropic, Google şi OpenRouter, plus tool de comparare a convergenţei.</div>
+      <div class="why">Cu două modele rulate în paralel putem detecta dezacordurile şi prioritiza revizuirea manuală exact pe acolo.</div>
+    </li>
+    <li>
+      <div class="date">2026-05-15</div>
+      <div class="what">Revizuire manuală a QID-urilor completă: 300 din 310 persoane potrivite.</div>
+      <div class="why">Incidentul „Michel Vorm" — un portar olandez atribuit lui Cuza — a dus la introducerea unei verificări de unicitate QID. Greşelile prind devreme acum.</div>
+    </li>
+    <li>
+      <div class="date">2026-05-16</div>
+      <div class="what">Variantă densă a dashboard-ului, în stil atlas. 12 coloane, 3 niveluri responsive, panouri concentrate pe date.</div>
+      <div class="why">Vechea variantă editorială a fost arhivată — accesibilă încă, dar nu mai este principalul deliverable. Site-ul devine un instrument de explorare, nu o publicaţie.</div>
+    </li>
+    <li>
+      <div class="date">2026-05-16</div>
+      <div class="what">Plăci de stradă în stilul românesc: alb pe albastru semnal (#0E4D92), cu umbre duble pentru senzaţia gravată.</div>
+    </li>
+    <li>
+      <div class="date">2026-05-16</div>
+      <div class="what">Header reconstruit: filtru pe judeţ, widget de statistici, eliminată căutarea redundantă.</div>
+    </li>
+    <li>
+      <div class="date">2026-05-16</div>
+      <div class="what">Restilizare îndrăzneaţă: statbar negru, IBM Plex, indicii emoji pe categorii, rândul lider evidenţiat cu auriu, amprente per judeţ pe hartă.</div>
+      <div class="why">Repere vizuale pe care această pagină de metodologie le împrumută — band ink-negru, accente aurii, IBM Plex Sans.</div>
+    </li>
+    <li>
+      <div class="date">2026-05-16</div>
+      <div class="what">Pagina aceasta. Prima încercare de a spune <em>cum</em> funcţionează proiectul, nu doar <em>ce</em> arată.</div>
+    </li>
+  </ol>
+</section>
+
+<section id="cod">
+  <h2><span class="num">10</span> Cod şi surse</h2>
+  <p>
+    Proiectul este open în sensul reproductibil: tot codul este Python 3.11+ pe stdlib
+    (cu mici excepţii — <code>openpyxl</code> la ingestie, <code>osmium</code>/<code>shapely</code>
+    pentru OSM). Schema, query-urile şi deciziile sunt documentate în:
+  </p>
+  <ul>
+    <li><code>docs/CODE_SPEC.md</code> — PRD-ul complet al stratului de date (schema, reguli de curăţare, prioritizare).</li>
+    <li><code>docs/queries.sql</code> — catalogul de query-uri numite care alimentează dashboard-ul.</li>
+    <li><code>docs/BACKLOG.md</code> — chestiuni deschise şi muncă viitoare, prioritizate P0–P3.</li>
+    <li><code>docs/activity-history.md</code> — jurnalul de sesiuni, cu motivele din spatele deciziilor non-evidente.</li>
+  </ul>
+  <p>
+    Pentru orice întrebare punctuală — sau dacă vreţi să contribuiţi cu o rundă de curatare —
+    contactaţi-ne la adresa din footer.
+  </p>
+</section>
+
+</article>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="col">
+      <div class="lbl"><span style="font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif;">📄</span> Despre date</div>
+      <p>Registrul Secţiilor de Vot, Autoritatea Electorală Permanentă, 14.05.2025. Descriere adrese cu alegători înregistraţi.</p>
+    </div>
+    <div class="col">
+      <div class="lbl"><span style="font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif;">⚗️</span> Metodologie</div>
+      <p>Sunteţi pe pagina de metodologie. <a href="index.html">Înapoi la dashboard →</a></p>
+    </div>
+    <div class="col">
+      <div class="lbl"><span style="font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif;">⌨️</span> Cod sursă</div>
+      <p>Proiect personal · pax@mioritics.ro</p>
+    </div>
+  </div>
+  <div class="meta">
+    Cum ne numim străzile · metodologie · ultima actualizare 16.05.2026
+  </div>
+</footer>
+
+</body>
+</html>

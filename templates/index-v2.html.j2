@@ -1,10 +1,10 @@
-{# templates/index.html.j2 — primary dashboard: cluster-cloud top + side-by-side persoane #}
+{# templates/index.html.j2 — primary (dense / atlas) layout #}
 <!DOCTYPE html>
 <html lang="ro">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Cum ne numim străzile</title>
+  <title>Cum ne numim străzile · variantă densă</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&family=Barlow+Semi+Condensed:wght@600;700&display=swap" rel="stylesheet">
@@ -148,8 +148,8 @@ body {
    dashboard's masthead "ticker": dense, high-contrast, Bloomberg-feel.
    4-col on desktop → 2-col at ≤1024 → 1-col at ≤640. */
 .statbar {
-  background: var(--surface-1);
-  color: var(--ink);
+  background: var(--ink-band);
+  color: #FFFFFF;
   border-bottom: 3px solid var(--gold);
   padding: 22px 28px 24px;
   display: grid;
@@ -160,13 +160,13 @@ body {
 }
 .statbar::before {
   content: ''; position: absolute; left: 0; right: 0; top: 0;
-  height: 1px; background: var(--hairline);
+  height: 1px; background: rgba(255,255,255,.12);
 }
 .statbar .group {
   display: flex; flex-direction: column; gap: 10px;
   padding: 0 26px 0 0;
   min-width: 0;
-  border-right: 1px solid var(--rule);
+  border-right: 1px solid rgba(255,255,255,.10);
 }
 .statbar .group + .group { padding-left: 26px; }
 .statbar .group:last-child { border-right: none; padding-right: 0; }
@@ -176,7 +176,7 @@ body {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: .22em;
-  color: var(--muted);
+  color: var(--gold);
   font-weight: 700;
   display: inline-flex; align-items: center; gap: 7px;
 }
@@ -184,14 +184,14 @@ body {
   font-family: var(--sans);
   font-weight: 700;
   font-size: 34px;
-  color: var(--ink);
+  color: #FFFFFF;
   line-height: 1;
   font-variant-numeric: tabular-nums;
   letter-spacing: -.025em;
 }
 .statbar .v .u {
   font-size: 14px;
-  color: var(--muted);
+  color: rgba(255,255,255,.55);
   margin-left: 4px;
   font-weight: 600;
   letter-spacing: 0;
@@ -201,11 +201,11 @@ body {
   font-size: 10.5px;
   text-transform: uppercase;
   letter-spacing: .14em;
-  color: var(--muted);
+  color: rgba(255,255,255,.55);
   margin-top: 4px;
   font-weight: 500;
 }
-.statbar .accent { color: var(--accent); }
+.statbar .accent { color: var(--gold); }
 
 .statbar .scale-stack { display: flex; flex-direction: column; gap: 12px; }
 .statbar .scale-stack .item { display: flex; align-items: baseline; gap: 12px; }
@@ -216,14 +216,14 @@ body {
 .statbar .gen-row .frac {
   font-family: var(--sans);
   font-size: 15px;
-  color: var(--muted);
+  color: rgba(255,255,255,.7);
   font-variant-numeric: tabular-nums;
   font-weight: 500;
 }
 
 .statbar .minibar {
   display: flex; height: 8px; border-radius: 0; overflow: hidden;
-  background: var(--rule); margin-top: 4px;
+  background: rgba(255,255,255,.10); margin-top: 4px;
 }
 
 .statbar .top-pair { display: flex; flex-direction: column; gap: 9px; }
@@ -235,28 +235,28 @@ body {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: .18em;
-  color: var(--muted);
+  color: var(--gold);
   font-weight: 700;
   min-width: 28px;
 }
 .statbar .top-pair .name {
   font-size: 14.5px;
   font-weight: 600;
-  color: var(--ink);
+  color: #FFFFFF;
   letter-spacing: -.005em;
 }
 .statbar .top-pair .cnt {
   font-family: var(--sans);
   font-weight: 700;
   font-size: 15px;
-  color: var(--ink);
+  color: #FFFFFF;
   font-variant-numeric: tabular-nums;
   margin-left: auto;
   letter-spacing: -.01em;
 }
 .statbar .top-pair .cnt .u {
   font-size: 10.5px;
-  color: var(--muted);
+  color: rgba(255,255,255,.55);
   margin-left: 3px;
   font-weight: 600;
 }
@@ -279,7 +279,7 @@ body {
   .statbar .group {
     border-right: none !important;
     padding: 0 0 18px 0 !important;
-    border-bottom: 1px solid var(--rule);
+    border-bottom: 1px solid rgba(255,255,255,.10);
   }
   .statbar .group:last-child {
     border-bottom: none;
@@ -652,120 +652,6 @@ body {
 
 /* ──────── Footer (dark band, mirrors statbar) ──────── */
 footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 28px; }
-
-/* ──────── Cluster cloud (new top-row panels) ────────
-   Replaces the s12 leaderboards for #cele-mai-intalnite and
-   "Top persoane onorate". Words flow inline as small tokens grouped
-   under category eyebrows. Size variance is intentionally mild.        */
-.cluster-panel .panel-header { margin-bottom: 6px; }
-.cluster-band {
-  padding: 12px 0 14px;
-  border-top: 1px solid var(--hairline);
-}
-.cluster-band:first-of-type { border-top: 0; padding-top: 6px; }
-.cluster-band.tail { opacity: .82; }
-.cluster-band.highlighted {
-  padding-left: 11px;
-  border-left: 2px solid var(--cluster-color, var(--ink));
-  margin-left: -13px;
-}
-.cluster-eyebrow {
-  display: flex; align-items: baseline; gap: 8px;
-  font-family: var(--sans);
-  font-size: 10.5px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: .18em;
-  color: var(--ink);
-  margin-bottom: 9px;
-}
-.cluster-eyebrow .dot {
-  width: 7px; height: 7px; border-radius: 999px;
-  background: var(--cluster-color, var(--ink));
-  display: inline-block;
-}
-.cluster-eyebrow .lbl-meta {
-  color: var(--muted-2);
-  font-weight: 600; letter-spacing: .12em;
-  font-family: var(--mono); font-size: 10px;
-  margin-left: auto;
-}
-.cluster-band.tail .cluster-eyebrow { color: var(--muted); }
-
-.flat-tokens {
-  display: flex; flex-wrap: wrap;
-  align-items: baseline;
-  gap: 11px 12px;
-  line-height: 1.55;
-  padding: 6px 0 4px;
-}
-.cluster-tokens {
-  display: flex; flex-wrap: wrap;
-  align-items: baseline;
-  gap: 11px 12px;
-  line-height: 1.55;
-}
-.flat-tokens .ctok,
-.cluster-tokens .ctok {
-  display: inline-block;
-  position: relative;
-  white-space: nowrap;
-}
-/* Street plaque token (left panel) */
-.ctok.street .plaque {
-  display: inline-block;
-  background: var(--plaque);
-  color: #FFFFFF;
-  font-family: var(--street);
-  font-weight: 600;
-  letter-spacing: .01em;
-  padding: 4px 11px;
-  border-radius: 3px;
-  text-shadow: 0 -0.5px 0 rgba(0,0,0,.30), 0 1px 1.5px rgba(0,0,0,.50);
-}
-/* Person chip token (right panel) */
-.ctok.person .chip {
-  display: inline-block;
-  background: var(--surface-1);
-  color: var(--ink);
-  font-family: var(--sans);
-  font-weight: 600;
-  letter-spacing: .005em;
-  padding: 4px 12px;
-  border: 1px solid var(--rule-strong);
-  border-radius: 4px;
-}
-.ctok.person .chip.female {
-  border-color: var(--accent);
-  box-shadow: inset 0 -2px 0 rgba(192,79,53,.18);
-}
-.ctok .cnt-badge {
-  position: absolute;
-  top: -6px;
-  right: -8px;
-  font-family: var(--mono);
-  font-size: 9px;
-  font-weight: 700;
-  background: var(--ink-band);
-  color: var(--gold-soft);
-  padding: 1px 5px;
-  border-radius: 7px;
-  letter-spacing: .02em;
-  line-height: 1.4;
-  vertical-align: baseline;
-  pointer-events: none;
-}
-.ctok.person .cnt-badge {
-  background: var(--ink-2);
-  color: #FFFFFF;
-}
-.ctok.leader .plaque,
-.ctok.leader .chip {
-  box-shadow: 0 0 0 2px var(--gold);
-}
-
-.cluster-panel .panel-meta-tail {
-  font-family: var(--sans); font-size: 10.5px;
-  color: var(--muted); padding: 10px 0 0;
-}
   </style>
 </head>
 <body>
@@ -878,8 +764,8 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 
 <div class="dash-grid">
 
-{# PANEL: CELE MAI FRECVENTE (s6, cluster cloud) #}
-<div class="panel s6 cluster-panel" id="cele-mai-intalnite">
+{# PANEL: CELE MAI FRECVENTE (s12, 2-col rank list) #}
+<div class="panel s12" id="cele-mai-intalnite">
   <div class="panel-header">
     <span class="panel-label"><span class="emo md">🔝</span> Cele mai frecvente · Top 30</span>
     <div class="s2-judet-pick">
@@ -890,25 +776,10 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       </select>
     </div>
   </div>
-  <div id="s2-clusters">
+  <div class="rank-list rank-2col s2-list" id="s2-list">
     {# Populated by JS #}
   </div>
-  <div class="panel-meta-tail" id="s2-footer"></div>
-</div>
-
-{# PANEL: TOP PERSOANE — moved up, flat cloud, s6 next to streets panel #}
-<div class="panel s6 cluster-panel" id="top-persoane">
-  <div class="panel-header">
-    <span class="panel-label"><span class="emo md">👥</span> Top persoane onorate · {{ section3.top_persons | length }} pers.</span>
-    <span class="panel-meta">filtrat de județ ↑</span>
-  </div>
-  <div id="s3p-clusters">
-    {# Populated by JS #}
-  </div>
-  <div class="panel-meta-tail">
-    <span style="display:inline-block;width:7px;height:7px;background:var(--accent);border-radius:50%;margin-right:4px;vertical-align:middle;"></span>
-    contur roșu = femeie
-  </div>
+  <div style="font-family:var(--sans);font-size:10.5px;color:var(--muted);padding:8px 0 0;" id="s2-footer"></div>
 </div>
 
 {# PANEL: REPARTIȚIE TEMATICĂ (s4) #}
@@ -1101,7 +972,29 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
   {% endfor %}
 </div>
 
-{# (Top persoane panel removed — moved up to sit beside #cele-mai-intalnite as an s6 cluster cloud.) #}
+{# PANEL: TOP PERSOANE (s12, 2-col internal) #}
+<div class="panel s12">
+  <div class="panel-header">
+    <span class="panel-label"><span class="emo md">👥</span> Top persoane onorate · număr de străzi</span>
+    <span class="panel-meta">{{ section3.top_persons | length }} pers. · <span style="color:var(--accent);font-weight:700;">●</span> feminin</span>
+  </div>
+  <div class="rank-list rank-2col s3-tower">
+    {% set max_count = section3.top_persons[0].street_count %}
+    {% for p in section3.top_persons %}
+    <div class="rank-row">
+      <span class="rank-name person">
+        <span class="portrait" aria-hidden="true">{{ (p.full_name.split()[0][0] if p.full_name else '·') }}{{ (p.full_name.split()[-1][0] if p.full_name and (p.full_name.split() | length) > 1 else '') }}</span>
+        {{ p.full_name }}{% if p.gender == 'F' %} <span style="display:inline-block;width:7px;height:7px;background:var(--accent);border-radius:50%;margin-left:4px;vertical-align:middle;"></span>{% endif %}
+      </span>
+      <div class="bar-wrap">
+        <div class="{{ 'bar accent' if loop.first else ('bar female' if p.gender == 'F' else 'bar') }}"
+             style="width:{{ (p.street_count / max_count * 100)|int }}%"></div>
+      </div>
+      <span class="rank-count">{{ p.street_count }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
 
 {# PANEL: RECUNOAȘTERE GLOBALĂ (s6) #}
 <div class="panel s6" id="recunoastere">
@@ -1352,25 +1245,14 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
     </div>
   </div>
   <div style="max-width:1640px;margin:18px auto 0;border-top:1px solid rgba(255,255,255,.10);padding-top:12px;font-family:var(--sans);font-size:11px;color:rgba(255,255,255,.5);letter-spacing:.04em;">
-    Cum ne numim străzile · {{ section1.total_streets | default(0) | int | string }} adrese · ultima actualizare 14.05.2025
+    Cum ne numim străzile · variantă densă · {{ section1.total_streets | default(0) | int | string }} adrese · ultima actualizare 14.05.2025
   </div>
 </footer>
 
-{# JavaScript: flat cloud render — both panels share the județ filter #}
+{# JavaScript for Section 2 (județ filter) #}
 <script>
 (function() {
-  const LIMIT_STREETS = 30;
-  const OVERALL_LEADERS = 3;
-  const FONT_MIN = 17, FONT_MAX = 28;
-
-  function fontFor(count, lo, hi) {
-    if (hi === lo) return (FONT_MIN + FONT_MAX) / 2;
-    return FONT_MIN + ((count - lo) / (hi - lo)) * (FONT_MAX - FONT_MIN);
-  }
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, c =>
-      ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  }
+  const LIMIT = 30;
 
   const JUDET_NAMES = {
     AB:'Alba', AG:'Argeș', AR:'Arad', B:'București', BC:'Bacău',
@@ -1384,60 +1266,61 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
     TM:'Timiș', TR:'Teleorman', VL:'Vâlcea', VN:'Vrancea', VS:'Vaslui',
   };
 
+  const CAT_RO = {
+    'persoană':'persoană','natură':'natură','religios':'religios','dată':'dată',
+    'religious':'religios','ideological':'ideologic','abstract':'abstract',
+    'institutional':'instituțional','trade':'meșteșug','occupational':'ocupațional',
+    'commemorative':'comemorativ','mythology':'mitologie','infrastructure':'infrastructură',
+    'place':'loc','category':'categorie',
+  };
+
   const select = document.getElementById('s2-judet-select');
-  Object.keys(DATA_S2.by_judet || {}).sort((a, b) =>
-    (JUDET_NAMES[a] || a).localeCompare(JUDET_NAMES[b] || b, 'ro')
-  ).forEach(code => {
+  const available = Object.keys(DATA_S2.by_judet || {}).sort((a, b) => {
+    const na = JUDET_NAMES[a] || a, nb = JUDET_NAMES[b] || b;
+    return na.localeCompare(nb, 'ro');
+  });
+  available.forEach(code => {
     const opt = document.createElement('option');
     opt.value = code;
     opt.textContent = (JUDET_NAMES[code] || code) + ' · ' + code;
     select.appendChild(opt);
   });
 
-  function renderFlat(rows, rootId, isPersons) {
-    const root = document.getElementById(rootId);
-    root.innerHTML = '';
-    if (!rows || !rows.length) {
-      root.innerHTML = '<div style="color:var(--muted);font-size:11.5px;padding:6px 0;">(fără date)</div>';
-      return;
-    }
-    const keyFn = r => isPersons ? r.full_name : r.name_normalized;
-    const counts = rows.map(r => r.street_count);
-    const lo = Math.min(...counts), hi = Math.max(...counts);
-    const leaders = new Set(
-      rows.slice().sort((a, b) => b.street_count - a.street_count)
-                 .slice(0, OVERALL_LEADERS).map(keyFn)
-    );
-    const tokens = rows.map(r => {
-      const fs = fontFor(r.street_count, lo, hi).toFixed(1);
-      const isLeader = leaders.has(keyFn(r));
-      const cnt = `<sup class="cnt-badge">${r.street_count.toLocaleString('ro-RO')}</sup>`;
-      if (isPersons) {
-        const female = r.gender === 'F';
-        return `<span class="ctok person${isLeader ? ' leader' : ''}">`
-             + `<span class="chip${female ? ' female' : ''}" style="font-size:${fs}px;">${escapeHtml(r.full_name)}</span>`
-             + cnt + `</span>`;
-      }
-      return `<span class="ctok street${isLeader ? ' leader' : ''}">`
-           + `<span class="plaque" style="font-size:${fs}px;">${escapeHtml(r.name_normalized)}</span>`
-           + cnt + `</span>`;
-    }).join('');
-    root.innerHTML = `<div class="flat-tokens">${tokens}</div>`;
+  function renderList(rows, scopeLabel) {
+    const list = document.getElementById('s2-list');
+    list.innerHTML = '';
+    const trimmed = rows.slice(0, LIMIT);
+    const maxCount = trimmed[0]?.street_count || 1;
+
+    trimmed.forEach((row, i) => {
+      const pct = Math.round(row.street_count / maxCount * 100);
+      const isPerson = row.category === 'persoană';
+      const catLabel = CAT_RO[row.category] || row.category;
+      const tag = row.category !== 'altele'
+        ? `<span class="tag${isPerson ? ' person' : ''}">${catLabel}</span>` : '';
+      const barClass = isPerson ? 'bar accent' : 'bar';
+      list.insertAdjacentHTML('beforeend', `
+        <div class="rank-row">
+          <span class="rank-num">${i + 1}</span>
+          <span class="name-cell"><span class="rank-name">${row.name_normalized}</span>${tag}</span>
+          <div class="bar-wrap"><div class="${barClass}" style="width:${pct}%"></div></div>
+          <span class="rank-count">${row.street_count.toLocaleString('ro-RO')}</span>
+        </div>
+      `);
+    });
+    document.getElementById('s2-footer').textContent =
+      `Afișare 1–${trimmed.length} din ${rows.length} · ${scopeLabel}`;
   }
 
   function render(code) {
     if (code === 'all') {
-      renderFlat(DATA_S2.top_names.slice(0, LIMIT_STREETS), 's2-clusters', false);
-      renderFlat(DATA_S3.top_persons, 's3p-clusters', true);
-      document.getElementById('s2-footer').textContent =
-        `top ${Math.min(LIMIT_STREETS, DATA_S2.top_names.length)} · la nivel național`;
+      renderList(DATA_S2.top_names, 'la nivel național');
     } else {
       const label = (JUDET_NAMES[code] || code) + ' (' + code + ')';
-      renderFlat(DATA_S2.by_judet[code] || [], 's2-clusters', false);
-      renderFlat((DATA_S3.persons_by_judet || {})[code] || [], 's3p-clusters', true);
-      document.getElementById('s2-footer').textContent = `județul ${label}`;
+      renderList(DATA_S2.by_judet[code] || [], 'județul ' + label);
     }
   }
+
   select.addEventListener('change', e => render(e.target.value));
   render('all');
 })();

@@ -1,5 +1,96 @@
 # Activity History
 
+## 2026-05-16 — Cluster cloud promoted to primary (`dist/index.html`)
+
+### What was done
+- Iterated the cluster-cloud variant through three rounds of refinement, then **swapped the variant names**: the former `index-clusters.html` is now `dist/index.html` (the primary dashboard) and the former `dist/index.html` (dense leaderboard layout) is now `dist/index-v2.html`. `--variant default` builds the cluster cloud; `--variant v2` builds the dense legacy.
+- **Round 1 — flatten:** removed the category/wiki_scope cluster banding entirely. Both panels render as a single flat word-cloud (no eyebrows, no colored rules, no ALTELE tail). One shared `<select>` filters both panels by județ; added `persons_by_judet` to `site_queries.section3()` so the persons panel also responds to the filter.
+- **Round 2 — bigger type, real superscripts:** doubled the token font range from `11.5–14.5px` → `17–28px` for a stronger tagcloud rhythm; switched `.ctok` from `inline-flex` (which silently disabled `<sup>` positioning) to `inline-block` so the count badge can be truly superscript.
+- **Round 3 — floating count badges:** the count is now absolutely positioned at the top-right corner of each plaque/chip as a tiny dark pill (9px mono, gold-soft text on streets, white text on persons). Removes all inline horizontal space taken by counts — the tokens pack tighter, the count reads as a notification-style annotation.
+- **Light statbar:** flipped the top stats header from dark Bloomberg-ticker (`var(--ink-band)`) to a soft light surface (`var(--surface-1)`) with ink text, muted gray labels, and `var(--rule)` dividers. The 3px gold border-bottom is preserved as the divider between statbar and dash-grid. The dark footer is untouched.
+- **Test updates:** removed `test_clusters_page_builds` (obsolete now that clusters IS default), added `test_default_is_cluster_cloud` (asserts flat-tokens markup + cluster panels before `#tematica` in `dist/index.html`) and `test_v2_dashboard_builds` (smoke test for the renamed dense layout). **12/12 tests pass.**
+
+### Why
+- The first cluster prototype had three issues the user flagged: (1) category bands felt like over-grouping for what was already a small data set, (2) județ filter only affected streets, breaking the side-by-side parity, and (3) the original cluster idea looked better as a true cloud than as banded groups. Each round of changes addressed user feedback directly.
+- The rename reflects a decision: the cluster cloud is now the better default for the casual visitor — denser, more scannable, instantly comparable street-vs-person honoring. The dense leaderboard remains accessible at `/index-v2.html` for users who want the long-ranked-list view.
+
+### Non-obvious decisions
+- **Count badge as absolute, not inline `<sup>`:** the user said "superscript-like, more compact" three times. The breakthrough was realizing `<sup>` inside `display:inline-flex` silently loses its `vertical-align: super` behavior — flex baseline alignment overrides it. Switching `.ctok` to `inline-block` restored real superscript, but absolute positioning (top-right corner pill) made it truly *take no horizontal space*, which is the actual win for compactness.
+- **Persons panel uses chips, streets uses plaques** — kept from round 1. Multi-word person names ("Mihai Eminescu", "Ștefan cel Mare") don't read as street plaques; flat ink-on-surface chips with a 1px rule border carry the information without forcing every name into RO-plaque aesthetic.
+- **Both panels' top-3 get the gold halo, not just cluster leaders** — there's no clustering anymore, but the "top-3 by count" rule still applies so the most-frequent items pop.
+- **Statbar light, footer dark:** the user asked to flip only the stats header. The dark footer stays — it acts as a closer on the page and the brand gold accents (Despre date / Metodologie / Cod sursă section labels) need a dark background to sing. Light statbar + dark footer reads as "data inputs above, attribution below."
+- **`persons_by_judet` shape mirrors `streets by_judet`** so the JS render function can swap data sources without restructuring. Bucharest sectors collapse to `'B'` at the SQL level for consistency with the rest of the site.
+
+### Files touched
+- `templates/index.html.j2` (was `index-clusters.html.j2`) — rounds 1-3 + light statbar
+- `templates/index-v2.html.j2` (was `index.html.j2`) — unchanged content, renamed file
+- `site_queries.py` (`persons_by_judet` query added to `section3()`)
+- `build_site.py` (`VARIANTS` swapped; `v2` added; `clusters` removed; `--variant all` builds default + v1 + v2 + methodology)
+- `tests/test_build.py` (test renames + v2 smoke test)
+
+## 2026-05-16 — Cluster-cloud variant (`dist/index-clusters.html`)
+
+### What was done
+- Added a fourth build variant (`--variant clusters`) that ships `dist/index-clusters.html` alongside the unchanged dense layout. New template `templates/index-clusters.html.j2` (~267 KB rendered), copied from `index.html.j2` with two structural changes at the top of `.dash-grid`.
+- **Two s6 panels side-by-side** replace the previous pair of stacked s12 leaderboards: streets cluster on the left, persons cluster on the right. The old s12 Top persoane panel is removed from its original position further down the page.
+- **Cluster-cloud layout**: tokens flow inline (flex-wrap), grouped under category eyebrows with a colored left-rule. Top 3 clusters highlighted; remaining categories merge into an ALTELE tail. Font varies mildly within each cluster (11.5–14.5px normalized to cluster min/max). Overall top-3 entries by count get a gold halo regardless of which cluster they belong to.
+- **Streets panel**: blue RO plaques, grouped by `category` (natură / persoană / instituțional / …). County `<select>` preserved — changing județ re-clusters. Count badges in gold mono after each token.
+- **Persons panel**: flat ink-on-surface chips (not plaques), grouped by `wiki_scope` (universal / național / local / unknown). Red accent border on female persons. Same size-variance and gold-halo logic.
+- **Data change**: `site_queries.section3()` `top_persons` query now returns `COALESCE(p.wiki_scope, 'unknown') AS wiki_scope` so the JS grouper can bucket persons by recognition tier.
+- **`build_site.py`**: `"clusters"` added to `VARIANTS` and `--variant` choices; `--variant all` now renders default + v1 + methodology + clusters.
+- **Smoke test**: `test_clusters_page_builds` in `tests/test_build.py` asserts file exists, both panels precede `#tematica` in DOM order, `.cluster-band`/`.cluster-eyebrow` present, old `.rank-list.rank-2col.s2-list` markup absent. 11/11 tests pass.
+
+### Why
+- The user wanted to try an alternative visual rhythm at the top of the dashboard — "word next to word, somewhat like a wordcloud" — without throwing away the dense ranked-list view. Shipping as a parallel variant lets both sit open in browser tabs.
+
+### Non-obvious decisions
+- **Size-variance capped deliberately at 3px spread (11.5–14.5px).** The user asked for "not big difference, first to last." Normalizing within each cluster independently (not globally) keeps the spread local so even a small cluster with just 3–4 tokens still shows visible rhythm.
+- **Persons use chips, not plaques**, because multi-word names ("Mihai Eminescu") sit awkwardly in narrow blue street-plaque form at inline-flow sizes. The contrast flip (light chip, dark text) also visually separates the two panels when they sit side-by-side.
+- **No LOCAL wiki_scope cluster visible** in current data — the top-20 persons don't include any `wiki_scope='local'` rows. The JS renders clusters from data only; `local` is wired and will appear as the DB coverage improves.
+- **Tail group merges all non-top-3 categories** (streets) and renders `unknown` scope as tail (persons). Eyebrow uses a muted color and a dimmer dot to visually retire these entries from the primary scan path.
+- **Panel is data-backed (not STATIC)** because it renders `section2`, `section3`, `section4`, `section5`, `section6`, `section8` — same as the default variant. Only the template and the top-of-grid layout differ.
+
+### Files touched
+- `templates/index-clusters.html.j2` (new, ~1600 lines)
+- `site_queries.py` (`section3` `top_persons` SELECT: added `COALESCE(p.wiki_scope,'unknown')`)
+- `build_site.py` (clusters variant wired)
+- `tests/test_build.py` (`test_clusters_page_builds` added)
+
+## 2026-05-16 — Methodology page (`dist/metodologie.html`)
+
+### What was done
+- Added a standalone Romanian-language methodology page rendered through the existing `build_site.py` pipeline. New template `templates/metodologie.html.j2`, new variant `methodology` in `VARIANTS`, output `dist/metodologie.html` (~34 KB).
+- `build_site.py` now distinguishes data-backed variants from `STATIC_VARIANTS` (currently just `methodology`), so the methodology build skips the `site_queries.section1..section8` calls entirely — no DB needed at template render time. The `--variant` flag gained `methodology` and `all` (the latter renders default + v1 + methodology).
+- Page structure: hero with 4-number statbar strip and an editorial-review flag, 2-column TOC, 10 sections (`#de-ce`, `#sursa`, `#schema`, `#clasificare`, `#recunoastere`, `#osm`, `#limite`, `#ce-urmeaza`, `#cronologie`, `#cod`), and a vertical timeline of ~16 milestones distilled from the activity log and git history (2026-04-26 ETL → 2026-05-16 bold restyle → this page).
+- Visual treatment shares the dashboard's design language without forking it: `var(--ink-band)` hero/footer, gold accents, IBM Plex Sans body, 2px ink-rule section headings, small monospace dark `demo` block for the `Bd. Regele Carol I → carol i` normalization example.
+- Wired cross-links in both dashboard variants: `templates/index.html.j2` and `templates/index-v1.html.j2` got a `Metodologie` link in the sticky nav and a "Citește metodologia completă →" link in the footer's existing Metodologie column.
+- Added two smoke tests to `tests/test_build.py`: `test_methodology_page_builds` (builds the variant, asserts all 10 section anchors + editorial-review notice + dashboard cross-link) and `test_methodology_link_in_dashboard`. All 10 tests pass.
+
+### Why
+- The footer's Metodologie column was two sentences. Anyone wondering "where does the ~57% classified come from?", "why does Gorj have 18% OSM coverage?" or "what does `core_name_norm` mean?" had nowhere to look. The page is the structured answer.
+- The user explicitly asked for a methodology page with a timeline drawn from the activity log, backlog, and git history. Tone: lightly informal, mostly explanatory — closer to good docs than to a blog post.
+
+### Non-obvious decisions
+- **Standalone HTML, not a section appended to the dashboard.** Long-form prose dilutes the dense-analytics feel of `index.html`; the methodology page also wants a different layout (single-column 760px prose) than the 12-column dashboard grid. Separate page keeps both reads clean.
+- **Romanian copy carries a `[Revizuire editorială RO în curs]` flag** in the hero and as a header comment in the `.j2`, per the CLAUDE.md rule against generating fictional Romanian copy that "sounds right." The copy is structurally and factually correct, but tone/word-choice benefit from a native pass before this is treated as final.
+- **Hero stat numbers hardcoded** (`105.107`, `1.155`, `~57%`, `310`) rather than passed through from queries. They're snapshot-anchored (14.05.2025 build) and the methodology page explicitly explains they're prototype-phase figures; coupling this page to the DB just to render its hero would add a build-time dependency for cosmetic value.
+- **Coverage table doesn't auto-update either.** Same reasoning: the methodology page describes a *moment* in the project; if numbers shift materially, this page is the right place to revise narrative and number together, not have one slip silently when the other isn't ready.
+- **Timeline cut at ~16 entries.** The activity log has ~25 distinct sessions; keeping only the load-bearing ones (first ETL, each curation batch, LLM classifier, OSM milestones, Wikidata milestones, dense-variant rebuild, design passes, this page) shows the arc without becoming a commit-log dump. Each entry has a one-sentence "what" and an optional italic "why" pulled from the activity log's non-obvious-decisions sections.
+- **No emoji in the timeline entries** even though the dashboard uses them as category cues. At ~16 entries on a single vertical rule the page reads cleanly with just the gold date chip; adding per-entry emojis would compete visually with the chips themselves.
+- **Footer's Metodologie column is now a real link, not a static blurb.** On `metodologie.html` itself it reads "Sunteți pe pagina de metodologie. Înapoi la dashboard →" so the column adapts to context.
+
+### Files touched
+- `templates/metodologie.html.j2` (new, 34 KB rendered)
+- `build_site.py` (VARIANTS + STATIC_VARIANTS gate + --variant choices)
+- `templates/index.html.j2` (nav link + footer cross-link)
+- `templates/index-v1.html.j2` (nav link + footer cross-link)
+- `tests/test_build.py` (2 new tests; 8 existing still pass)
+
+### Verification
+- `python3 build_site.py --variant all` → all 3 variants build cleanly.
+- `python3 -m pytest tests/test_build.py` → 10/10 pass.
+- Visual: hero, TOC, all 10 sections, timeline, and footer render at 1440×900; Metodologie link present and highlighted in the dashboard nav.
+
 ## 2026-05-16 — Bold analytics restyle: dark statbar, IBM Plex, emoji category cues
 
 ### What was done

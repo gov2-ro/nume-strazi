@@ -132,6 +132,7 @@ def section2(conn: sqlite3.Connection) -> dict:
 def section3(conn: sqlite3.Connection) -> dict:
     top_persons = _rows(conn, """
         SELECT p.full_name, p.gender, p.profession, p.era,
+               COALESCE(p.wiki_scope, 'unknown') AS wiki_scope,
                COUNT(*) AS street_count
         FROM streets_dedup sd
         JOIN persons p ON p.core_name_norm = sd.core_name_norm
@@ -171,8 +172,41 @@ def section3(conn: sqlite3.Connection) -> dict:
         LIMIT 6
     """)
 
+    # Top-20 persons per județ — drives the shared județ filter in the clusters variant.
+    persons_by_judet_rows = _rows(conn, """
+        WITH per_judet AS (
+          SELECT
+            CASE WHEN sd.judet LIKE 'BUCURESTI%%' OR sd.judet = 'B' THEN 'B'
+                 ELSE sd.judet END AS judet,
+            p.core_name_norm,
+            MAX(p.full_name) AS full_name,
+            MAX(p.gender)    AS gender,
+            COUNT(*)         AS street_count
+          FROM streets_dedup sd
+          JOIN persons p ON p.core_name_norm = sd.core_name_norm
+          WHERE sd.is_numeric = 0
+          GROUP BY 1, 2
+        ),
+        ranked AS (
+          SELECT judet, full_name, gender, street_count,
+                 ROW_NUMBER() OVER (PARTITION BY judet ORDER BY street_count DESC) AS rn
+          FROM per_judet
+        )
+        SELECT judet, full_name, gender, street_count
+        FROM ranked WHERE rn <= 20
+        ORDER BY judet, street_count DESC
+    """)
+    persons_by_judet: dict[str, list[dict]] = {}
+    for r in persons_by_judet_rows:
+        persons_by_judet.setdefault(r["judet"], []).append({
+            "full_name": r["full_name"],
+            "gender": r["gender"],
+            "street_count": r["street_count"],
+        })
+
     return {
         "top_persons": top_persons,
+        "persons_by_judet": persons_by_judet,
         "total_m": counts.get("m", 0) or 0,
         "total_f": counts.get("f", 0) or 0,
         "profession_dist": profession_dist,

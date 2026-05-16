@@ -62,3 +62,57 @@ def test_footer_present():
     assert "Despre date" in html
     assert "Metodologie" in html
     assert "Cod sursă" in html
+
+
+def test_methodology_page_builds():
+    result = subprocess.run(
+        [sys.executable, "build_site.py", "--variant", "methodology",
+         "--db", "data/streets.db"],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    out = Path("dist/metodologie.html")
+    assert out.exists()
+    html = out.read_text(encoding="utf-8")
+    # Hero + structural anchors
+    assert "Metodologie · cum funcționează" in html
+    for anchor in ("de-ce", "sursa", "schema", "clasificare",
+                   "recunoastere", "osm", "limite", "ce-urmeaza",
+                   "cronologie", "cod"):
+        assert f'id="{anchor}"' in html, f"missing anchor #{anchor}"
+    # Editorial-review notice required by CLAUDE.md
+    assert "Revizuire editorială RO" in html
+    # Cross-link to dashboard nav present
+    assert 'href="index.html' in html
+
+
+def test_methodology_link_in_dashboard():
+    html = Path("dist/index.html").read_text(encoding="utf-8")
+    assert 'href="metodologie.html"' in html
+
+
+def test_default_is_cluster_cloud():
+    html = Path("dist/index.html").read_text(encoding="utf-8")
+    # Both top panels present and ordered before #tematica
+    assert 'id="cele-mai-intalnite"' in html
+    assert 'id="top-persoane"' in html
+    assert html.index('id="cele-mai-intalnite"') < html.index('id="tematica"')
+    assert html.index('id="top-persoane"') < html.index('id="tematica"')
+    # Flat-cloud markup present, old leaderboard markup gone
+    assert "flat-tokens" in html
+    assert 'rank-list rank-2col s2-list' not in html
+
+
+def test_v2_dashboard_builds():
+    result = subprocess.run(
+        [sys.executable, "build_site.py", "--variant", "v2",
+         "--db", "data/streets.db"],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    out = Path("dist/index-v2.html")
+    assert out.exists()
+    html = out.read_text(encoding="utf-8")
+    # v2 keeps the original dense leaderboards
+    assert 'rank-list rank-2col s2-list' in html
+    assert 'id="cele-mai-intalnite"' in html

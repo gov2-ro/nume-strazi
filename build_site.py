@@ -17,24 +17,31 @@ COUNTIES_SRC = Path("data/gis/romania-counties.geojson")
 VARIANTS = {
     "default": ("index.html.j2", "index.html"),
     "v1": ("index-v1.html.j2", "index-v1.html"),
+    "v2": ("index-v2.html.j2", "index-v2.html"),
+    "methodology": ("metodologie.html.j2", "metodologie.html"),
 }
+
+# Static-content variants don't need any of the section query data.
+STATIC_VARIANTS = {"methodology"}
 
 
 def build(db_path: str = DB_PATH, variant: str = "default") -> None:
     DIST.mkdir(exist_ok=True)
 
-    conn = site_queries.get_connection(db_path)
-
-    data = {
-        "section1": site_queries.section1(conn),
-        "section2": site_queries.section2(conn),
-        "section3": site_queries.section3(conn),
-        "section4": site_queries.section4(conn),
-        "section5": site_queries.section5(conn),
-        "section6": site_queries.section6(conn),
-        "section8": site_queries.section8(conn),
-    }
-    conn.close()
+    if variant in STATIC_VARIANTS:
+        data = {}
+    else:
+        conn = site_queries.get_connection(db_path)
+        data = {
+            "section1": site_queries.section1(conn),
+            "section2": site_queries.section2(conn),
+            "section3": site_queries.section3(conn),
+            "section4": site_queries.section4(conn),
+            "section5": site_queries.section5(conn),
+            "section6": site_queries.section6(conn),
+            "section8": site_queries.section8(conn),
+        }
+        conn.close()
 
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(str(TEMPLATES)),
@@ -58,13 +65,18 @@ def main() -> None:
     parser.add_argument("--db", default=DB_PATH)
     parser.add_argument(
         "--variant",
-        choices=["default", "v1", "both"],
+        choices=["default", "v1", "v2", "methodology", "both", "all"],
         default="default",
-        help="Which template to render (default | v1 | both)",
+        help="Which template to render (default = cluster cloud | v1 | v2 = dense | methodology | both = default+v2 | all)",
     )
     parser.add_argument("--serve", action="store_true", help="Build then serve on localhost:8000")
     args = parser.parse_args()
-    variants = ["default", "v1"] if args.variant == "both" else [args.variant]
+    if args.variant == "both":
+        variants = ["default", "v2"]
+    elif args.variant == "all":
+        variants = ["default", "v1", "v2", "methodology"]
+    else:
+        variants = [args.variant]
     for v in variants:
         build(db_path=args.db, variant=v)
     if args.serve:
