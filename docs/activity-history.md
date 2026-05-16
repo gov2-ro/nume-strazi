@@ -1,5 +1,38 @@
 # Activity History
 
+## 2026-05-16 — Bold analytics restyle: dark statbar, IBM Plex, emoji category cues
+
+### What was done
+- Reskinned the dense dashboard (`templates/index.html.j2`) for a "bolder, denser, analytics" feel while keeping the structure and all D3/JS hooks intact. All changes are in the template's `<style>` block plus targeted label/header edits — no schema, query, or build-pipeline changes.
+- **Palette pivot from cream to white.** Dropped `--bg #FAF8F3` / `--wash #EEEAE0`. Body is now `#FFFFFF`. Cool washes (`--surface-1 #F7F9FC`, `--surface-2 #ECF1F8`) replace the warm cream as bar tracks and tag fills. Pale yellow (`--warn-1 #FFF7CC`, `--warn-2 #FBE486`) introduced as a leader-highlight; gold (`--gold #E8AE00`) introduced as the dashboard's secondary accent (used in nav brand mark, statbar group labels, footer section labels, and the leader-row inset stripe on every rank list).
+- **Dark statbar.** Statbar is now an ink-black band (`var(--ink-band) #0B1118`) with reverse-out white type, gold group labels, and a 3px gold underline anchoring it to the canvas below. Headline numbers grew from 22px → 34px (scale items 22px → 28px), tabular-nums and tight letterspacing. Group columns separated by 1px white-alpha rules instead of gap-only.
+- **Typography swap.** `Inter` → `IBM Plex Sans` (400/500/600/700). `Barlow Semi Condensed` retained for the RO white-on-blue street plaques. Plaque size bumped 12.5px → 13.5px (small variant 11.5px → 12px) to match the denser overall feel.
+- **Panel headers** now use a 2px solid-ink rule (was 1px hairline `--rule`), 700-weight uppercase 11.5px labels (was 600/9.5px), and each panel-label gained an emoji prefix for at-a-glance category cue (🔝, 🧭, 🌿, 🚩, 🎓, ⏳, 👥, 🌍, 📈, 🗺️, 🧬, 📜, 🔎, 🏟️, 📝).
+- **Leader-row highlight.** Every `.rank-list > .rank-row:first-child` gets `box-shadow: inset 3px 0 0 var(--gold)` + a pale yellow horizontal gradient. Rank-num for the leader row goes from muted to ink-700. Works across all leaderboards including the s2 top-30 (DOM order = visual order on the multicol).
+- **Bars.** Height 3px → 5px, opacity .4 → .82 — visibly more present. New variants: `.bar.olive` (used in nature subtypes panel) and `.bar.gold` (reserved for future highlight bars).
+- **Recognition tier cards** (Universal / Național / Local) got bigger 38px numbers, emoji corner markers (🌍 / 🇷🇴 / 📍), and a deep-ink Universal card with gold uppercase label instead of the old accent-red label.
+- **Footer** moved from cream-accent to gold-accent labels; added emoji prefixes (📄 / ⚗️ / ⌨️). Footer dark band now aligns visually with the new dark statbar — symmetric framing.
+- **Portrait scaffolding.** Added `.portrait` CSS class (26px gradient circle, gold-rule fallback) wired into the s12 "Top persoane onorate" list with first+last initials as placeholders. When real portraits arrive, drop in `<img>` and the layout already accommodates them.
+- **Inline rows** (nature subtypes, professions, eras) restructured to: leading emoji column (14px), label, bar, count. Each row gets a hairline top border for visual rhythm; counts are now ink-700 12px instead of muted 10.5px.
+- **Ideological-token chips** got bolder weights, sharper outlines (1.5px), and a more saturated red highlight for high-frequency tokens.
+- **Stat picker / chip styles** — judet `<select>` now has a 1.5px ink border and a gold focus ring; `.chip` lost its pill radius and became a 2px-rounded square with a flat-black active state.
+
+### Why
+- Brief: "bolder, denser dashboard, larger type, like a data heavy dashboard, analytics. White background. Light blueish / yellow shades, if/where necessary." Plus "add icons where possible" — covered with emojis as placeholders (proper SVG icons can swap in later via the unused `.icon` CSS class already in the stylesheet).
+
+### Non-obvious decisions
+- **Dark statbar over light statbar** despite the "white background" brief. Reading "white background" as the *main canvas* (panels), with the statbar serving as a Bloomberg-style ticker masthead. The dark band creates the strongest analytics-dashboard cue available in one move; it also mirrors the existing footer (symmetric framing). Easy to flip to a white statbar if the user pushes back — just swap the `.statbar` background and color values.
+- **Gold (`#E8AE00`) chosen over a pure-yellow (`#FFD84D`) for the secondary accent.** Pure yellow on white reads as warning/alert in this kind of layout; gold reads as "honor/leader" and pairs better with the blue plaques. The pale-yellow leader-row wash (`--warn-1 #FFF7CC`) is the only place a near-pure yellow appears.
+- **IBM Plex Sans over Inter Tight or Manrope.** Plex has the analytical-publication register (used by IBM, Mozilla, Stripe in similar contexts) and the open counters/short ascenders give better information density at the smaller body sizes the dashboard uses. Retained Barlow Semi Condensed for the plaque type — that's the RO street-sign convention and shouldn't move.
+- **Emojis instead of an SVG icon sprite** because the user explicitly chose that route ("or emojis and we'll later look for icons"). Trade-off accepted: emoji rendering varies by OS (a Liberation/Symbola fallback on Linux looks worse than Apple Color Emoji on macOS). The `.emo` class isolates the emoji styling so swapping to inline SVG is a single search-and-replace later.
+- **`:first-child` for leader highlight, not nth-child(-n+3).** Top-3 highlight would have been noisy across the ~10 rank lists on the page. Single-leader highlight reads as "the standout in this list" without competing with the bars themselves. Also works correctly under `column-count: 2` multicol because DOM order = visual order, so only rank 1 (DOM) gets the gold inset (not rank 16, despite both being column-tops).
+- **Portrait placeholders use 2-letter initials parsed in Jinja** (`p.full_name.split()[0][0] + p.full_name.split()[-1][0]`) rather than a server-side helper. Trade-off: not robust to one-word names or names with mid-word particles, but acceptable for the placeholder state — it's meant to be replaced with `<img>` before this matters.
+
+### Files touched
+- `templates/index.html.j2` (CSS rewrite + emoji insertion + portrait scaffolding)
+- `dist/index.html` (rebuilt, 263 KB — up from 252 KB; growth is the emoji codepoints and the slightly longer CSS)
+- Verification screenshots: `ss-bold-1440-top.png`, `ss-bold-1440-full.png`
+
 ## 2026-05-16 — Header rebuild: județ filter, stats widget, drop search
 
 ### What was done

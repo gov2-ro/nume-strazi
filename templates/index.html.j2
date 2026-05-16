@@ -7,7 +7,7 @@
   <title>Cum ne numim străzile · variantă densă</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&family=Barlow+Semi+Condensed:wght@600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
   <script>
@@ -20,15 +20,38 @@ const DATA_S8 = {{ section8 | tojson }};
   </script>
   <style>
 :root {
-  --bg: #FAF8F3;
-  --ink: #15171A;
-  --muted: #6E6E70;
-  --rule: #DDDCD7;
-  --wash: #EEEAE0;
-  --accent: #C04F35;
+  /* Surfaces */
+  --bg: #FFFFFF;
+  --surface-1: #F7F9FC;
+  --surface-2: #ECF1F8;
+  --surface-blue: #DEE8F4;
+  --warn-1: #FFF7CC;
+  --warn-2: #FBE486;
+  --ink-band: #0B1118;
+
+  /* Ink + rules */
+  --ink: #0B1118;
+  --ink-2: #2A313B;
+  --muted: #5A6573;
+  --muted-2: #8B95A2;
+  --rule: #E2E6EC;
+  --rule-strong: #BFC7D2;
+  --hairline: #EEF1F5;
+
+  /* Accents */
   --plaque: #0E4D92;
-  --sans: 'Inter', system-ui, sans-serif;
-  --street: 'Barlow Semi Condensed', 'Inter', sans-serif;
+  --plaque-deep: #08366D;
+  --accent: #C04F35;
+  --accent-dark: #8E3320;
+  --gold: #E8AE00;
+  --gold-soft: #F7D777;
+  --olive: #5F7A4E;
+  --teal: #2F6B6B;
+
+  /* Fonts */
+  --sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --mono: 'IBM Plex Mono', monospace;
+  --street: 'Barlow Semi Condensed', 'IBM Plex Sans', sans-serif;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -37,124 +60,246 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--sans);
+  font-size: 13px;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-variant-ligatures: common-ligatures contextual;
 }
+
+/* ──────── ICONS ──────── */
+.icon { width: 14px; height: 14px; flex-shrink: 0; vertical-align: middle; stroke: currentColor; stroke-width: 1.75; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.icon.sm { width: 11px; height: 11px; stroke-width: 1.9; }
+.icon.lg { width: 18px; height: 18px; }
+.icon.xl { width: 22px; height: 22px; stroke-width: 1.6; }
+
+/* Portrait — placeholder slot for future personality portraits */
+.portrait {
+  width: 26px; height: 26px;
+  border-radius: 999px;
+  background: var(--surface-2) linear-gradient(135deg, var(--surface-2), var(--surface-blue));
+  border: 1px solid var(--rule-strong);
+  flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--muted-2);
+  font-family: var(--sans); font-size: 10px; font-weight: 700;
+  letter-spacing: .02em;
+  overflow: hidden;
+  vertical-align: middle;
+}
+.portrait.lg { width: 36px; height: 36px; font-size: 12px; }
+.portrait img { width: 100%; height: 100%; object-fit: cover; }
+
+/* Emoji helper: keep size aligned with surrounding body text */
+.emo {
+  font-family: 'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji', sans-serif;
+  font-style: normal; font-weight: 400;
+  display: inline-block;
+  line-height: 1;
+  font-variant-emoji: emoji;
+}
+.emo.sm  { font-size: 10px; }
+.emo.md  { font-size: 12px; }
+.emo.lg  { font-size: 14px; }
+.emo.xl  { font-size: 18px; }
+.emo.xxl { font-size: 22px; }
 
 /* Nav */
 .site-nav {
   position: sticky; top: 0; z-index: 100;
   background: var(--bg);
-  border-bottom: 1px solid var(--rule);
-  padding: 8px 20px;
+  border-bottom: 1px solid var(--ink);
+  padding: 10px 24px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-family: var(--sans);
-  font-size: 11px;
+  font-size: 11.5px;
   letter-spacing: .06em;
 }
 .site-nav .brand {
-  font-weight: 600;
+  font-weight: 700;
   color: var(--ink);
-  letter-spacing: .12em;
+  letter-spacing: .14em;
   text-transform: uppercase;
   text-decoration: none;
+  font-size: 12.5px;
+  display: inline-flex; align-items: center; gap: 8px;
 }
-.site-nav nav { display: flex; gap: 18px; }
-.site-nav nav a { color: var(--muted); text-decoration: none; }
-.site-nav nav a:hover { color: var(--ink); }
+.site-nav .brand::before {
+  content: '◆';
+  color: var(--gold);
+  font-size: 10px;
+  line-height: 1;
+}
+.site-nav nav { display: flex; gap: 22px; }
+.site-nav nav a {
+  color: var(--muted); text-decoration: none;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  font-size: 10.5px;
+  padding-bottom: 2px;
+  border-bottom: 2px solid transparent;
+  transition: color .12s ease, border-color .12s ease;
+}
+.site-nav nav a:hover { color: var(--ink); border-bottom-color: var(--gold); }
 
-/* Stats widget — 4-column dashboard band under the nav.
-   Breaks to 2 columns at ≤1024px, single column at ≤640px. */
+/* Stats widget — dark ink band with reverse-out type. Acts as the
+   dashboard's masthead "ticker": dense, high-contrast, Bloomberg-feel.
+   4-col on desktop → 2-col at ≤1024 → 1-col at ≤640. */
 .statbar {
-  background: #F2EDE0;
-  border-bottom: 1px solid var(--rule);
-  padding: 18px 24px;
+  background: var(--ink-band);
+  color: #FFFFFF;
+  border-bottom: 3px solid var(--gold);
+  padding: 22px 28px 24px;
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1.3fr;
-  gap: 32px;
-  align-items: center;
+  grid-template-columns: 1fr 1fr 1fr 1.45fr;
+  gap: 0;
+  align-items: stretch;
+  position: relative;
 }
-.statbar .group { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.statbar::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 0;
+  height: 1px; background: rgba(255,255,255,.12);
+}
+.statbar .group {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 0 26px 0 0;
+  min-width: 0;
+  border-right: 1px solid rgba(255,255,255,.10);
+}
+.statbar .group + .group { padding-left: 26px; }
+.statbar .group:last-child { border-right: none; padding-right: 0; }
+
 .statbar .group-label {
   font-family: var(--sans);
-  font-size: 9px;
+  font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: .18em;
-  color: var(--muted);
-  font-weight: 600;
+  letter-spacing: .22em;
+  color: var(--gold);
+  font-weight: 700;
+  display: inline-flex; align-items: center; gap: 7px;
 }
 .statbar .v {
-  font-family: var(--street);
+  font-family: var(--sans);
   font-weight: 700;
-  font-size: 22px;
-  color: var(--ink);
+  font-size: 34px;
+  color: #FFFFFF;
   line-height: 1;
   font-variant-numeric: tabular-nums;
+  letter-spacing: -.025em;
 }
 .statbar .v .u {
-  font-size: 12px; color: var(--muted);
-  margin-left: 2px; font-weight: 600;
+  font-size: 14px;
+  color: rgba(255,255,255,.55);
+  margin-left: 4px;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 .statbar .l {
   font-family: var(--sans);
-  font-size: 9.5px;
+  font-size: 10.5px;
   text-transform: uppercase;
   letter-spacing: .14em;
-  color: var(--muted);
-  margin-top: 3px;
+  color: rgba(255,255,255,.55);
+  margin-top: 4px;
+  font-weight: 500;
 }
-.statbar .accent { color: var(--accent); }
+.statbar .accent { color: var(--gold); }
 
-.statbar .scale-stack { display: flex; flex-direction: column; gap: 6px; }
-.statbar .scale-stack .item { display: flex; align-items: baseline; gap: 10px; }
+.statbar .scale-stack { display: flex; flex-direction: column; gap: 12px; }
+.statbar .scale-stack .item { display: flex; align-items: baseline; gap: 12px; }
+.statbar .scale-stack .item .v { font-size: 28px; }
 .statbar .scale-stack .item .l { margin-top: 0; }
 
-.statbar .tema-row, .statbar .gen-row { display: flex; align-items: baseline; gap: 6px; }
+.statbar .tema-row, .statbar .gen-row { display: flex; align-items: baseline; gap: 8px; }
 .statbar .gen-row .frac {
-  font-family: var(--sans); font-size: 11.5px; color: var(--muted);
+  font-family: var(--sans);
+  font-size: 15px;
+  color: rgba(255,255,255,.7);
   font-variant-numeric: tabular-nums;
+  font-weight: 500;
 }
 
 .statbar .minibar {
-  display: flex; height: 6px; border-radius: 1px; overflow: hidden;
-  background: rgba(0,0,0,.06); margin-top: 2px;
+  display: flex; height: 8px; border-radius: 0; overflow: hidden;
+  background: rgba(255,255,255,.10); margin-top: 4px;
 }
 
-.statbar .top-pair { display: flex; flex-direction: column; gap: 6px; }
+.statbar .top-pair { display: flex; flex-direction: column; gap: 9px; }
 .statbar .top-pair .row {
-  display: flex; align-items: baseline; gap: 8px;
+  display: flex; align-items: baseline; gap: 10px;
   font-family: var(--sans);
 }
 .statbar .top-pair .prefix {
-  font-size: 9.5px; text-transform: uppercase; letter-spacing: .14em;
-  color: var(--muted); font-weight: 600; min-width: 22px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .18em;
+  color: var(--gold);
+  font-weight: 700;
+  min-width: 28px;
 }
-.statbar .top-pair .name { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+.statbar .top-pair .name {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #FFFFFF;
+  letter-spacing: -.005em;
+}
 .statbar .top-pair .cnt {
-  font-family: var(--street); font-weight: 700;
-  font-size: 13px; color: var(--muted);
-  font-variant-numeric: tabular-nums; margin-left: auto;
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 15px;
+  color: #FFFFFF;
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+  letter-spacing: -.01em;
 }
-.statbar .top-pair .cnt .u { font-size: 10px; color: var(--muted); margin-left: 2px; }
+.statbar .top-pair .cnt .u {
+  font-size: 10.5px;
+  color: rgba(255,255,255,.55);
+  margin-left: 3px;
+  font-weight: 600;
+}
 
 @media (max-width: 1024px) {
-  .statbar { grid-template-columns: 1fr 1fr; row-gap: 22px; padding: 16px 20px; }
+  .statbar {
+    grid-template-columns: 1fr 1fr;
+    row-gap: 24px;
+    padding: 20px 22px 22px;
+  }
+  .statbar .group:nth-child(2) { border-right: none; padding-right: 0; }
+  .statbar .group:nth-child(3) { padding-left: 0; }
 }
 @media (max-width: 640px) {
-  .statbar { grid-template-columns: 1fr; row-gap: 18px; padding: 14px 16px; gap: 18px; }
+  .statbar {
+    grid-template-columns: 1fr;
+    row-gap: 22px;
+    padding: 18px 18px 20px;
+  }
+  .statbar .group {
+    border-right: none !important;
+    padding: 0 0 18px 0 !important;
+    border-bottom: 1px solid rgba(255,255,255,.10);
+  }
+  .statbar .group:last-child {
+    border-bottom: none;
+    padding-bottom: 0 !important;
+  }
 }
 
-/* 12-col panel grid */
+/* 12-col panel grid — hairline 1px grid lines between panels */
 .dash-grid {
   display: grid;
   grid-template-columns: repeat(12, 1fr);
-  gap: 1px; background: var(--rule);
-  max-width: 1600px; margin: 0 auto;
+  gap: 1px;
+  background: var(--rule-strong);
+  max-width: 1640px;
+  margin: 0 auto;
+  border-bottom: 1px solid var(--rule-strong);
 }
 .panel {
   background: var(--bg);
-  padding: 12px 14px 10px;
+  padding: 14px 16px 12px;
   grid-column: span 6;
   min-width: 0;
 }
@@ -163,124 +308,178 @@ body {
 .panel.s8  { grid-column: span 8; }
 .panel.s12 { grid-column: span 12; }
 
-/* Panel header */
+/* Panel header — heavy 2px rule below, ink-black label, gold-on-hover lift */
 .panel-header {
   display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--rule);
-  gap: 10px; flex-wrap: wrap;
+  margin: 0 0 12px;
+  padding: 0 0 8px;
+  border-bottom: 2px solid var(--ink);
+  gap: 12px; flex-wrap: wrap;
+  position: relative;
 }
 .panel-label {
-  font-family: var(--sans); font-size: 9.5px; letter-spacing: .14em;
-  text-transform: uppercase; font-weight: 600; color: var(--muted);
+  font-family: var(--sans);
+  font-size: 11.5px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--ink);
+  display: inline-flex; align-items: center; gap: 7px;
 }
 .panel-meta {
-  font-family: var(--sans); font-size: 10.5px; color: var(--muted);
+  font-family: var(--sans);
+  font-size: 11px;
+  color: var(--muted);
   font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  letter-spacing: .04em;
 }
 
 .panel-caption {
-  font-family: var(--sans); font-size: 11px; color: var(--muted);
-  margin-top: 8px; line-height: 1.45;
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 8px;
+  line-height: 1.5;
 }
 
 .kicker {
   font-family: var(--sans);
-  font-size: 9.5px;
-  letter-spacing: .16em;
+  font-size: 10px;
+  letter-spacing: .18em;
   text-transform: uppercase;
-  color: var(--muted);
-  font-weight: 500;
+  color: var(--ink);
+  font-weight: 700;
   margin-bottom: 8px;
+  display: inline-flex; align-items: center; gap: 6px;
 }
+.kicker.muted { color: var(--muted); font-weight: 600; }
 
-/* Chip toggles */
+/* Chip toggles — sharp squared pills */
 .chip-row {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
   margin-bottom: 10px; padding-bottom: 8px;
   border-bottom: 1px solid var(--rule);
-  font-family: var(--sans); font-size: 11px;
+  font-family: var(--sans); font-size: 11.5px;
 }
 .chip-row .label {
-  letter-spacing: .12em; text-transform: uppercase;
-  font-weight: 500; color: var(--muted);
+  letter-spacing: .14em; text-transform: uppercase;
+  font-weight: 700; color: var(--muted);
+  font-size: 10.5px; margin-right: 4px;
 }
 .chip {
-  font-family: var(--sans); font-size: 11px;
-  color: var(--muted);
-  padding: 3px 10px;
-  border: 1px solid var(--rule); border-radius: 999px;
-  background: transparent; cursor: pointer;
-  transition: background .15s, color .15s;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+  padding: 4.5px 11px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  background: var(--bg);
+  cursor: pointer;
+  letter-spacing: .02em;
+  transition: background .12s ease, color .12s ease, border-color .12s ease;
 }
-.chip:hover, .chip.active {
-  color: var(--bg); background: var(--ink); border-color: var(--ink);
+.chip:hover { background: var(--surface-2); border-color: var(--ink); }
+.chip.active {
+  color: #FFFFFF;
+  background: var(--ink);
+  border-color: var(--ink);
 }
 
-/* Județ picker for the top-frequent panel */
+/* Județ picker — hard outline, bold weight */
 .s2-judet-pick {
-  display: flex; align-items: center; gap: 8px;
-  font-family: var(--sans); font-size: 11px;
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--sans); font-size: 11.5px;
 }
 .s2-judet-pick label {
-  letter-spacing: .12em; text-transform: uppercase;
-  font-weight: 500; color: var(--muted);
+  letter-spacing: .14em; text-transform: uppercase;
+  font-weight: 700; color: var(--muted);
+  font-size: 10.5px;
 }
 .s2-judet-pick select {
-  font-family: var(--sans); font-size: 11.5px;
-  color: var(--ink); background: var(--bg);
-  border: 1px solid var(--rule); border-radius: 3px;
-  padding: 4px 24px 4px 10px;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1.5px solid var(--ink);
+  border-radius: 2px;
+  padding: 5px 28px 5px 11px;
   -webkit-appearance: none; -moz-appearance: none; appearance: none;
   background-image:
-    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
-    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
-  background-position: calc(100% - 12px) 50%, calc(100% - 8px) 50%;
-  background-size: 4px 4px, 4px 4px;
+    linear-gradient(45deg, transparent 50%, var(--ink) 50%),
+    linear-gradient(135deg, var(--ink) 50%, transparent 50%);
+  background-position: calc(100% - 12px) 55%, calc(100% - 8px) 55%;
+  background-size: 5px 5px, 5px 5px;
   background-repeat: no-repeat;
   cursor: pointer; outline: none;
-  min-width: 200px;
+  min-width: 220px;
 }
-.s2-judet-pick select:focus { border-color: var(--ink); }
+.s2-judet-pick select:focus { box-shadow: 0 0 0 3px var(--warn-2); }
 
-/* Tag pills */
+/* Tag pills — square, denser, bolder */
 .tag {
-  font-family: var(--sans); font-size: 9.5px;
-  color: var(--muted); background: var(--wash);
-  padding: 1px 6px; border-radius: 999px;
-  margin-left: 6px; vertical-align: middle;
+  font-family: var(--sans);
+  font-size: 10px;
+  color: var(--ink-2);
+  background: var(--surface-2);
+  padding: 2px 7px;
+  border-radius: 2px;
+  margin-left: 6px;
+  vertical-align: middle;
+  letter-spacing: .04em;
+  font-weight: 600;
+  text-transform: lowercase;
 }
-.tag.person { background: #F4E8E5; color: #B8432F; }
+.tag.person { background: #F8DAD0; color: var(--accent-dark); }
+.tag.ideo   { background: #FFF1C6; color: #7A5400; }
+.tag.nature { background: #E1ECDA; color: #3D5A2A; }
 
-/* Rank list — generic */
+/* Rank list — generic. Hairline rows + a faint yellow flag on rank #1
+   (a gold-leader cue used across all leaderboards). */
 .rank-list { display: flex; flex-direction: column; }
 .rank-row {
   display: grid;
-  align-items: center; gap: 10px;
-  padding: 4px 0;
-  border-bottom: 1px solid var(--wash);
+  align-items: center;
+  gap: 10px;
+  padding: 5px 4px;
+  border-bottom: 1px solid var(--hairline);
   break-inside: avoid;
+  transition: background .1s ease;
+  position: relative;
 }
+.rank-row:hover { background: var(--surface-1); }
 .rank-row:last-child { border-bottom: none; }
+
+/* Gold inset on the leader row of every list */
+.rank-list > .rank-row:first-child {
+  background: linear-gradient(to right, var(--warn-1) 0%, rgba(255,247,204,.35) 60%, transparent 100%);
+  box-shadow: inset 3px 0 0 var(--gold);
+  padding-left: 7px;
+}
+
 .rank-num {
-  font-family: var(--sans); font-size: 10.5px;
-  color: var(--muted); text-align: right;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: right;
   font-variant-numeric: tabular-nums;
 }
-/* Street names rendered as Romanian street-sign plaques:
-   white lettering on signal-blue (the RO street-sign convention),
-   with a faint inset top highlight and a soft drop shadow so the
-   plate reads as slightly raised. Type carries a dual text-shadow
-   (subtle top darkening + soft cast below) for an engraved feel.
-   `width: max-content` + `justify-self: start` keeps plaques sized to
-   their content even inside `1fr` grid columns; `max-width: 100%` lets
-   the longest names truncate cleanly with an ellipsis. */
+.rank-list > .rank-row:first-child .rank-num {
+  color: var(--ink); font-weight: 700;
+}
+
+/* Street names rendered as RO street-sign plaques (white-on-blue).
+   Slightly upsized for the denser layout. */
 .rank-name, .street-tag {
   font-family: var(--street);
   font-weight: 700;
-  font-size: 12.5px;
+  font-size: 13.5px;
   letter-spacing: .045em;
   display: inline-block;
-  padding: 2px 9px;
+  padding: 2.5px 10px;
   background: var(--plaque);
   color: #FFFFFF;
   border: none;
@@ -289,7 +488,7 @@ body {
     0 -0.5px 0 rgba(0, 0, 0, .30),
     0 1px 1.5px rgba(0, 0, 0, .50);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, .12),
+    inset 0 1px 0 rgba(255, 255, 255, .14),
     0 2px 3px rgba(0, 0, 0, .26);
   line-height: 1.25;
   vertical-align: middle;
@@ -301,15 +500,17 @@ body {
   justify-self: start;
 }
 .street-tag.small {
-  font-size: 11.5px;
-  padding: 1px 7px;
+  font-size: 12px;
+  padding: 1.5px 8px;
 }
 /* Person names: clean, bold sans, no plaque */
 .rank-name.person {
   display: inline;
   padding: 0; border: none; background: transparent; border-radius: 0;
-  font-family: var(--sans); font-weight: 600;
-  font-size: 12.5px; letter-spacing: 0;
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: -.005em;
   color: var(--ink);
   text-shadow: none;
   box-shadow: none;
@@ -318,26 +519,30 @@ body {
   justify-self: auto;
 }
 .rank-count {
-  font-family: var(--sans); font-size: 11.5px;
-  color: var(--muted); text-align: right;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: right;
   font-variant-numeric: tabular-nums;
+  letter-spacing: -.005em;
 }
 
-/* 2-column rank list inside a wide panel.
-   Override display:block so column-count works (flex containers ignore multicol). */
+/* 2-column rank list (column-count multicol) */
 .rank-2col {
   display: block;
-  column-count: 2; column-gap: 32px;
+  column-count: 2;
+  column-gap: 36px;
   column-rule: 1px solid var(--rule);
 }
 .rank-2col .rank-row { break-inside: avoid; }
 
 /* Per-section row templates */
-.s2-list .rank-row     { grid-template-columns: 24px minmax(0, 1fr) 110px 48px; gap: 8px; }
-.s3-tower .rank-row    { grid-template-columns: minmax(0, 1fr) minmax(60px, 1fr) 38px; }
-.s4-list .rank-row     { grid-template-columns: minmax(0, 1fr) minmax(60px, 1fr) 60px 56px; }
+.s2-list .rank-row     { grid-template-columns: 26px minmax(0, 1fr) 110px 52px; gap: 10px; }
+.s3-tower .rank-row    { grid-template-columns: minmax(0, 1fr) minmax(60px, 1fr) 40px; }
+.s4-list .rank-row     { grid-template-columns: minmax(0, 1fr) minmax(60px, 1fr) 60px 60px; }
 
-/* Row cell containing the street-name plaque and (optionally) a category tag */
+/* Row cell containing the plaque + optional tag */
 .name-cell {
   display: flex; align-items: center; gap: 6px;
   min-width: 0;
@@ -346,29 +551,34 @@ body {
 .name-cell .rank-name { flex: 0 1 auto; min-width: 0; }
 .name-cell .tag { flex: 0 0 auto; }
 
-/* Contest row: fixed plaque column so bars share a left edge across rows.
-   The 140px column fits every label we ship (longest ~ "Trandafirilor",
-   "Privighetorii", "Răsăritului") at the small plaque size. */
+/* Contest row */
 .contest-row {
   display: grid;
   grid-template-columns: 14px 140px minmax(50px, 1fr) 36px;
   gap: 8px;
   align-items: center;
-  padding: 3px 0;
+  padding: 4px 0;
 }
-.contest-row + .contest-row { border-top: 1px solid var(--wash); }
+.contest-row + .contest-row { border-top: 1px solid var(--hairline); }
 .contest-row .rank-num-mini {
-  font-family: var(--sans); font-size: 9.5px;
-  color: var(--muted); text-align: right;
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: right;
   font-variant-numeric: tabular-nums;
 }
+.contest-row:first-child .rank-num-mini { color: var(--ink); font-weight: 700; }
 .contest-row .rank-count-mini {
-  font-family: var(--sans); font-size: 10.5px;
-  color: var(--muted); text-align: right;
+  font-family: var(--sans);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-/* Internal 3-col grids inside wide panels (amprente, conteste). Collapse at narrow widths. */
+/* Internal 3-col grids inside wide panels */
 .subgrid-3 {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
@@ -377,35 +587,43 @@ body {
   border: 1px solid var(--rule);
 }
 
-/* Bars */
+/* Bars — taller, more opaque for visual punch */
 .bar-wrap {
-  height: 3px; background: var(--wash);
-  border-radius: 1px; position: relative;
+  height: 5px;
+  background: var(--surface-2);
+  border-radius: 0;
+  position: relative;
 }
 .bar {
   position: absolute; left: 0; top: 0;
-  height: 100%; border-radius: 1px;
-  background: var(--ink); opacity: .4;
+  height: 100%;
+  border-radius: 0;
+  background: var(--ink);
+  opacity: .82;
 }
-.bar.accent { background: var(--accent); opacity: .65; }
-.bar.female { background: var(--accent); opacity: .5; }
+.bar.accent { background: var(--accent); opacity: 1; }
+.bar.female { background: var(--accent); opacity: .72; }
+.bar.gold   { background: var(--gold);   opacity: .95; }
+.bar.olive  { background: var(--olive);  opacity: .9;  }
 
-/* Display numbers (sans, tabular) */
+/* Display numbers */
 .display-num {
-  font-family: var(--sans); font-weight: 600;
+  font-family: var(--sans);
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -.02em; line-height: 1;
+  letter-spacing: -.025em;
+  line-height: 1;
 }
 
-/* Map fingerprint right rail */
+/* Map + right-rail fingerprint */
 .map-grid {
   display: grid;
   grid-template-columns: 8fr 4fr;
-  gap: 24px;
+  gap: 28px;
 }
 .map-grid .fingerprint {
   border-left: 1px solid var(--rule);
-  padding-left: 18px;
+  padding-left: 22px;
 }
 
 /* Tablet: collapse aggressive 3-up to 2-up, stack map, soften subgrids */
@@ -417,7 +635,7 @@ body {
     border-left: none;
     border-top: 1px solid var(--rule);
     padding-left: 0;
-    padding-top: 14px;
+    padding-top: 16px;
     margin-top: 4px;
   }
   .subgrid-3 { grid-template-columns: 1fr 1fr; }
@@ -425,12 +643,15 @@ body {
 
 /* Mobile: single column, single-col rank lists, fully collapsed subgrids */
 @media (max-width: 640px) {
-  .panel { grid-column: span 12 !important; padding: 10px 12px 8px; }
+  .panel { grid-column: span 12 !important; padding: 12px 14px 10px; }
   .dash-grid { gap: 0; max-width: 100%; }
   .rank-2col { column-count: 1; column-rule: none; }
   .site-nav nav { display: none; }
   .subgrid-3 { grid-template-columns: 1fr; }
 }
+
+/* ──────── Footer (dark band, mirrors statbar) ──────── */
+footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 28px; }
   </style>
 </head>
 <body>
@@ -469,7 +690,7 @@ body {
 <div class="statbar">
 
   <div class="group">
-    <div class="group-label">Scară</div>
+    <div class="group-label"><span class="emo md">📊</span> Scară</div>
     <div class="scale-stack">
       <div class="item">
         <div class="v">{{ "{:,.0f}".format(section1.total_streets).replace(",", ".") }}</div>
@@ -483,7 +704,7 @@ body {
   </div>
 
   <div class="group">
-    <div class="group-label">Tematică</div>
+    <div class="group-label"><span class="emo md">🏷️</span> Tematică</div>
     <div class="tema-row">
       <div class="v">{{ lead_pct }}<span class="u">% {{ theme_ro[lead.category] | default(lead.category) }}</span></div>
     </div>
@@ -506,7 +727,7 @@ body {
   </div>
 
   <div class="group">
-    <div class="group-label">Repartiție pe gen</div>
+    <div class="group-label"><span class="emo md">⚥</span> Repartiție pe gen</div>
     <div class="gen-row">
       <div class="v">{{ male_pct }}<span class="u">% B</span></div>
       <div class="frac">/ <span class="accent" style="font-weight:600;">{{ female_pct }}% F</span></div>
@@ -519,7 +740,7 @@ body {
   </div>
 
   <div class="group">
-    <div class="group-label">Cei mai des onorați</div>
+    <div class="group-label"><span class="emo md">🏆</span> Cei mai des onorați</div>
     <div class="top-pair">
       {% if section1.top_men %}
       <div class="row">
@@ -545,7 +766,7 @@ body {
 {# PANEL: CELE MAI FRECVENTE (s12, 2-col rank list) #}
 <div class="panel s12" id="cele-mai-intalnite">
   <div class="panel-header">
-    <span class="panel-label">Cele mai frecvente · Top 30</span>
+    <span class="panel-label"><span class="emo md">🔝</span> Cele mai frecvente · Top 30</span>
     <div class="s2-judet-pick">
       <label for="s2-judet-select">Județ</label>
       <select id="s2-judet-select">
@@ -562,11 +783,15 @@ body {
 
 {# PANEL: REPARTIȚIE TEMATICĂ (s4) #}
 {% set theme_total = section5.theme_dist | sum(attribute='count') %}
-{% set theme_colors = ['#C04F35','#A0826A','#8BA888','#6E6E70','#B8A090','#3A3A3D','#DDDCD7'] %}
+{% set theme_colors = ['#5F7A4E','#0E4D92','#5A6573','#C04F35','#E8AE00','#7A4A33','#B0B7C0'] %}
+{% set theme_emoji = {
+  'natură':'🌿','persoană':'👤','concept / abstract':'💭',
+  'ideologic':'🚩','dată / sărbătoare':'📅','religios':'⛪'
+} %}
 {% set ns = namespace(cumulative=0) %}
 <div class="panel s4" id="tematica">
   <div class="panel-header">
-    <span class="panel-label">Repartiție tematică</span>
+    <span class="panel-label"><span class="emo md">🧭</span> Repartiție tematică</span>
     <span class="panel-meta">{{ "{:,.0f}".format(theme_total).replace(",", ".") }} clasif.</span>
   </div>
   <div style="display:flex;gap:18px;align-items:center;">
@@ -587,9 +812,10 @@ body {
       {% for t in section5.theme_dist %}
       {% set pct = (t.count / theme_total * 100) | round(1) %}
       <div style="display:flex;align-items:center;gap:8px;">
-        <div style="width:8px;height:8px;border-radius:1px;background:{{ theme_colors[loop.index0 % theme_colors|length] }};flex-shrink:0;"></div>
-        <span style="font-family:var(--sans);font-size:11.5px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ t.category }}</span>
-        <span style="font-family:var(--sans);font-size:11.5px;font-weight:600;font-variant-numeric:tabular-nums;">{{ pct }}%</span>
+        <div style="width:10px;height:10px;border-radius:2px;background:{{ theme_colors[loop.index0 % theme_colors|length] }};flex-shrink:0;"></div>
+        <span class="emo md">{{ theme_emoji.get(t.category, '·') }}</span>
+        <span style="font-family:var(--sans);font-size:12px;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ t.category }}</span>
+        <span style="font-family:var(--sans);font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.01em;">{{ pct }}%</span>
       </div>
       {% endfor %}
     </div>
@@ -605,16 +831,23 @@ body {
   'orchard':'livadă','valley':'vale','peak':'vârf','mountain':'munte',
   'mountain_peak':'vârf de munte'
 } %}
+{% set nature_emoji = {
+  'flower':'🌸','tree':'🌳','water':'💧','plant':'🌱','bird':'🐦',
+  'sky':'☁️','geography':'🗺️','forest':'🌲','meadow':'🌾','season':'🍂',
+  'animal':'🦌','weather':'🌦️','fruit':'🍎','field':'🌾','hill':'⛰️',
+  'orchard':'🍒','valley':'🏞️','peak':'🏔️','mountain':'⛰️','mountain_peak':'🏔️'
+} %}
 <div class="panel s4">
   <div class="panel-header">
-    <span class="panel-label">Subtipuri · Natură</span>
+    <span class="panel-label"><span class="emo md">🌿</span> Subtipuri · Natură</span>
   </div>
   {% set max_n = section5.nature_subtypes[0].n if section5.nature_subtypes else 1 %}
   {% for row in section5.nature_subtypes %}
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-    <span style="font-family:var(--sans);font-size:11.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ nature_ro.get(row.nature_type, row.nature_type) }}</span>
-    <div class="bar-wrap" style="width:80px;"><div class="bar" style="width:{{ (row.n / max_n * 100)|int }}%;background:#A0826A;opacity:.7;"></div></div>
-    <span style="font-family:var(--sans);font-size:10.5px;color:var(--muted);width:26px;text-align:right;font-variant-numeric:tabular-nums;">{{ row.n }}</span>
+  <div style="display:flex;align-items:center;gap:8px;padding:3px 0;{% if not loop.first %}border-top:1px solid var(--hairline);{% endif %}">
+    <span class="emo md" style="width:14px;text-align:center;">{{ nature_emoji.get(row.nature_type, '·') }}</span>
+    <span style="font-family:var(--sans);font-size:12px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ nature_ro.get(row.nature_type, row.nature_type) }}</span>
+    <div class="bar-wrap" style="width:90px;"><div class="bar olive" style="width:{{ (row.n / max_n * 100)|int }}%;"></div></div>
+    <span style="font-family:var(--sans);font-size:12px;font-weight:700;color:var(--ink);width:30px;text-align:right;font-variant-numeric:tabular-nums;letter-spacing:-.005em;">{{ row.n }}</span>
   </div>
   {% endfor %}
 </div>
@@ -633,12 +866,12 @@ body {
 } %}
 <div class="panel s4">
   <div class="panel-header">
-    <span class="panel-label">Tokeni ideologici</span>
+    <span class="panel-label"><span class="emo md">🚩</span> Tokeni ideologici</span>
   </div>
-  <div style="display:flex;flex-wrap:wrap;gap:5px;">
+  <div style="display:flex;flex-wrap:wrap;gap:6px;">
     {% for tok in section5.ideo_tokens %}
-    <span style="font-family:var(--sans);font-size:11px;padding:2px 8px;border:1px solid {{ 'var(--accent)' if tok.n > 30 else 'var(--rule)' }};border-radius:3px;color:{{ '#B8432F' if tok.n > 30 else 'var(--ink)' }};background:{{ '#FDF4F2' if tok.n > 30 else 'transparent' }};">
-      {{ ideo_ro.get(tok.token, tok.token) }} <span style="color:var(--muted);font-size:9.5px;margin-left:3px;font-variant-numeric:tabular-nums;">{{ tok.n }}</span>
+    <span style="font-family:var(--sans);font-size:11.5px;font-weight:600;padding:3px 9px;border:1.5px solid {{ 'var(--accent)' if tok.n > 30 else 'var(--rule-strong)' }};border-radius:2px;color:{{ 'var(--accent-dark)' if tok.n > 30 else 'var(--ink)' }};background:{{ '#FFF1ED' if tok.n > 30 else 'var(--bg)' }};">
+      {{ ideo_ro.get(tok.token, tok.token) }} <span style="color:var(--muted);font-size:10px;margin-left:3px;font-variant-numeric:tabular-nums;font-weight:500;">{{ tok.n }}</span>
     </span>
     {% endfor %}
     {% if not section5.ideo_tokens %}
@@ -650,7 +883,7 @@ body {
 {# PANEL: ECART DE GEN (s4) #}
 <div class="panel s4" id="pe-cine-onoram">
   <div class="panel-header">
-    <span class="panel-label">Ecart de gen</span>
+    <span class="panel-label"><span class="emo md">⚥</span> Ecart de gen</span>
     <span class="panel-meta">{{ section3.total_m + section3.total_f }} pers.</span>
   </div>
   <div style="display:flex;gap:16px;align-items:start;">
@@ -686,18 +919,27 @@ body {
   'doctor':'medic','economist':'economist','jurist':'jurist',
   'linguist':'lingvist','mathematician':'matematician','lawyer':'avocat'
 } %}
+{% set prof_emoji = {
+  'writer':'✍️','poet':'🪶','politician':'🏛️','voievod':'🗡️',
+  'revolutionary':'✊','military':'🎖️','royalty':'👑','scientist':'🔬',
+  'painter':'🎨','ruler':'⚜️','historian':'📜','composer':'🎼',
+  'engineer':'⚙️','educator':'🎓','clergy':'✝️','philosopher':'🧠',
+  'actor':'🎭','architect':'📐','doctor':'🩺','economist':'💼',
+  'jurist':'⚖️','linguist':'🗣️','mathematician':'➗','lawyer':'⚖️'
+} %}
 <div class="panel s4">
   <div class="panel-header">
-    <span class="panel-label">Profesia persoanei onorate</span>
+    <span class="panel-label"><span class="emo md">🎓</span> Profesia persoanei onorate</span>
   </div>
   {% set max_prof = section3.profession_dist[0].n if section3.profession_dist else 1 %}
   {% for row in section3.profession_dist %}
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-    <span style="font-family:var(--sans);font-size:11.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ prof_ro.get(row.profession, row.profession) }}</span>
-    <div class="bar-wrap" style="width:80px;">
+  <div style="display:flex;align-items:center;gap:8px;padding:3px 0;{% if not loop.first %}border-top:1px solid var(--hairline);{% endif %}">
+    <span class="emo md" style="width:14px;text-align:center;">{{ prof_emoji.get(row.profession, '·') }}</span>
+    <span style="font-family:var(--sans);font-size:12px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ prof_ro.get(row.profession, row.profession) }}</span>
+    <div class="bar-wrap" style="width:90px;">
       <div class="bar" style="width:{{ (row.n / max_prof * 100)|int }}%"></div>
     </div>
-    <span style="font-family:var(--sans);font-size:10.5px;color:var(--muted);width:22px;text-align:right;font-variant-numeric:tabular-nums;">{{ row.n }}</span>
+    <span style="font-family:var(--sans);font-size:12px;font-weight:700;color:var(--ink);width:26px;text-align:right;font-variant-numeric:tabular-nums;letter-spacing:-.005em;">{{ row.n }}</span>
   </div>
   {% endfor %}
 </div>
@@ -708,18 +950,23 @@ body {
   '1848':'generația de la 1848','interwar':'interbelic (1900–1947)',
   'communist':'comunism (1947–1989)'
 } %}
+{% set era_emoji = {
+  'ancient':'🏺','medieval':'🏰','premodern':'🕯️',
+  '1848':'🗽','interwar':'🎩','communist':'⭐'
+} %}
 <div class="panel s4">
   <div class="panel-header">
-    <span class="panel-label">Epoca în care a trăit</span>
+    <span class="panel-label"><span class="emo md">⏳</span> Epoca în care a trăit</span>
   </div>
   {% set max_era = section3.era_dist[0].n if section3.era_dist else 1 %}
   {% for row in section3.era_dist %}
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-    <span style="font-family:var(--sans);font-size:11.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ era_ro.get(row.era, row.era or 'necunoscută') }}</span>
-    <div class="bar-wrap" style="width:80px;">
+  <div style="display:flex;align-items:center;gap:8px;padding:3px 0;{% if not loop.first %}border-top:1px solid var(--hairline);{% endif %}">
+    <span class="emo md" style="width:14px;text-align:center;">{{ era_emoji.get(row.era, '·') }}</span>
+    <span style="font-family:var(--sans);font-size:12px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ era_ro.get(row.era, row.era or 'necunoscută') }}</span>
+    <div class="bar-wrap" style="width:90px;">
       <div class="bar" style="width:{{ (row.n / max_era * 100)|int }}%"></div>
     </div>
-    <span style="font-family:var(--sans);font-size:10.5px;color:var(--muted);width:22px;text-align:right;font-variant-numeric:tabular-nums;">{{ row.n }}</span>
+    <span style="font-family:var(--sans);font-size:12px;font-weight:700;color:var(--ink);width:26px;text-align:right;font-variant-numeric:tabular-nums;letter-spacing:-.005em;">{{ row.n }}</span>
   </div>
   {% endfor %}
 </div>
@@ -727,15 +974,16 @@ body {
 {# PANEL: TOP PERSOANE (s12, 2-col internal) #}
 <div class="panel s12">
   <div class="panel-header">
-    <span class="panel-label">Top persoane onorate · număr de străzi</span>
-    <span class="panel-meta">{{ section3.top_persons | length }} pers. · • feminin</span>
+    <span class="panel-label"><span class="emo md">👥</span> Top persoane onorate · număr de străzi</span>
+    <span class="panel-meta">{{ section3.top_persons | length }} pers. · <span style="color:var(--accent);font-weight:700;">●</span> feminin</span>
   </div>
   <div class="rank-list rank-2col s3-tower">
     {% set max_count = section3.top_persons[0].street_count %}
     {% for p in section3.top_persons %}
     <div class="rank-row">
       <span class="rank-name person">
-        {{ p.full_name }}{% if p.gender == 'F' %} <span style="display:inline-block;width:6px;height:6px;background:var(--accent);border-radius:50%;margin-left:4px;vertical-align:middle;"></span>{% endif %}
+        <span class="portrait" aria-hidden="true">{{ (p.full_name.split()[0][0] if p.full_name else '·') }}{{ (p.full_name.split()[-1][0] if p.full_name and (p.full_name.split() | length) > 1 else '') }}</span>
+        {{ p.full_name }}{% if p.gender == 'F' %} <span style="display:inline-block;width:7px;height:7px;background:var(--accent);border-radius:50%;margin-left:4px;vertical-align:middle;"></span>{% endif %}
       </span>
       <div class="bar-wrap">
         <div class="{{ 'bar accent' if loop.first else ('bar female' if p.gender == 'F' else 'bar') }}"
@@ -750,24 +998,27 @@ body {
 {# PANEL: RECUNOAȘTERE GLOBALĂ (s6) #}
 <div class="panel s6" id="recunoastere">
   <div class="panel-header">
-    <span class="panel-label">Recunoaștere globală · Wikidata</span>
+    <span class="panel-label"><span class="emo md">🌍</span> Recunoaștere globală · Wikidata</span>
     <span class="panel-meta">{{ wikidata_total }} persoane</span>
   </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--rule);border:1px solid var(--rule);">
-    <div style="background:var(--ink);color:#FAF8F3;padding:12px 12px;">
-      <div style="font-family:var(--sans);font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;font-weight:600;color:var(--accent);margin-bottom:6px;">Universal</div>
-      <div class="display-num" style="font-size:32px;margin-bottom:2px;">{{ section4.tier_counts.universal }}</div>
-      <div style="font-family:var(--sans);font-size:9.5px;color:#C9C9CB;">≥ 50 limbi Wikipedia</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--rule-strong);border:1px solid var(--rule-strong);">
+    <div style="background:var(--ink-band);color:#FFFFFF;padding:14px 14px;position:relative;">
+      <div style="position:absolute;top:10px;right:12px;font-size:18px;line-height:1;opacity:.85;">🌍</div>
+      <div style="font-family:var(--sans);font-size:10px;letter-spacing:.2em;text-transform:uppercase;font-weight:700;color:var(--gold);margin-bottom:8px;">Universal</div>
+      <div class="display-num" style="font-size:38px;margin-bottom:4px;">{{ section4.tier_counts.universal }}</div>
+      <div style="font-family:var(--sans);font-size:10.5px;color:rgba(255,255,255,.65);font-weight:500;">≥ 50 limbi Wikipedia</div>
     </div>
-    <div style="background:var(--bg);padding:12px 12px;">
-      <div style="font-family:var(--sans);font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;font-weight:600;color:var(--muted);margin-bottom:6px;">Național</div>
-      <div class="display-num" style="font-size:32px;margin-bottom:2px;">{{ section4.tier_counts.national }}</div>
-      <div style="font-family:var(--sans);font-size:9.5px;color:var(--muted);">5–49 limbi</div>
+    <div style="background:var(--surface-1);padding:14px 14px;position:relative;">
+      <div style="position:absolute;top:10px;right:12px;font-size:18px;line-height:1;">🇷🇴</div>
+      <div style="font-family:var(--sans);font-size:10px;letter-spacing:.2em;text-transform:uppercase;font-weight:700;color:var(--ink);margin-bottom:8px;">Național</div>
+      <div class="display-num" style="font-size:38px;margin-bottom:4px;">{{ section4.tier_counts.national }}</div>
+      <div style="font-family:var(--sans);font-size:10.5px;color:var(--muted);font-weight:500;">5–49 limbi</div>
     </div>
-    <div style="background:var(--bg);padding:12px 12px;">
-      <div style="font-family:var(--sans);font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;font-weight:600;color:var(--muted);margin-bottom:6px;">Local</div>
-      <div class="display-num" style="font-size:32px;margin-bottom:2px;">{{ section4.tier_counts.local }}</div>
-      <div style="font-family:var(--sans);font-size:9.5px;color:var(--muted);">sub 5 limbi</div>
+    <div style="background:var(--bg);padding:14px 14px;position:relative;">
+      <div style="position:absolute;top:10px;right:12px;font-size:18px;line-height:1;">📍</div>
+      <div style="font-family:var(--sans);font-size:10px;letter-spacing:.2em;text-transform:uppercase;font-weight:700;color:var(--ink);margin-bottom:8px;">Local</div>
+      <div class="display-num" style="font-size:38px;margin-bottom:4px;">{{ section4.tier_counts.local }}</div>
+      <div style="font-family:var(--sans);font-size:10.5px;color:var(--muted);font-weight:500;">sub 5 limbi</div>
     </div>
   </div>
 </div>
@@ -775,7 +1026,7 @@ body {
 {# PANEL: RENUMIRI placeholder (s6) #}
 <div class="panel s6" id="renumiri">
   <div class="panel-header">
-    <span class="panel-label">Renumiri</span>
+    <span class="panel-label"><span class="emo md">📝</span> Renumiri</span>
   </div>
   <div class="panel-caption">Secțiune în construcție — date indisponibile.</div>
 </div>
@@ -783,7 +1034,7 @@ body {
 {# PANEL: NOTORIETATE WIKIPEDIA (s12, 2-col internal) #}
 <div class="panel s12">
   <div class="panel-header">
-    <span class="panel-label">Notorietate Wikipedia · vizualizări lunare medii · ro.wikipedia.org · 12 luni</span>
+    <span class="panel-label"><span class="emo md">📈</span> Notorietate Wikipedia · vizualizări lunare medii · ro.wikipedia.org · 12 luni</span>
   </div>
   <div class="rank-list rank-2col s4-list">
     {% set max_pv = section4.top_pageviews[0].wiki_ro_views if section4.top_pageviews else 1 %}
@@ -804,7 +1055,7 @@ body {
 {# PANEL: HARTA (s12, internal 8/4) #}
 <div class="panel s12" id="harta">
   <div class="panel-header">
-    <span class="panel-label">Harta · statistici pe județ</span>
+    <span class="panel-label"><span class="emo md">🗺️</span> Harta · statistici pe județ</span>
     <div class="chip-row" id="s6-metric-row" style="margin:0;padding:0;border:none;">
       <span class="label">Vedeți după</span>
       <button class="chip active" data-metric="saint_pct">% sfinți</button>
@@ -823,8 +1074,8 @@ body {
       </div>
     </div>
     <div class="fingerprint" id="s6-fingerprint">
-      <div class="kicker">Amprenta județului</div>
-      <p style="font-family:var(--sans);font-size:12px;color:var(--muted);padding-top:20px;">
+      <div class="kicker"><span class="emo md">🧬</span> Amprenta județului</div>
+      <p style="font-family:var(--sans);font-size:12.5px;color:var(--muted);padding-top:20px;line-height:1.55;">
         Selectați un județ pe hartă.
       </p>
     </div>
@@ -834,13 +1085,13 @@ body {
 {# PANEL: AMPRENTE JUDEȚENE (s12, internal 3-col) #}
 <div class="panel s12">
   <div class="panel-header">
-    <span class="panel-label">Amprente județene · trei caractere</span>
+    <span class="panel-label"><span class="emo md">🧬</span> Amprente județene · trei caractere</span>
   </div>
   <div class="subgrid-3">
 
     {# Most "exclusivist" - judete with most names found nowhere else #}
-    <div style="background:var(--bg);padding:12px 14px;">
-      <div class="panel-label" style="margin-bottom:6px;">Cele mai exclusiviste</div>
+    <div style="background:var(--bg);padding:14px 16px;">
+      <div class="panel-label" style="margin-bottom:6px;"><span class="emo md">💎</span> Cele mai exclusiviste</div>
       <div class="panel-caption" style="margin:0 0 8px;">Județe cu cele mai multe nume găsite doar acolo · ≥3 străzi local</div>
       {% set max_d = section8.judet_distinctive[0].n if section8.judet_distinctive else 1 %}
       {% for row in section8.judet_distinctive %}
@@ -854,8 +1105,8 @@ body {
     </div>
 
     {# Most "rural-poetic" - highest nature % #}
-    <div style="background:var(--bg);padding:12px 14px;">
-      <div class="panel-label" style="margin-bottom:6px;">Cele mai «rurale-poetice»</div>
+    <div style="background:var(--bg);padding:14px 16px;">
+      <div class="panel-label" style="margin-bottom:6px;"><span class="emo md">🌾</span> Cele mai «rurale-poetice»</div>
       <div class="panel-caption" style="margin:0 0 8px;">Cota de străzi cu nume din natură (flori, copaci, ape, animale…)</div>
       {% set max_r = section8.judet_rural[0].pct if section8.judet_rural else 1 %}
       {% for row in section8.judet_rural %}
@@ -869,8 +1120,8 @@ body {
     </div>
 
     {# Most ideological #}
-    <div style="background:var(--bg);padding:12px 14px;">
-      <div class="panel-label" style="margin-bottom:6px;">Cele mai «ideologice»</div>
+    <div style="background:var(--bg);padding:14px 16px;">
+      <div class="panel-label" style="margin-bottom:6px;"><span class="emo md">🚩</span> Cele mai «ideologice»</div>
       <div class="panel-caption" style="margin:0 0 8px;">Cota de străzi cu nume ideologic (libertate, victorie, unire…)</div>
       {% set max_i = section8.judet_ideo[0].pct if section8.judet_ideo else 1 %}
       {% for row in section8.judet_ideo %}
@@ -889,7 +1140,7 @@ body {
 {# PANEL: SEMNĂTURI REGIONALE (s6) + CURIOZITĂȚI UNICE NAȚIONALE (s6) #}
 <div class="panel s6">
   <div class="panel-header">
-    <span class="panel-label">Semnături regionale · ≥80% concentrare într-un județ</span>
+    <span class="panel-label"><span class="emo md">📜</span> Semnături regionale · ≥80% concentrare într-un județ</span>
     <span class="panel-meta">{{ section8.regional_signatures | length }} nume</span>
   </div>
   <div class="rank-list">
@@ -905,7 +1156,7 @@ body {
 
 <div class="panel s6" id="curiozitati">
   <div class="panel-header">
-    <span class="panel-label">Curiozități unice naționale · doar într-un singur UAT</span>
+    <span class="panel-label"><span class="emo md">🔎</span> Curiozități unice naționale · doar într-un singur UAT</span>
     <span class="panel-meta">selecție · geografice</span>
   </div>
   <div class="rank-list">
@@ -927,16 +1178,24 @@ body {
   'sky':     'Cer · lumină',
   'trades':  'Meserii',
 } %}
+{% set contest_emoji = {
+  'animals': '🦌',
+  'flowers': '🌸',
+  'trees':   '🌳',
+  'birds':   '🐦',
+  'sky':     '☀️',
+  'trades':  '🔨',
+} %}
 {% set contest_order = ['flowers', 'trees', 'birds', 'animals', 'sky', 'trades'] %}
 <div class="panel s12">
   <div class="panel-header">
-    <span class="panel-label">Conteste tematice · top 7 din fiecare familie</span>
+    <span class="panel-label"><span class="emo md">🏟️</span> Conteste tematice · top 7 din fiecare familie</span>
   </div>
   <div class="subgrid-3">
     {% for key in contest_order %}
     {% set entries = section8.contests[key] %}
-    <div style="background:var(--bg);padding:12px 14px;">
-      <div class="panel-label" style="margin-bottom:8px;">{{ contest_labels[key] }}</div>
+    <div style="background:var(--bg);padding:14px 16px;">
+      <div class="panel-label" style="margin-bottom:8px;"><span class="emo md">{{ contest_emoji.get(key, '·') }}</span> {{ contest_labels[key] }}</div>
       {% if entries %}
         {% set max_e = entries[0].n %}
         {% for row in entries %}
@@ -959,31 +1218,31 @@ body {
 </div>{# end .dash-grid #}
 
 {# FOOTER #}
-<footer style="background:var(--ink);color:#FAF8F3;padding:20px 24px;">
-  <div style="max-width:1600px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr 1fr;gap:32px;">
+<footer class="site-footer" style="background:var(--ink-band);color:#FFFFFF;padding:24px 28px;">
+  <div style="max-width:1640px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr 1fr;gap:36px;">
     <div>
-      <div style="font-family:var(--sans);font-size:9px;letter-spacing:.18em;text-transform:uppercase;font-weight:600;color:var(--accent);margin-bottom:6px;">Despre date</div>
-      <p style="font-family:var(--sans);font-size:12px;line-height:1.55;color:#C9C9CB;">
+      <div style="font-family:var(--sans);font-size:10px;letter-spacing:.22em;text-transform:uppercase;font-weight:700;color:var(--gold);margin-bottom:8px;display:inline-flex;align-items:center;gap:7px;"><span class="emo md">📄</span> Despre date</div>
+      <p style="font-family:var(--sans);font-size:12.5px;line-height:1.6;color:rgba(255,255,255,.72);">
         Registrul Secțiilor de Vot, Autoritatea Electorală Permanentă, 14.05.2025.
         Descriere adrese cu alegători înregistrați.
       </p>
     </div>
     <div>
-      <div style="font-family:var(--sans);font-size:9px;letter-spacing:.18em;text-transform:uppercase;font-weight:600;color:var(--accent);margin-bottom:6px;">Metodologie</div>
-      <p style="font-family:var(--sans);font-size:12px;line-height:1.55;color:#C9C9CB;">
+      <div style="font-family:var(--sans);font-size:10px;letter-spacing:.22em;text-transform:uppercase;font-weight:700;color:var(--gold);margin-bottom:8px;display:inline-flex;align-items:center;gap:7px;"><span class="emo md">⚗️</span> Metodologie</div>
+      <p style="font-family:var(--sans);font-size:12.5px;line-height:1.6;color:rgba(255,255,255,.72);">
         Clasificare: curation manual + LLM batch (Claude Haiku + Gemini).
         Recunoaștere: Wikidata + Wikipedia pageviews.
         Harta: GeoJSON județe, surse publice.
       </p>
     </div>
     <div>
-      <div style="font-family:var(--sans);font-size:9px;letter-spacing:.18em;text-transform:uppercase;font-weight:600;color:var(--accent);margin-bottom:6px;">Cod sursă</div>
-      <p style="font-family:var(--sans);font-size:12px;line-height:1.55;color:#C9C9CB;">
+      <div style="font-family:var(--sans);font-size:10px;letter-spacing:.22em;text-transform:uppercase;font-weight:700;color:var(--gold);margin-bottom:8px;display:inline-flex;align-items:center;gap:7px;"><span class="emo md">⌨️</span> Cod sursă</div>
+      <p style="font-family:var(--sans);font-size:12.5px;line-height:1.6;color:rgba(255,255,255,.72);">
         Proiect personal · pax@mioritics.ro
       </p>
     </div>
   </div>
-  <div style="max-width:1600px;margin:14px auto 0;border-top:1px solid #2A2C30;padding-top:10px;font-family:var(--sans);font-size:10.5px;color:var(--muted);">
+  <div style="max-width:1640px;margin:18px auto 0;border-top:1px solid rgba(255,255,255,.10);padding-top:12px;font-family:var(--sans);font-size:11px;color:rgba(255,255,255,.5);letter-spacing:.04em;">
     Cum ne numim străzile · variantă densă · {{ section1.total_streets | default(0) | int | string }} adrese · ultima actualizare 14.05.2025
   </div>
 </footer>
@@ -1192,17 +1451,17 @@ body {
 
     const fp = document.getElementById('s6-fingerprint');
     fp.innerHTML = `
-      <div class="kicker">Amprenta județului · selectat</div>
-      <div style="font-family:var(--sans);font-weight:600;font-size:18px;margin:2px 0 2px;letter-spacing:-.005em;">${feature.properties?.name || code}</div>
-      <div style="font-family:var(--sans);font-size:10.5px;color:var(--muted);margin-bottom:12px;font-variant-numeric:tabular-nums;">${(row.total_streets || 0).toLocaleString('ro-RO')} de străzi · Sfinți ${(row.saint_pct || 0).toFixed(1)}% · Feminin ${(row.female_pct || 0).toFixed(1)}%</div>
+      <div class="kicker"><span class="emo md">🧬</span> Amprenta județului</div>
+      <div style="font-family:var(--sans);font-weight:700;font-size:20px;margin:2px 0 4px;letter-spacing:-.015em;color:var(--ink);">${feature.properties?.name || code}</div>
+      <div style="font-family:var(--sans);font-size:11px;color:var(--muted);margin-bottom:14px;font-variant-numeric:tabular-nums;font-weight:500;">${(row.total_streets || 0).toLocaleString('ro-RO')} de străzi · Sfinți ${(row.saint_pct || 0).toFixed(1)}% · Feminin ${(row.female_pct || 0).toFixed(1)}%</div>
 
-      <div class="kicker" style="margin-bottom:4px;">Cele mai frecvente</div>
-      <div style="margin-bottom:12px;">${topRows || '<span style="color:var(--muted)">—</span>'}</div>
+      <div class="kicker" style="margin-bottom:6px;"><span class="emo md">🔝</span> Cele mai frecvente</div>
+      <div style="margin-bottom:14px;">${topRows || '<span style="color:var(--muted)">—</span>'}</div>
 
-      <div class="kicker" style="margin-bottom:4px;">Persoane omagiate</div>
-      <div style="margin-bottom:12px;">${personsRows || '<span style="color:var(--muted)">—</span>'}</div>
+      <div class="kicker" style="margin-bottom:6px;"><span class="emo md">👤</span> Persoane omagiate</div>
+      <div style="margin-bottom:14px;">${personsRows || '<span style="color:var(--muted)">—</span>'}</div>
 
-      <div class="kicker" style="margin-bottom:4px;">Cele mai rare (unice național)</div>
+      <div class="kicker" style="margin-bottom:6px;"><span class="emo md">💎</span> Cele mai rare (unice național)</div>
       <div>${rareRows || '<span style="color:var(--muted)">—</span>'}</div>
     `;
   }

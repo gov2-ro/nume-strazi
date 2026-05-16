@@ -75,5 +75,11 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 ## Misc ideas
 
-- [ ] UI - more of a compact dashboard,  raw numbers. Leave the story telling / editorialisation to another medium, move that to Jupyter notebooks.
+- [ ] UI - more of a compact dashboard,  raw numbers. Leave the story telling / editorialisation to another medium, move that to Jupyter notebooks. *(partly done 2026-05-16 — the dense layout has been restyled bolder/denser with IBM Plex, dark statbar, larger numbers, leader-row highlights. Editorial-mode page already lives separately at `dist/index-v1.html` via `--variant v1`. Remaining: Jupyter notebooks for the editorial/story side.)*
 - [ ] Go wild, nerdy, quirky. The people, how old, what are the occupations? Reason of death?
+
+- [ ] **Replace placeholder emojis with proper monoline SVG icons.** Current dashboard uses emojis (🔝 🧭 🌿 🚩 🎓 ⏳ 👥 🌍 📈 🗺️ 🧬 📜 🔎 🏟️ 📝, + per-row category emojis in nature subtypes / professions / eras / contests) as category cues. They render inconsistently across OSes (Apple Color Emoji vs Noto vs Segoe) and clash with the otherwise refined typography. Plan: inline SVG sprite of ~30 Lucide/Phosphor icons, swap each `<span class="emo">…</span>` to `<svg class="icon">…</svg>`. The `.icon` CSS class already exists in the stylesheet for this. Wait until icon set is curated — don't dribble in one-off SVGs.
+
+- [ ] **Wire real portraits into the Top Persoane list.** The dense dashboard now has a `.portrait` CSS class on each row of the s12 "Top persoane onorate" list, currently filled with parsed initials. When portrait images are available (Wikimedia thumbnails via `wikidata_persons.qid` is the obvious path), replace the initials with `<img>`. Layout already accommodates 26px circles without reflow. Wikimedia API: `https://commons.wikimedia.org/w/api.php?action=query&titles=File:<P18-value>&prop=imageinfo&iiprop=url&iiurlwidth=64`. Cache hashed thumbnails to `dist/portraits/<qid>.jpg` so the static site stays portable.
+
+- [ ] **Validate dark-statbar direction with stakeholders.** The bold-restyle pass moved the stats band from a light cream to dark ink (Bloomberg-feel). User brief said "white background" — interpreted as the main panels, with the statbar as a structural masthead. If user pushes back, flip `.statbar` to `background: var(--bg)` + `color: var(--ink)` and the rest of the design holds (panels, leader highlights, type scale all read fine on white-on-white as well).
