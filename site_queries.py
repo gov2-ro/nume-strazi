@@ -354,15 +354,7 @@ def section8(conn: sqlite3.Connection) -> dict:
         LIMIT 8
     """)
 
-    animal_names = _rows(conn, """
-        SELECT nt.term AS animal_ro, sd.name_normalized, COUNT(*) AS n
-        FROM streets_dedup sd
-        JOIN nature_terms nt ON nt.core_name_norm = sd.core_name_norm
-        WHERE nt.nature_type = 'animal'
-        GROUP BY nt.term
-        ORDER BY n DESC
-        LIMIT 10
-    """)
+    animal_names = _contest_by_nature(conn, "animal")
 
     local_honorees = _rows(conn, """
         SELECT p.full_name, p.profession, sd.judet, sd.uat,
@@ -372,7 +364,146 @@ def section8(conn: sqlite3.Connection) -> dict:
         GROUP BY p.core_name_norm
         HAVING COUNT(DISTINCT sd.siruta) = 1
         ORDER BY sd.judet, sd.uat
-        LIMIT 10
+        LIMIT 12
+    """)
+
+    # Themed contests: top-7 lemma per taxonomy
+    contests = {
+        "animals":  animal_names,
+        "flowers":  _contest_by_nature(conn, "flower"),
+        "trees":    _contest_by_nature(conn, "tree"),
+        "birds":    _contest_by_nature(conn, "bird"),
+        "sky":      _contest_by_nature(conn, "sky"),
+        "trades":   _contest_trades(conn),
+    }
+
+    # Names where one județ holds ≥80% of national occurrences (≥5 total)
+    regional_signatures = _rows(conn, """
+        WITH per_name AS (
+          SELECT name_normalized, COUNT(*) AS national_total
+          FROM streets_dedup
+          WHERE is_numeric = 0 AND core_name IS NOT NULL
+          GROUP BY name_normalized
+        ),
+        per_jn AS (
+          SELECT name_normalized, judet, MIN(name) AS display_name,
+                 COUNT(*) AS local_total
+          FROM streets_dedup
+          WHERE is_numeric = 0 AND core_name IS NOT NULL
+          GROUP BY name_normalized, judet
+        )
+        SELECT pj.display_name, pj.judet,
+               pj.local_total, pn.national_total,
+               ROUND(100.0 * pj.local_total / pn.national_total, 1) AS pct
+        FROM per_jn pj
+        JOIN per_name pn USING(name_normalized)
+        WHERE pn.national_total >= 5
+          AND 100.0 * pj.local_total / pn.national_total >= 80
+        ORDER BY pn.national_total DESC, pct DESC
+        LIMIT 18
+    """)
+
+    # Names existing in exactly 1 UAT nationally — atmospheric / geographic.
+    # Positive filter on landscape / settlement noun prefixes that produce
+    # evocative micro-toponyms ("Valea Lupului", "Dealul cu Vânt", etc.).
+    # Person-honored streets and route prefixes (Strada/Aleea/...) are
+    # excluded by construction.
+    local_uniques = _rows(conn, """
+        WITH x AS (
+          SELECT sd.name_normalized,
+                 MIN(sd.name) AS display_name,
+                 MIN(sd.judet) AS judet, MIN(sd.uat) AS uat,
+                 COUNT(DISTINCT sd.siruta) AS uat_n
+          FROM streets_dedup sd
+          WHERE sd.is_numeric = 0 AND sd.core_name IS NOT NULL
+          GROUP BY sd.name_normalized
+        )
+        , prefixed AS (
+          SELECT display_name, judet, uat,
+                 -- First word of name = the prefix bucket
+                 substr(display_name, 1, instr(display_name, ' ') - 1) AS prefix
+          FROM x
+          WHERE uat_n = 1
+            AND LENGTH(display_name) BETWEEN 10 AND 30
+            AND display_name LIKE '% %'
+            AND (
+              display_name LIKE 'Valea %'    OR display_name LIKE 'Dealul %'  OR
+              display_name LIKE 'Plaiul %'   OR display_name LIKE 'Pârâul %'  OR
+              display_name LIKE 'Lunca %'    OR display_name LIKE 'Poiana %'  OR
+              display_name LIKE 'Pădurea %'  OR display_name LIKE 'Moara %'   OR
+              display_name LIKE 'Cetatea %'  OR display_name LIKE 'Stejarii %' OR
+              display_name LIKE 'Vatra %'    OR display_name LIKE 'Cireșii %' OR
+              display_name LIKE 'Râul %'     OR display_name LIKE 'Lacul %'   OR
+              display_name LIKE 'Izvorul %'  OR display_name LIKE 'Vârful %'  OR
+              display_name LIKE 'Gura %'     OR display_name LIKE 'Dosul %'   OR
+              display_name LIKE 'Mănăstirea %' OR display_name LIKE 'Cheile %' OR
+              display_name LIKE 'Coasta %'   OR display_name LIKE 'Pietrele %' OR
+              display_name LIKE 'Fântâna %'  OR display_name LIKE 'Câmpul %' OR
+              display_name LIKE 'Crucea %'   OR display_name LIKE 'Movila %' OR
+              display_name LIKE 'Vâlcele %'  OR display_name LIKE 'Bradului %'
+            )
+        ),
+        ranked AS (
+          SELECT display_name, judet, uat, prefix,
+                 ROW_NUMBER() OVER (PARTITION BY prefix ORDER BY display_name) AS rn
+          FROM prefixed
+        )
+        SELECT display_name, judet, uat
+        FROM ranked
+        WHERE rn = 1
+        ORDER BY prefix
+        LIMIT 14
+    """)
+
+    # Per-județ rankings — three different "characters" of a county
+
+    # 1. Most territory-exclusive names (judet owns 100% of these names, ≥3 streets there)
+    judet_distinctive = _rows(conn, """
+        WITH per_name AS (
+          SELECT name_normalized,
+                 COUNT(DISTINCT judet) AS judet_n
+          FROM streets_dedup
+          WHERE is_numeric = 0 AND core_name IS NOT NULL
+          GROUP BY name_normalized
+        ),
+        per_jn AS (
+          SELECT name_normalized, judet, COUNT(*) AS local_total
+          FROM streets_dedup
+          WHERE is_numeric = 0 AND core_name IS NOT NULL
+          GROUP BY name_normalized, judet
+        )
+        SELECT pj.judet, COUNT(*) AS n
+        FROM per_jn pj
+        JOIN per_name pn USING(name_normalized)
+        WHERE pn.judet_n = 1 AND pj.local_total >= 3
+        GROUP BY pj.judet
+        ORDER BY n DESC LIMIT 8
+    """)
+
+    # 2. Most "rural-poetic" — highest % nature names among non-numeric streets
+    judet_rural = _rows(conn, """
+        SELECT sd.judet,
+               ROUND(100.0 * SUM(CASE WHEN nt.nature_type IS NOT NULL THEN 1 ELSE 0 END)
+                     / COUNT(*), 1) AS pct,
+               COUNT(*) AS total
+        FROM streets_dedup sd
+        LEFT JOIN nature_terms nt ON nt.core_name_norm = sd.core_name_norm
+        WHERE sd.is_numeric = 0
+        GROUP BY sd.judet
+        ORDER BY pct DESC LIMIT 8
+    """)
+
+    # 3. Most ideological — highest % ideological-tagged names
+    judet_ideo = _rows(conn, """
+        SELECT sd.judet,
+               ROUND(100.0 * SUM(CASE WHEN nc.category = 'ideological' THEN 1 ELSE 0 END)
+                     / COUNT(*), 1) AS pct,
+               COUNT(*) AS total
+        FROM streets_dedup sd
+        LEFT JOIN name_categories nc ON nc.core_name_norm = sd.core_name_norm
+        WHERE sd.is_numeric = 0
+        GROUP BY sd.judet
+        ORDER BY pct DESC LIMIT 8
     """)
 
     return {
@@ -383,4 +514,38 @@ def section8(conn: sqlite3.Connection) -> dict:
         "longest_names": longest_names,
         "animal_names": animal_names,
         "local_honorees": local_honorees,
+        "contests": contests,
+        "regional_signatures": regional_signatures,
+        "local_uniques": local_uniques,
+        "judet_distinctive": judet_distinctive,
+        "judet_rural": judet_rural,
+        "judet_ideo": judet_ideo,
     }
+
+
+def _contest_by_nature(conn: sqlite3.Connection, nature_type: str) -> list[dict]:
+    return _rows(conn, """
+        SELECT nt.term AS label, sd.name_normalized, COUNT(*) AS n
+        FROM streets_dedup sd
+        JOIN nature_terms nt ON nt.core_name_norm = sd.core_name_norm
+        WHERE nt.nature_type = ?
+        GROUP BY nt.term
+        ORDER BY n DESC
+        LIMIT 7
+    """, (nature_type,))
+
+
+def _contest_trades(conn: sqlite3.Connection) -> list[dict]:
+    # Mix of trade + occupational. Use core_name_norm display via name_normalized
+    # of the most-frequent street for that lemma. The label shown is the lemma itself.
+    return _rows(conn, """
+        SELECT sd.name_normalized AS label,
+               sd.name_normalized,
+               COUNT(*) AS n
+        FROM streets_dedup sd
+        JOIN name_categories nc ON nc.core_name_norm = sd.core_name_norm
+        WHERE nc.category IN ('trade', 'occupational')
+        GROUP BY sd.name_normalized
+        ORDER BY n DESC
+        LIMIT 7
+    """)
