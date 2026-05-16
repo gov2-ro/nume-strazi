@@ -17,6 +17,7 @@ const DATA_S4 = {{ section4 | tojson }};
 const DATA_S5 = {{ section5 | tojson }};
 const DATA_S6 = {{ section6 | tojson }};
 const DATA_S8 = {{ section8 | tojson }};
+const PORTRAITS = new Set({{ portraits | tojson }});
   </script>
   <style>
 :root {
@@ -983,7 +984,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
     {% for p in section3.top_persons %}
     <div class="rank-row">
       <span class="rank-name person">
-        <span class="portrait" aria-hidden="true">{{ (p.full_name.split()[0][0] if p.full_name else '·') }}{{ (p.full_name.split()[-1][0] if p.full_name and (p.full_name.split() | length) > 1 else '') }}</span>
+        <span class="portrait lg" aria-hidden="true">{% if p.wikidata_qid and p.wikidata_qid in portraits %}<img src="portraits/{{ p.wikidata_qid }}.jpg" alt="" loading="lazy">{% else %}{{ (p.full_name.split()[0][0] if p.full_name else '·') }}{{ (p.full_name.split()[-1][0] if p.full_name and (p.full_name.split() | length) > 1 else '') }}{% endif %}</span>
         {{ p.full_name }}{% if p.gender == 'F' %} <span style="display:inline-block;width:7px;height:7px;background:var(--accent);border-radius:50%;margin-left:4px;vertical-align:middle;"></span>{% endif %}
       </span>
       <div class="bar-wrap">

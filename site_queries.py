@@ -139,14 +139,14 @@ def section2(conn: sqlite3.Connection) -> dict:
 
 def section3(conn: sqlite3.Connection) -> dict:
     top_persons = _rows(conn, """
-        SELECT p.full_name, p.gender, p.profession, p.era,
+        SELECT p.full_name, p.gender, p.profession, p.era, p.wikidata_qid,
                COALESCE(p.wiki_scope, 'unknown') AS wiki_scope,
                COUNT(*) AS street_count
         FROM streets_dedup sd
         JOIN persons p ON p.core_name_norm = sd.core_name_norm
         GROUP BY p.core_name_norm
         ORDER BY street_count DESC
-        LIMIT 20
+        LIMIT 50
     """)
 
     counts = _one(conn, """

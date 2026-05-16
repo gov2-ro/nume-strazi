@@ -73,7 +73,7 @@ body {
 .icon.lg { width: 18px; height: 18px; }
 .icon.xl { width: 22px; height: 22px; stroke-width: 1.6; }
 
-/* Portrait — placeholder slot for future personality portraits */
+/* Portrait — circular person thumbnail */
 .portrait {
   width: 26px; height: 26px;
   border-radius: 999px;
@@ -89,6 +89,24 @@ body {
 }
 .portrait.lg { width: 36px; height: 36px; font-size: 12px; }
 .portrait img { width: 100%; height: 100%; object-fit: cover; }
+
+/* Person chip token: portrait overflows the chip border */
+.ctok.person {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+.ctok.person .portrait {
+  width: 46px; height: 46px;
+  font-size: 14px;
+  margin-right: -18px;
+  z-index: 2;
+  position: relative;
+  box-shadow: 0 0 0 3px var(--bg);
+}
+.ctok.person.has-portrait .chip {
+  padding-left: 24px;
+}
 
 /* Emoji helper: keep size aligned with surrounding body text */
 .emo {
@@ -1431,10 +1449,11 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       const cnt = `<sup class="cnt-badge">${r.street_count.toLocaleString('ro-RO')}</sup>`;
       if (isPersons) {
         const qid = r.wikidata_qid;
-        const portrait = (qid && PORTRAITS.has(qid))
+        const hasPortrait = (qid && PORTRAITS.has(qid));
+        const portrait = hasPortrait
           ? `<span class="portrait"><img src="portraits/${qid}.jpg" alt="" loading="lazy"></span>`
           : '';
-        return `<span class="ctok person${isLeader ? ' leader' : ''}">`
+        return `<span class="ctok person${isLeader ? ' leader' : ''}${hasPortrait ? ' has-portrait' : ''}">`
              + portrait
              + `<span class="chip" style="font-size:${fs}px;">${escapeHtml(labelFn(r))}</span>`
              + cnt + `</span>`;
