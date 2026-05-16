@@ -67,7 +67,8 @@ def section2(conn: sqlite3.Connection) -> dict:
     top_names = _rows(conn, """
         SELECT
           sd.name_normalized,
-          MIN(sd.core_name) AS core_name,
+          MIN(sd.core_name)      AS core_name,
+          MAX(p.wikidata_qid)    AS wikidata_qid,
           COUNT(*) AS street_count,
           CASE
             WHEN p.core_name_norm IS NOT NULL THEN 'persoană'
@@ -97,6 +98,7 @@ def section2(conn: sqlite3.Connection) -> dict:
                  ELSE sd.judet END AS judet,
             sd.name_normalized,
             sd.core_name,
+            p.wikidata_qid,
             CASE
               WHEN p.core_name_norm IS NOT NULL THEN 'persoană'
               WHEN nt.core_name_norm IS NOT NULL THEN 'natură'
@@ -113,14 +115,15 @@ def section2(conn: sqlite3.Connection) -> dict:
         ),
         ranked AS (
           SELECT judet, name_normalized,
-                 MIN(core_name) AS core_name,
-                 MAX(category) AS category,
+                 MIN(core_name)     AS core_name,
+                 MAX(category)      AS category,
+                 MAX(wikidata_qid)  AS wikidata_qid,
                  COUNT(*) AS street_count,
                  ROW_NUMBER() OVER (PARTITION BY judet ORDER BY COUNT(*) DESC) AS rn
           FROM judet_named
           GROUP BY judet, name_normalized
         )
-        SELECT judet, name_normalized, core_name, category, street_count
+        SELECT judet, name_normalized, core_name, category, wikidata_qid, street_count
         FROM ranked
         WHERE rn <= 50
         ORDER BY judet, street_count DESC
@@ -129,9 +132,10 @@ def section2(conn: sqlite3.Connection) -> dict:
     for r in by_judet_rows:
         by_judet.setdefault(r["judet"], []).append({
             "name_normalized": r["name_normalized"],
-            "core_name": r["core_name"],
-            "street_count": r["street_count"],
-            "category": r["category"],
+            "core_name":       r["core_name"],
+            "wikidata_qid":    r["wikidata_qid"],
+            "street_count":    r["street_count"],
+            "category":        r["category"],
         })
 
     return {"top_names": top_names, "by_judet": by_judet}

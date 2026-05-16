@@ -90,13 +90,15 @@ body {
 .portrait.lg { width: 36px; height: 36px; font-size: 12px; }
 .portrait img { width: 100%; height: 100%; object-fit: cover; }
 
-/* Person chip token: portrait overflows the chip border */
-.ctok.person {
+/* Person chip and street plaque tokens: portrait overflows the sign border */
+.ctok.person,
+.ctok.street {
   display: inline-flex;
   align-items: center;
   vertical-align: middle;
 }
-.ctok.person .portrait {
+.ctok.person .portrait,
+.ctok.street .portrait {
   width: 46px; height: 46px;
   font-size: 14px;
   margin-right: -18px;
@@ -105,6 +107,9 @@ body {
   box-shadow: 0 0 0 3px var(--bg);
 }
 .ctok.person.has-portrait .chip {
+  padding-left: 24px;
+}
+.ctok.street.has-portrait .plaque {
   padding-left: 24px;
 }
 
@@ -1458,7 +1463,12 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
              + `<span class="chip" style="font-size:${fs}px;">${escapeHtml(labelFn(r))}</span>`
              + cnt + `</span>`;
       }
-      return `<span class="ctok street${isLeader ? ' leader' : ''}">`
+      const sqid = r.wikidata_qid;
+      const sPortrait = (sqid && PORTRAITS.has(sqid))
+        ? `<span class="portrait"><img src="portraits/${sqid}.jpg" alt="" loading="lazy"></span>`
+        : '';
+      return `<span class="ctok street${isLeader ? ' leader' : ''}${sPortrait ? ' has-portrait' : ''}">`
+           + sPortrait
            + `<span class="plaque" style="font-size:${fs}px;">${escapeHtml(labelFn(r))}</span>`
            + cnt + `</span>`;
     }).join('');
