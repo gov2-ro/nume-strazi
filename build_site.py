@@ -14,8 +14,13 @@ TEMPLATES = Path("templates")
 DB_PATH = "data/streets.db"
 COUNTIES_SRC = Path("data/gis/romania-counties.geojson")
 
+VARIANTS = {
+    "default": ("index.html.j2", "index.html"),
+    "v1": ("index-v1.html.j2", "index-v1.html"),
+}
 
-def build(db_path: str = DB_PATH) -> None:
+
+def build(db_path: str = DB_PATH, variant: str = "default") -> None:
     DIST.mkdir(exist_ok=True)
 
     conn = site_queries.get_connection(db_path)
@@ -35,10 +40,11 @@ def build(db_path: str = DB_PATH) -> None:
         loader=jinja2.FileSystemLoader(str(TEMPLATES)),
         autoescape=jinja2.select_autoescape(["html"]),
     )
-    tmpl = env.get_template("index.html.j2")
+    template_name, output_name = VARIANTS[variant]
+    tmpl = env.get_template(template_name)
     html = tmpl.render(**data)
 
-    out = DIST / "index.html"
+    out = DIST / output_name
     out.write_text(html, encoding="utf-8")
     print(f"  → {out}  ({out.stat().st_size // 1024} KB)")
 
@@ -50,9 +56,17 @@ def build(db_path: str = DB_PATH) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build street names static site")
     parser.add_argument("--db", default=DB_PATH)
+    parser.add_argument(
+        "--variant",
+        choices=["default", "v1", "both"],
+        default="default",
+        help="Which template to render (default | v1 | both)",
+    )
     parser.add_argument("--serve", action="store_true", help="Build then serve on localhost:8000")
     args = parser.parse_args()
-    build(db_path=args.db)
+    variants = ["default", "v1"] if args.variant == "both" else [args.variant]
+    for v in variants:
+        build(db_path=args.db, variant=v)
     if args.serve:
         import http.server
         import os

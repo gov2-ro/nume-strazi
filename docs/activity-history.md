@@ -1,5 +1,90 @@
 # Activity History
 
+## 2026-05-16 — Bold analytics restyle: dark statbar, IBM Plex, emoji category cues
+
+### What was done
+- Reskinned the dense dashboard (`templates/index.html.j2`) for a "bolder, denser, analytics" feel while keeping the structure and all D3/JS hooks intact. All changes are in the template's `<style>` block plus targeted label/header edits — no schema, query, or build-pipeline changes.
+- **Palette pivot from cream to white.** Dropped `--bg #FAF8F3` / `--wash #EEEAE0`. Body is now `#FFFFFF`. Cool washes (`--surface-1 #F7F9FC`, `--surface-2 #ECF1F8`) replace the warm cream as bar tracks and tag fills. Pale yellow (`--warn-1 #FFF7CC`, `--warn-2 #FBE486`) introduced as a leader-highlight; gold (`--gold #E8AE00`) introduced as the dashboard's secondary accent (used in nav brand mark, statbar group labels, footer section labels, and the leader-row inset stripe on every rank list).
+- **Dark statbar.** Statbar is now an ink-black band (`var(--ink-band) #0B1118`) with reverse-out white type, gold group labels, and a 3px gold underline anchoring it to the canvas below. Headline numbers grew from 22px → 34px (scale items 22px → 28px), tabular-nums and tight letterspacing. Group columns separated by 1px white-alpha rules instead of gap-only.
+- **Typography swap.** `Inter` → `IBM Plex Sans` (400/500/600/700). `Barlow Semi Condensed` retained for the RO white-on-blue street plaques. Plaque size bumped 12.5px → 13.5px (small variant 11.5px → 12px) to match the denser overall feel.
+- **Panel headers** now use a 2px solid-ink rule (was 1px hairline `--rule`), 700-weight uppercase 11.5px labels (was 600/9.5px), and each panel-label gained an emoji prefix for at-a-glance category cue (🔝, 🧭, 🌿, 🚩, 🎓, ⏳, 👥, 🌍, 📈, 🗺️, 🧬, 📜, 🔎, 🏟️, 📝).
+- **Leader-row highlight.** Every `.rank-list > .rank-row:first-child` gets `box-shadow: inset 3px 0 0 var(--gold)` + a pale yellow horizontal gradient. Rank-num for the leader row goes from muted to ink-700. Works across all leaderboards including the s2 top-30 (DOM order = visual order on the multicol).
+- **Bars.** Height 3px → 5px, opacity .4 → .82 — visibly more present. New variants: `.bar.olive` (used in nature subtypes panel) and `.bar.gold` (reserved for future highlight bars).
+- **Recognition tier cards** (Universal / Național / Local) got bigger 38px numbers, emoji corner markers (🌍 / 🇷🇴 / 📍), and a deep-ink Universal card with gold uppercase label instead of the old accent-red label.
+- **Footer** moved from cream-accent to gold-accent labels; added emoji prefixes (📄 / ⚗️ / ⌨️). Footer dark band now aligns visually with the new dark statbar — symmetric framing.
+- **Portrait scaffolding.** Added `.portrait` CSS class (26px gradient circle, gold-rule fallback) wired into the s12 "Top persoane onorate" list with first+last initials as placeholders. When real portraits arrive, drop in `<img>` and the layout already accommodates them.
+- **Inline rows** (nature subtypes, professions, eras) restructured to: leading emoji column (14px), label, bar, count. Each row gets a hairline top border for visual rhythm; counts are now ink-700 12px instead of muted 10.5px.
+- **Ideological-token chips** got bolder weights, sharper outlines (1.5px), and a more saturated red highlight for high-frequency tokens.
+- **Stat picker / chip styles** — judet `<select>` now has a 1.5px ink border and a gold focus ring; `.chip` lost its pill radius and became a 2px-rounded square with a flat-black active state.
+
+### Why
+- Brief: "bolder, denser dashboard, larger type, like a data heavy dashboard, analytics. White background. Light blueish / yellow shades, if/where necessary." Plus "add icons where possible" — covered with emojis as placeholders (proper SVG icons can swap in later via the unused `.icon` CSS class already in the stylesheet).
+
+### Non-obvious decisions
+- **Dark statbar over light statbar** despite the "white background" brief. Reading "white background" as the *main canvas* (panels), with the statbar serving as a Bloomberg-style ticker masthead. The dark band creates the strongest analytics-dashboard cue available in one move; it also mirrors the existing footer (symmetric framing). Easy to flip to a white statbar if the user pushes back — just swap the `.statbar` background and color values.
+- **Gold (`#E8AE00`) chosen over a pure-yellow (`#FFD84D`) for the secondary accent.** Pure yellow on white reads as warning/alert in this kind of layout; gold reads as "honor/leader" and pairs better with the blue plaques. The pale-yellow leader-row wash (`--warn-1 #FFF7CC`) is the only place a near-pure yellow appears.
+- **IBM Plex Sans over Inter Tight or Manrope.** Plex has the analytical-publication register (used by IBM, Mozilla, Stripe in similar contexts) and the open counters/short ascenders give better information density at the smaller body sizes the dashboard uses. Retained Barlow Semi Condensed for the plaque type — that's the RO street-sign convention and shouldn't move.
+- **Emojis instead of an SVG icon sprite** because the user explicitly chose that route ("or emojis and we'll later look for icons"). Trade-off accepted: emoji rendering varies by OS (a Liberation/Symbola fallback on Linux looks worse than Apple Color Emoji on macOS). The `.emo` class isolates the emoji styling so swapping to inline SVG is a single search-and-replace later.
+- **`:first-child` for leader highlight, not nth-child(-n+3).** Top-3 highlight would have been noisy across the ~10 rank lists on the page. Single-leader highlight reads as "the standout in this list" without competing with the bars themselves. Also works correctly under `column-count: 2` multicol because DOM order = visual order, so only rank 1 (DOM) gets the gold inset (not rank 16, despite both being column-tops).
+- **Portrait placeholders use 2-letter initials parsed in Jinja** (`p.full_name.split()[0][0] + p.full_name.split()[-1][0]`) rather than a server-side helper. Trade-off: not robust to one-word names or names with mid-word particles, but acceptable for the placeholder state — it's meant to be replaced with `<img>` before this matters.
+
+### Files touched
+- `templates/index.html.j2` (CSS rewrite + emoji insertion + portrait scaffolding)
+- `dist/index.html` (rebuilt, 263 KB — up from 252 KB; growth is the emoji codepoints and the slightly longer CSS)
+- Verification screenshots: `ss-bold-1440-top.png`, `ss-bold-1440-full.png`
+
+## 2026-05-16 — Header rebuild: județ filter, stats widget, drop search
+
+### What was done
+- Removed the section-2 search input. It was redundant with the județ filter and competed for header space.
+- Wired up the județ filter that previously only showed "Toate". Added `by_judet` to `section2()` in `site_queries.py` — a per-județ top-30 with the same category logic as the national list, Bucharest sectors aggregated as 'B'. Replaced the chip row with a native `<select>` (all 42 județe, sorted alphabetically by Romanian name, displayed as "Cluj · CJ"). JS swaps the rendered list on change and rescales the bars to that județ's local max.
+- Dropped the "Strada Principală · N apariții · exclusă" header callout and its principal/rest split in the section-2 JS. The split's logic took `top_names[0]` blindly as Principală, but that comment was stale — in the current sample, rank 1 is `florilor` (519). Principală sits at rank 12 (381) and now appears in the list at its actual position.
+- Replaced the dark inline `.stats-bar` ticker with a light-background widget (`.statbar`). 4 modules: Scară (Adrese / Persoane onorate), Tematică (lead category % + 5-segment minibar pulling from `section5.theme_dist` using the same palette as the conic-gradient in the panel below + named breakdown), Repartiție pe gen (M% / F% + minibar), Cei mai des onorați (#1 B / #1 F with counts). Removed Județe and Wikidata counts — neither was a strong story to lead with.
+- Statbar is responsive: 4 cols ≥ 1025px → 2×2 ≤ 1024px → single column ≤ 640px.
+
+### Non-obvious decisions
+- Stats-widget tematică palette deliberately reuses the conic-gradient colors from the Repartiție tematică panel (`#C04F35,#A0826A,#8BA888,#6E6E70,#B8A090,#3A3A3D`). Visually links the minibar at the top of the page with the donut chart below. The semantic oddity (`#C04F35` = accent red applied to *natură* which dominates) is inherited from the existing panel and worth revisiting site-wide later, not in this pass.
+- The județ picker is a native `<select>` rather than a custom searchable combobox. Native gives free type-ahead, a11y, and mobile UX with zero JS. 42 entries is well within native-select usability.
+- Top-3 categories in tematică subline only — bottom 2 ("date", "religios") are barely visible at 1-2% and would clutter the row.
+
+## 2026-05-16 — RO blue street-plaques + promote dense layout to primary
+
+### What was done
+- Redesigned street-name plaques to follow the Romanian street-sign convention: white on signal blue (`#0E4D92`), with a dual text-shadow (faint top darkening + soft cast below) for a slightly engraved feel, and a tighter `2px 9px` padding (`1px 7px` for `.small`). Added `--plaque` token to `:root`. Updated `.rank-name.person` to clear the inherited text-shadow so plain person-name text doesn't pick up the engraved look.
+- Promoted the dense layout to the project's primary deliverable. `templates/index.dense.html.j2` → `templates/index.html.j2` (the editorial layout it replaces was archived as `templates/index-v1.html.j2`). `build_site.py` `VARIANTS` and `--variant` choices updated accordingly; `--variant both` now renders `default + v1`.
+- Slimmed `tests/test_build.py` to assertions that hold for the new primary layout. Dropped `test_section1_hero_content` and `test_section8_ciorani` — both were editorial-layout-specific (hero copy "99 din 100" and the Cioranii curiosity). 8 tests pass against the new `dist/index.html`.
+
+### Non-obvious decisions
+- Plaque variants explored under `dist/plaque-preview.html` (4 directions: classic enamel, signal blue, embossed gradient, flat-with-outline) and `dist/plaque-preview-b.html` (4 refinements of signal-blue varying padding and text-shadow). Chose **B4 · Engraved**: `text-shadow: 0 -0.5px 0 rgba(0,0,0,.30), 0 1px 1.5px rgba(0,0,0,.50)`. The negative-y component is what makes the type read as pressed into the plate rather than floating above it.
+- Editorial layout was archived (not deleted) so its hero copy and Cioranii framing remain available if we want to revive any of it later. Available via `python3 build_site.py --variant v1` → `dist/index-v1.html`.
+- Slimmed tests rather than rewriting copy-specific assertions against the new layout. The dense layout's copy is still being iterated; pinning copy-string tests now would just mean rewriting them on the next pass. Structural-anchor assertions (which already pass) are the durable shape of coverage for this phase.
+
+## 2026-05-16 — Dense UI variant + atlas-style data panels
+
+### What was done
+- Added a parallel "dense" build of the dashboard. New template `templates/index.dense.html.j2` rendered via `python3 build_site.py --variant dense` (also `--variant both`); writes to `dist/index.dense.html`, leaving the existing `dist/index.html` untouched for side-by-side comparison.
+- Switched the dense variant to a 12-column outer grid (`.panel.s4/s6/s8/s12`) with three responsive tiers: aggressive 3-up at desktop, 2-up at ≤1024px, single column at ≤640px. Stats bar now horizontally scrollable on mobile; nav collapses to brand only. Wide rank lists (top 30 frequent, top persons, top pageviews) use `column-count: 2` with `display: block` override (flex `.rank-list` blocked multicol — needed explicit override).
+- Replaced Source Serif 4 with **Barlow Semi Condensed** (street names) + **Inter** (everything else). All `var(--serif)` usages removed; person names stay in Inter. Both fonts have full Romanian Latin Extended (`ă â î ș ț`).
+- Removed Cioranii hero + "Cea mai poetică" longest-names columns from the curiozități area. Removed the standalone "Onorat doar aici" panel — the curated `persons` table has only 2 truly-unique-to-one-UAT entries, too thin to fill the panel.
+- Added 4 new data-driven sections to the dense variant:
+  - **Amprente județene** (s12, 3-col internal): top-8 județe by (a) most names found nowhere else with ≥3 streets local, (b) % nume natură ("rurale-poetice"), (c) % nume ideologic.
+  - **Semnături regionale** (s6): up to 18 names where one județ holds ≥80% of all national occurrences (≥5 national). Tolocii 8/8 SV, Meduzei 7/8 CT, Suru 5/5 SB, Tánorok 5/5 HR, etc.
+  - **Curiozități unice naționale** (s6): 14 atmospheric/geographic names existing in exactly 1 UAT in the country. Surfaced via positive prefix filter on landscape nouns (Valea/Dealul/Plaiul/Pârâul/Lunca/Poiana/Pădurea/Moara/Cetatea/Cheile/Coasta/Pietrele/…) with `ROW_NUMBER() OVER (PARTITION BY prefix)` so each prefix shows once for diversity.
+  - **Conteste tematice** (s12, 3×2 cell grid): top-7 per family across Flori (8,493 streets / 107 distinct), Copaci (8,298 / 87), Păsări (1,527 / 43), Animale (697 / 25), Cer · lumină (1,237 / 25), Meserii (occupational + trade combined).
+- Section 8 (`section8()` in `site_queries.py`) gained: `contests` (dict of 6 lemma lists via `_contest_by_nature` + `_contest_trades` helpers), `regional_signatures`, `local_uniques`, `judet_distinctive`, `judet_rural`, `judet_ideo`.
+- Styled all street-name strings as **enamel plaques**: `.rank-name` and `.street-tag` get a thin `var(--ink)` border, `var(--bg)` background, weight 600 Barlow Semi Condensed, slight tracking. `.rank-name.person` overrides back to clean Inter 600 (no plaque) so person names in the top-persoane and pageviews lists stay typographic. Restructured the section-2 JS to emit `<span class="name-cell"><span class="rank-name">name</span><span class="tag">cat</span></span>` so the category pill sits beside the plaque, not inside it. Fingerprint top/rare lists use `.street-tag.small`.
+
+### Numbers
+- Default `dist/index.html`: 101 KB. Dense `dist/index.dense.html`: ~160 KB.
+- Page height at 1440px: original ~4,500px → dense ~3,620px (with the 4 new substantive panels added). Without the new panels, dense bottomed out at ~2,757px.
+- Mobile (≤640px): bodyWidth equals viewport, no horizontal overflow.
+
+### Non-obvious decisions
+- 1-UAT curiosities had to use a positive geographic-prefix filter, not an anti-join with `persons`. The curated persons table is partial, so the anti-join still leaked person names (Abraham Lincoln, A.C. Popovici, Acad. X). The prefix list (Valea, Dealul, …) is the load-bearing filter. `ROW_NUMBER() OVER (PARTITION BY prefix)` is what made the output diverse — naive alphabetical ordering surfaced 14 "Cetatea …" entries.
+- Plaque outline uses `var(--ink)` border on `var(--bg)` (panel bg) rather than a filled coloured rectangle. Keeps the editorial earth-tone palette intact (no Bucharest navy/green) while still reading as a signage placard. Person names get the explicit `.person` override because boxing 20 person-rank rows in the top-persoane tower looked oppressive in early tests.
+- `.rank-2col` needs `display: block` explicitly. Flex containers ignore `column-count`; the bug was masked by `getComputedStyle().columnCount === "2"` returning truthful values while the visual layout silently stayed single-column.
+- Map fingerprint sizing dropped the original `* 1.6 / 2.6` multiplier — the dense map cell already gets 8/12 of the panel via `.map-grid`, so the SVG just uses `parentElement.clientWidth` directly.
+
 ## 2026-05-15 — Multi-provider LLM classifier + convergence tool
 
 ### What was done

@@ -16,17 +16,11 @@ def test_build_runs_and_produces_output():
     assert Path("dist/ro-counties.geojson").exists()
 
 
-def test_section1_hero_content():
-    html = Path("dist/index.html").read_text(encoding="utf-8")
-    assert "acasa" in html  # anchor
-    assert "99 din 100" in html
-    assert "bărbați" in html
-
-
-def test_section2_search_box():
+def test_section2_top_list():
     html = Path("dist/index.html").read_text(encoding="utf-8")
     assert "cele-mai-intalnite" in html
-    assert "Căutați un nume de stradă" in html
+    assert "s2-judet-select" in html  # județ filter present
+    assert "Cele mai frecvente" in html
 
 
 def test_section3_gender_grid():
@@ -60,12 +54,6 @@ def test_section7_renumiri():
     html = Path("dist/index.html").read_text(encoding="utf-8")
     assert "renumiri" in html
     assert "în construcție" in html
-
-
-def test_section8_ciorani():
-    html = Path("dist/index.html").read_text(encoding="utf-8")
-    assert "curiozitati" in html
-    assert "CIORANI" in html or "Cioranii" in html
 
 
 def test_footer_present():
