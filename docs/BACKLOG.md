@@ -77,7 +77,17 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [x] UI - more of a compact dashboard,  raw numbers. Leave the story telling / editorialisation to another medium, move that to Jupyter notebooks. *(partly done 2026-05-16 — the dense layout has been restyled bolder/denser with IBM Plex, dark statbar, larger numbers, leader-row highlights. Editorial-mode page already lives separately at `dist/index-v1.html` via `--variant v1`. Remaining: Jupyter notebooks for the editorial/story side.)*
 
-- [ ] UI make emojis larger/icons, slightly larger than the text
+- [x] UI make emojis larger/icons, slightly larger than the text
+
+- [ ] Harta · statistici pe județ – select random județ on load
+
+- [ ] add orașe / towns - top by population. SIRUTA?
+
+- [ ] og image, og description, metadata
+
+- [ ] top of foreigners foreign street names
+
+- [ ] percent of nationalities of personalities. Universal. Local.
 
 - [ ] Go wild, nerdy, quirky. The people, how old, what are the occupations? Reason of death?
 
