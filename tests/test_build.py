@@ -16,10 +16,11 @@ def test_build_runs_and_produces_output():
     assert Path("dist/ro-counties.geojson").exists()
 
 
-def test_section2_search_box():
+def test_section2_top_list():
     html = Path("dist/index.html").read_text(encoding="utf-8")
     assert "cele-mai-intalnite" in html
-    assert "Căutați un nume de stradă" in html
+    assert "s2-judet-select" in html  # județ filter present
+    assert "Cele mai frecvente" in html
 
 
 def test_section3_gender_grid():

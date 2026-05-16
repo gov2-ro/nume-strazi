@@ -64,17 +64,86 @@ body {
 .site-nav nav a { color: var(--muted); text-decoration: none; }
 .site-nav nav a:hover { color: var(--ink); }
 
-/* Stats bar — single line, horizontal scroll on small screens */
-.stats-bar {
-  background: var(--ink); color: #FAF8F3; padding: 6px 20px;
-  display: flex; gap: 16px;
-  font-family: var(--sans); font-size: 11px; align-items: center;
-  overflow-x: auto; white-space: nowrap;
-  scrollbar-width: none;
+/* Stats widget — 4-column dashboard band under the nav.
+   Breaks to 2 columns at ≤1024px, single column at ≤640px. */
+.statbar {
+  background: #F2EDE0;
+  border-bottom: 1px solid var(--rule);
+  padding: 18px 24px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1.3fr;
+  gap: 32px;
+  align-items: center;
 }
-.stats-bar::-webkit-scrollbar { display: none; }
-.stats-bar .stat-val { font-weight: 600; margin-right: 3px; }
-.stats-bar .stat-sep { color: #444; }
+.statbar .group { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.statbar .group-label {
+  font-family: var(--sans);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: .18em;
+  color: var(--muted);
+  font-weight: 600;
+}
+.statbar .v {
+  font-family: var(--street);
+  font-weight: 700;
+  font-size: 22px;
+  color: var(--ink);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.statbar .v .u {
+  font-size: 12px; color: var(--muted);
+  margin-left: 2px; font-weight: 600;
+}
+.statbar .l {
+  font-family: var(--sans);
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: .14em;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.statbar .accent { color: var(--accent); }
+
+.statbar .scale-stack { display: flex; flex-direction: column; gap: 6px; }
+.statbar .scale-stack .item { display: flex; align-items: baseline; gap: 10px; }
+.statbar .scale-stack .item .l { margin-top: 0; }
+
+.statbar .tema-row, .statbar .gen-row { display: flex; align-items: baseline; gap: 6px; }
+.statbar .gen-row .frac {
+  font-family: var(--sans); font-size: 11.5px; color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.statbar .minibar {
+  display: flex; height: 6px; border-radius: 1px; overflow: hidden;
+  background: rgba(0,0,0,.06); margin-top: 2px;
+}
+
+.statbar .top-pair { display: flex; flex-direction: column; gap: 6px; }
+.statbar .top-pair .row {
+  display: flex; align-items: baseline; gap: 8px;
+  font-family: var(--sans);
+}
+.statbar .top-pair .prefix {
+  font-size: 9.5px; text-transform: uppercase; letter-spacing: .14em;
+  color: var(--muted); font-weight: 600; min-width: 22px;
+}
+.statbar .top-pair .name { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+.statbar .top-pair .cnt {
+  font-family: var(--street); font-weight: 700;
+  font-size: 13px; color: var(--muted);
+  font-variant-numeric: tabular-nums; margin-left: auto;
+}
+.statbar .top-pair .cnt .u { font-size: 10px; color: var(--muted); margin-left: 2px; }
+
+@media (max-width: 1024px) {
+  .statbar { grid-template-columns: 1fr 1fr; row-gap: 22px; padding: 16px 20px; }
+}
+@media (max-width: 640px) {
+  .statbar { grid-template-columns: 1fr; row-gap: 18px; padding: 14px 16px; gap: 18px; }
+}
 
 /* 12-col panel grid */
 .dash-grid {
@@ -146,6 +215,32 @@ body {
 .chip:hover, .chip.active {
   color: var(--bg); background: var(--ink); border-color: var(--ink);
 }
+
+/* Județ picker for the top-frequent panel */
+.s2-judet-pick {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--sans); font-size: 11px;
+}
+.s2-judet-pick label {
+  letter-spacing: .12em; text-transform: uppercase;
+  font-weight: 500; color: var(--muted);
+}
+.s2-judet-pick select {
+  font-family: var(--sans); font-size: 11.5px;
+  color: var(--ink); background: var(--bg);
+  border: 1px solid var(--rule); border-radius: 3px;
+  padding: 4px 24px 4px 10px;
+  -webkit-appearance: none; -moz-appearance: none; appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 12px) 50%, calc(100% - 8px) 50%;
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+  cursor: pointer; outline: none;
+  min-width: 200px;
+}
+.s2-judet-pick select:focus { border-color: var(--ink); }
 
 /* Tag pills */
 .tag {
@@ -334,7 +429,6 @@ body {
   .dash-grid { gap: 0; max-width: 100%; }
   .rank-2col { column-count: 1; column-rule: none; }
   .site-nav nav { display: none; }
-  .stats-bar { padding: 6px 12px; gap: 12px; }
   .subgrid-3 { grid-template-columns: 1fr; }
 }
   </style>
@@ -354,24 +448,96 @@ body {
   </nav>
 </nav>
 
-{# Stats bar #}
+{# Stats widget — V3b · responsive 4→2→1 columns #}
 {% set total_gendered = section1.total_persons_m + section1.total_persons_f %}
 {% set male_pct = (section1.total_persons_m / total_gendered * 100) | round | int if total_gendered else 0 %}
-{% set wikidata_total = section4.tier_counts.universal + section4.tier_counts.national + section4.tier_counts.local %}
-<div class="stats-bar">
-  <span><span class="stat-val">{{ "{:,.0f}".format(section1.total_streets).replace(",", ".") }}</span> adrese</span>
-  <span class="stat-sep">·</span>
-  <span><span class="stat-val">{{ section6.by_judet | length }}</span> județe</span>
-  <span class="stat-sep">·</span>
-  <span><span class="stat-val">{{ section3.total_m + section3.total_f }}</span> persoane</span>
-  <span class="stat-sep">·</span>
-  <span><span class="stat-val">{{ male_pct }}%</span> bărbați</span>
-  <span class="stat-sep">·</span>
-  <span>#1 bărbat: <span class="stat-val">{{ section1.top_men[0].full_name if section1.top_men else '—' }}</span>{% if section1.top_men %} · {{ section1.top_men[0].street_count }} str.{% endif %}</span>
-  <span class="stat-sep">·</span>
-  <span>#1 femeie: <span class="stat-val">{{ section1.top_women[0].full_name if section1.top_women else '—' }}</span>{% if section1.top_women %} · {{ section1.top_women[0].street_count }} str.{% endif %}</span>
-  <span class="stat-sep">·</span>
-  <span><span class="stat-val">{{ wikidata_total }}</span> cu Wikidata</span>
+{% set female_pct = 100 - male_pct if total_gendered else 0 %}
+{% set total_persons = section3.total_m + section3.total_f %}
+{# Tematică: top category as headline, top-4 named, remainder grouped as "altele".
+   Colours match the conic-gradient in the Repartiție tematică panel below. #}
+{% set theme_total = section5.theme_dist | sum(attribute='count') %}
+{% set theme_palette = ['#C04F35','#A0826A','#8BA888','#6E6E70','#B8A090','#3A3A3D','#DDDCD7'] %}
+{% set theme_ro = {
+  'natură':'natură','persoană':'persoane','concept / abstract':'abstract',
+  'ideologic':'ideologic','dată / sărbătoare':'date','religios':'religios'
+} %}
+{% set top4 = section5.theme_dist[:4] %}
+{% set rest = section5.theme_dist[4:] %}
+{% set rest_count = rest | sum(attribute='count') %}
+{% set lead = section5.theme_dist[0] %}
+{% set lead_pct = (lead.count / theme_total * 100) | round | int %}
+<div class="statbar">
+
+  <div class="group">
+    <div class="group-label">Scară</div>
+    <div class="scale-stack">
+      <div class="item">
+        <div class="v">{{ "{:,.0f}".format(section1.total_streets).replace(",", ".") }}</div>
+        <div class="l">Adrese</div>
+      </div>
+      <div class="item">
+        <div class="v">{{ total_persons }}</div>
+        <div class="l">Persoane onorate</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="group-label">Tematică</div>
+    <div class="tema-row">
+      <div class="v">{{ lead_pct }}<span class="u">% {{ theme_ro[lead.category] | default(lead.category) }}</span></div>
+    </div>
+    <div class="minibar">
+      {% for t in top4 %}
+        {% set pct = (t.count / theme_total * 100) %}
+        <div style="width:{{ pct }}%;background:{{ theme_palette[loop.index0] }};"></div>
+      {% endfor %}
+      {% if rest_count %}
+        {% set rest_pct = (rest_count / theme_total * 100) %}
+        <div style="width:{{ rest_pct }}%;background:{{ theme_palette[4] }};"></div>
+      {% endif %}
+    </div>
+    <div class="l">
+      {% for t in top4[1:] %}
+        {% set pct = (t.count / theme_total * 100) | round | int %}
+        {{ theme_ro[t.category] | default(t.category) }} <strong style="color:var(--ink);">{{ pct }}%</strong>{{ ' · ' if not loop.last }}
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="group-label">Repartiție pe gen</div>
+    <div class="gen-row">
+      <div class="v">{{ male_pct }}<span class="u">% B</span></div>
+      <div class="frac">/ <span class="accent" style="font-weight:600;">{{ female_pct }}% F</span></div>
+    </div>
+    <div class="minibar">
+      <div style="width:{{ male_pct }}%;background:rgba(0,0,0,.42);"></div>
+      <div style="width:{{ female_pct }}%;background:var(--accent);"></div>
+    </div>
+    <div class="l">Persoane onorate, M vs F</div>
+  </div>
+
+  <div class="group">
+    <div class="group-label">Cei mai des onorați</div>
+    <div class="top-pair">
+      {% if section1.top_men %}
+      <div class="row">
+        <span class="prefix">#1 B</span>
+        <span class="name">{{ section1.top_men[0].full_name }}</span>
+        <span class="cnt">{{ section1.top_men[0].street_count }}<span class="u">str.</span></span>
+      </div>
+      {% endif %}
+      {% if section1.top_women %}
+      <div class="row">
+        <span class="prefix">#1 F</span>
+        <span class="name">{{ section1.top_women[0].full_name }}</span>
+        <span class="cnt">{{ section1.top_women[0].street_count }}<span class="u">str.</span></span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
 </div>
 
 <div class="dash-grid">
@@ -380,19 +546,13 @@ body {
 <div class="panel s12" id="cele-mai-intalnite">
   <div class="panel-header">
     <span class="panel-label">Cele mai frecvente · Top 30</span>
-    <div style="display:flex;gap:10px;align-items:center;">
-      <span class="panel-meta"><strong style="color:var(--ink);">Strada Principală</strong> · <strong id="s2-principal-count">—</strong> apariții · exclusă</span>
-      <div style="position:relative;">
-        <span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:12px;pointer-events:none;">⌕</span>
-        <input id="s2-search" type="text" placeholder="Căutați un nume de stradă…"
-          style="border:1px solid var(--rule);border-radius:3px;padding:4px 10px 4px 26px;font-family:var(--sans);font-size:11.5px;color:var(--ink);background:var(--bg);outline:none;width:220px;">
-      </div>
+    <div class="s2-judet-pick">
+      <label for="s2-judet-select">Județ</label>
+      <select id="s2-judet-select">
+        <option value="all">Toate județele</option>
+        {# Options populated by JS #}
+      </select>
     </div>
-  </div>
-  <div class="chip-row" id="s2-judet-row">
-    <span class="label">Județ</span>
-    <button class="chip active" data-judet="all">Toate</button>
-    {# Județ chips loaded by JS #}
   </div>
   <div class="rank-list rank-2col s2-list" id="s2-list">
     {# Populated by JS #}
@@ -828,30 +988,50 @@ body {
   </div>
 </footer>
 
-{# JavaScript for Section 2 (search) #}
+{# JavaScript for Section 2 (județ filter) #}
 <script>
 (function() {
-  const names = DATA_S2.top_names;
-  const principal = names[0];  // Principală is rank 1
-  const rest = names.slice(1);
-  const maxCount = rest[0]?.street_count || 1;
   const LIMIT = 30;
 
-  document.getElementById('s2-principal-count').textContent =
-    principal.street_count.toLocaleString('ro-RO');
+  const JUDET_NAMES = {
+    AB:'Alba', AG:'Argeș', AR:'Arad', B:'București', BC:'Bacău',
+    BH:'Bihor', BN:'Bistrița-Năsăud', BR:'Brăila', BT:'Botoșani',
+    BV:'Brașov', BZ:'Buzău', CJ:'Cluj', CL:'Călărași',
+    CS:'Caraș-Severin', CT:'Constanța', CV:'Covasna', DB:'Dâmbovița',
+    DJ:'Dolj', GJ:'Gorj', GL:'Galați', GR:'Giurgiu', HD:'Hunedoara',
+    HR:'Harghita', IF:'Ilfov', IL:'Ialomița', IS:'Iași', MH:'Mehedinți',
+    MM:'Maramureș', MS:'Mureș', NT:'Neamț', OT:'Olt', PH:'Prahova',
+    SB:'Sibiu', SJ:'Sălaj', SM:'Satu Mare', SV:'Suceava', TL:'Tulcea',
+    TM:'Timiș', TR:'Teleorman', VL:'Vâlcea', VN:'Vrancea', VS:'Vaslui',
+  };
 
-  function renderList(filtered) {
+  const CAT_RO = {
+    'persoană':'persoană','natură':'natură','religios':'religios','dată':'dată',
+    'religious':'religios','ideological':'ideologic','abstract':'abstract',
+    'institutional':'instituțional','trade':'meșteșug','occupational':'ocupațional',
+    'commemorative':'comemorativ','mythology':'mitologie','infrastructure':'infrastructură',
+    'place':'loc','category':'categorie',
+  };
+
+  const select = document.getElementById('s2-judet-select');
+  const available = Object.keys(DATA_S2.by_judet || {}).sort((a, b) => {
+    const na = JUDET_NAMES[a] || a, nb = JUDET_NAMES[b] || b;
+    return na.localeCompare(nb, 'ro');
+  });
+  available.forEach(code => {
+    const opt = document.createElement('option');
+    opt.value = code;
+    opt.textContent = (JUDET_NAMES[code] || code) + ' · ' + code;
+    select.appendChild(opt);
+  });
+
+  function renderList(rows, scopeLabel) {
     const list = document.getElementById('s2-list');
     list.innerHTML = '';
+    const trimmed = rows.slice(0, LIMIT);
+    const maxCount = trimmed[0]?.street_count || 1;
 
-    const CAT_RO = {
-      'persoană':'persoană','natură':'natură','religios':'religios','dată':'dată',
-      'religious':'religios','ideological':'ideologic','abstract':'abstract',
-      'institutional':'instituțional','trade':'meșteșug','occupational':'ocupațional',
-      'commemorative':'comemorativ','mythology':'mitologie','infrastructure':'infrastructură',
-      'place':'loc','category':'categorie',
-    };
-    filtered.slice(0, LIMIT).forEach((row, i) => {
+    trimmed.forEach((row, i) => {
       const pct = Math.round(row.street_count / maxCount * 100);
       const isPerson = row.category === 'persoană';
       const catLabel = CAT_RO[row.category] || row.category;
@@ -868,18 +1048,20 @@ body {
       `);
     });
     document.getElementById('s2-footer').textContent =
-      `Afișare 1–${Math.min(LIMIT, filtered.length)} din ${filtered.length} · Strada Principală exclusă din scară`;
+      `Afișare 1–${trimmed.length} din ${rows.length} · ${scopeLabel}`;
   }
 
-  renderList(rest);
+  function render(code) {
+    if (code === 'all') {
+      renderList(DATA_S2.top_names, 'la nivel național');
+    } else {
+      const label = (JUDET_NAMES[code] || code) + ' (' + code + ')';
+      renderList(DATA_S2.by_judet[code] || [], 'județul ' + label);
+    }
+  }
 
-  document.getElementById('s2-search').addEventListener('input', function() {
-    const q = this.value.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-    const filtered = rest.filter(r =>
-      r.name_normalized.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes(q)
-    );
-    renderList(filtered);
-  });
+  select.addEventListener('change', e => render(e.target.value));
+  render('all');
 })();
 </script>
 

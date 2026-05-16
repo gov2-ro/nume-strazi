@@ -83,7 +83,50 @@ def section2(conn: sqlite3.Connection) -> dict:
         ORDER BY street_count DESC
         LIMIT 50
     """)
-    return {"top_names": top_names}
+
+    # Top-30 within each județ — drives the județ filter dropdown.
+    # Bucharest sectors aggregate as 'B' to match the rest of the site.
+    by_judet_rows = _rows(conn, """
+        WITH judet_named AS (
+          SELECT
+            CASE WHEN sd.judet LIKE 'BUCURESTI%' OR sd.judet = 'B' THEN 'B'
+                 ELSE sd.judet END AS judet,
+            sd.name_normalized,
+            CASE
+              WHEN p.core_name_norm IS NOT NULL THEN 'persoană'
+              WHEN nt.core_name_norm IS NOT NULL THEN 'natură'
+              WHEN sd.is_saint = 1 THEN 'religios'
+              WHEN sd.is_date = 1 THEN 'dată'
+              WHEN nc.category IS NOT NULL THEN nc.category
+              ELSE 'altele'
+            END AS category
+          FROM streets_dedup sd
+          LEFT JOIN persons p ON p.core_name_norm = sd.core_name_norm
+          LEFT JOIN nature_terms nt ON nt.core_name_norm = sd.core_name_norm
+          LEFT JOIN name_categories nc ON nc.core_name_norm = sd.core_name_norm
+          WHERE sd.is_numeric = 0 AND sd.core_name IS NOT NULL
+        ),
+        ranked AS (
+          SELECT judet, name_normalized, category,
+                 COUNT(*) AS street_count,
+                 ROW_NUMBER() OVER (PARTITION BY judet ORDER BY COUNT(*) DESC) AS rn
+          FROM judet_named
+          GROUP BY judet, name_normalized
+        )
+        SELECT judet, name_normalized, category, street_count
+        FROM ranked
+        WHERE rn <= 30
+        ORDER BY judet, street_count DESC
+    """)
+    by_judet: dict[str, list[dict]] = {}
+    for r in by_judet_rows:
+        by_judet.setdefault(r["judet"], []).append({
+            "name_normalized": r["name_normalized"],
+            "street_count": r["street_count"],
+            "category": r["category"],
+        })
+
+    return {"top_names": top_names, "by_judet": by_judet}
 
 
 def section3(conn: sqlite3.Connection) -> dict:

@@ -1,5 +1,19 @@
 # Activity History
 
+## 2026-05-16 — Header rebuild: județ filter, stats widget, drop search
+
+### What was done
+- Removed the section-2 search input. It was redundant with the județ filter and competed for header space.
+- Wired up the județ filter that previously only showed "Toate". Added `by_judet` to `section2()` in `site_queries.py` — a per-județ top-30 with the same category logic as the national list, Bucharest sectors aggregated as 'B'. Replaced the chip row with a native `<select>` (all 42 județe, sorted alphabetically by Romanian name, displayed as "Cluj · CJ"). JS swaps the rendered list on change and rescales the bars to that județ's local max.
+- Dropped the "Strada Principală · N apariții · exclusă" header callout and its principal/rest split in the section-2 JS. The split's logic took `top_names[0]` blindly as Principală, but that comment was stale — in the current sample, rank 1 is `florilor` (519). Principală sits at rank 12 (381) and now appears in the list at its actual position.
+- Replaced the dark inline `.stats-bar` ticker with a light-background widget (`.statbar`). 4 modules: Scară (Adrese / Persoane onorate), Tematică (lead category % + 5-segment minibar pulling from `section5.theme_dist` using the same palette as the conic-gradient in the panel below + named breakdown), Repartiție pe gen (M% / F% + minibar), Cei mai des onorați (#1 B / #1 F with counts). Removed Județe and Wikidata counts — neither was a strong story to lead with.
+- Statbar is responsive: 4 cols ≥ 1025px → 2×2 ≤ 1024px → single column ≤ 640px.
+
+### Non-obvious decisions
+- Stats-widget tematică palette deliberately reuses the conic-gradient colors from the Repartiție tematică panel (`#C04F35,#A0826A,#8BA888,#6E6E70,#B8A090,#3A3A3D`). Visually links the minibar at the top of the page with the donut chart below. The semantic oddity (`#C04F35` = accent red applied to *natură* which dominates) is inherited from the existing panel and worth revisiting site-wide later, not in this pass.
+- The județ picker is a native `<select>` rather than a custom searchable combobox. Native gives free type-ahead, a11y, and mobile UX with zero JS. 42 entries is well within native-select usability.
+- Top-3 categories in tematică subline only — bottom 2 ("date", "religios") are barely visible at 1-2% and would clutter the row.
+
 ## 2026-05-16 — RO blue street-plaques + promote dense layout to primary
 
 ### What was done
