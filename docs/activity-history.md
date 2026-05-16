@@ -1,5 +1,43 @@
 # Activity History
 
+## 2026-05-16 — RO blue street-plaques + promote dense layout to primary
+
+### What was done
+- Redesigned street-name plaques to follow the Romanian street-sign convention: white on signal blue (`#0E4D92`), with a dual text-shadow (faint top darkening + soft cast below) for a slightly engraved feel, and a tighter `2px 9px` padding (`1px 7px` for `.small`). Added `--plaque` token to `:root`. Updated `.rank-name.person` to clear the inherited text-shadow so plain person-name text doesn't pick up the engraved look.
+- Promoted the dense layout to the project's primary deliverable. `templates/index.dense.html.j2` → `templates/index.html.j2` (the editorial layout it replaces was archived as `templates/index-v1.html.j2`). `build_site.py` `VARIANTS` and `--variant` choices updated accordingly; `--variant both` now renders `default + v1`.
+- Slimmed `tests/test_build.py` to assertions that hold for the new primary layout. Dropped `test_section1_hero_content` and `test_section8_ciorani` — both were editorial-layout-specific (hero copy "99 din 100" and the Cioranii curiosity). 8 tests pass against the new `dist/index.html`.
+
+### Non-obvious decisions
+- Plaque variants explored under `dist/plaque-preview.html` (4 directions: classic enamel, signal blue, embossed gradient, flat-with-outline) and `dist/plaque-preview-b.html` (4 refinements of signal-blue varying padding and text-shadow). Chose **B4 · Engraved**: `text-shadow: 0 -0.5px 0 rgba(0,0,0,.30), 0 1px 1.5px rgba(0,0,0,.50)`. The negative-y component is what makes the type read as pressed into the plate rather than floating above it.
+- Editorial layout was archived (not deleted) so its hero copy and Cioranii framing remain available if we want to revive any of it later. Available via `python3 build_site.py --variant v1` → `dist/index-v1.html`.
+- Slimmed tests rather than rewriting copy-specific assertions against the new layout. The dense layout's copy is still being iterated; pinning copy-string tests now would just mean rewriting them on the next pass. Structural-anchor assertions (which already pass) are the durable shape of coverage for this phase.
+
+## 2026-05-16 — Dense UI variant + atlas-style data panels
+
+### What was done
+- Added a parallel "dense" build of the dashboard. New template `templates/index.dense.html.j2` rendered via `python3 build_site.py --variant dense` (also `--variant both`); writes to `dist/index.dense.html`, leaving the existing `dist/index.html` untouched for side-by-side comparison.
+- Switched the dense variant to a 12-column outer grid (`.panel.s4/s6/s8/s12`) with three responsive tiers: aggressive 3-up at desktop, 2-up at ≤1024px, single column at ≤640px. Stats bar now horizontally scrollable on mobile; nav collapses to brand only. Wide rank lists (top 30 frequent, top persons, top pageviews) use `column-count: 2` with `display: block` override (flex `.rank-list` blocked multicol — needed explicit override).
+- Replaced Source Serif 4 with **Barlow Semi Condensed** (street names) + **Inter** (everything else). All `var(--serif)` usages removed; person names stay in Inter. Both fonts have full Romanian Latin Extended (`ă â î ș ț`).
+- Removed Cioranii hero + "Cea mai poetică" longest-names columns from the curiozități area. Removed the standalone "Onorat doar aici" panel — the curated `persons` table has only 2 truly-unique-to-one-UAT entries, too thin to fill the panel.
+- Added 4 new data-driven sections to the dense variant:
+  - **Amprente județene** (s12, 3-col internal): top-8 județe by (a) most names found nowhere else with ≥3 streets local, (b) % nume natură ("rurale-poetice"), (c) % nume ideologic.
+  - **Semnături regionale** (s6): up to 18 names where one județ holds ≥80% of all national occurrences (≥5 national). Tolocii 8/8 SV, Meduzei 7/8 CT, Suru 5/5 SB, Tánorok 5/5 HR, etc.
+  - **Curiozități unice naționale** (s6): 14 atmospheric/geographic names existing in exactly 1 UAT in the country. Surfaced via positive prefix filter on landscape nouns (Valea/Dealul/Plaiul/Pârâul/Lunca/Poiana/Pădurea/Moara/Cetatea/Cheile/Coasta/Pietrele/…) with `ROW_NUMBER() OVER (PARTITION BY prefix)` so each prefix shows once for diversity.
+  - **Conteste tematice** (s12, 3×2 cell grid): top-7 per family across Flori (8,493 streets / 107 distinct), Copaci (8,298 / 87), Păsări (1,527 / 43), Animale (697 / 25), Cer · lumină (1,237 / 25), Meserii (occupational + trade combined).
+- Section 8 (`section8()` in `site_queries.py`) gained: `contests` (dict of 6 lemma lists via `_contest_by_nature` + `_contest_trades` helpers), `regional_signatures`, `local_uniques`, `judet_distinctive`, `judet_rural`, `judet_ideo`.
+- Styled all street-name strings as **enamel plaques**: `.rank-name` and `.street-tag` get a thin `var(--ink)` border, `var(--bg)` background, weight 600 Barlow Semi Condensed, slight tracking. `.rank-name.person` overrides back to clean Inter 600 (no plaque) so person names in the top-persoane and pageviews lists stay typographic. Restructured the section-2 JS to emit `<span class="name-cell"><span class="rank-name">name</span><span class="tag">cat</span></span>` so the category pill sits beside the plaque, not inside it. Fingerprint top/rare lists use `.street-tag.small`.
+
+### Numbers
+- Default `dist/index.html`: 101 KB. Dense `dist/index.dense.html`: ~160 KB.
+- Page height at 1440px: original ~4,500px → dense ~3,620px (with the 4 new substantive panels added). Without the new panels, dense bottomed out at ~2,757px.
+- Mobile (≤640px): bodyWidth equals viewport, no horizontal overflow.
+
+### Non-obvious decisions
+- 1-UAT curiosities had to use a positive geographic-prefix filter, not an anti-join with `persons`. The curated persons table is partial, so the anti-join still leaked person names (Abraham Lincoln, A.C. Popovici, Acad. X). The prefix list (Valea, Dealul, …) is the load-bearing filter. `ROW_NUMBER() OVER (PARTITION BY prefix)` is what made the output diverse — naive alphabetical ordering surfaced 14 "Cetatea …" entries.
+- Plaque outline uses `var(--ink)` border on `var(--bg)` (panel bg) rather than a filled coloured rectangle. Keeps the editorial earth-tone palette intact (no Bucharest navy/green) while still reading as a signage placard. Person names get the explicit `.person` override because boxing 20 person-rank rows in the top-persoane tower looked oppressive in early tests.
+- `.rank-2col` needs `display: block` explicitly. Flex containers ignore `column-count`; the bug was masked by `getComputedStyle().columnCount === "2"` returning truthful values while the visual layout silently stayed single-column.
+- Map fingerprint sizing dropped the original `* 1.6 / 2.6` multiplier — the dense map cell already gets 8/12 of the panel via `.map-grid`, so the SVG just uses `parentElement.clientWidth` directly.
+
 ## 2026-05-15 — Multi-provider LLM classifier + convergence tool
 
 ### What was done

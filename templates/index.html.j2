@@ -1,13 +1,13 @@
-{# templates/index.html.j2 #}
+{# templates/index.html.j2 — primary (dense / atlas) layout #}
 <!DOCTYPE html>
 <html lang="ro">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Cum ne numim străzile</title>
+  <title>Cum ne numim străzile · variantă densă</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400;1,8..60,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
   <script>
@@ -26,8 +26,9 @@ const DATA_S8 = {{ section8 | tojson }};
   --rule: #DDDCD7;
   --wash: #EEEAE0;
   --accent: #C04F35;
-  --serif: 'Source Serif 4', Georgia, serif;
+  --plaque: #0E4D92;
   --sans: 'Inter', system-ui, sans-serif;
+  --street: 'Barlow Semi Condensed', 'Inter', sans-serif;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -44,12 +45,12 @@ body {
   position: sticky; top: 0; z-index: 100;
   background: var(--bg);
   border-bottom: 1px solid var(--rule);
-  padding: 14px 36px;
+  padding: 8px 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-family: var(--sans);
-  font-size: 11.5px;
+  font-size: 11px;
   letter-spacing: .06em;
 }
 .site-nav .brand {
@@ -59,58 +60,74 @@ body {
   text-transform: uppercase;
   text-decoration: none;
 }
-.site-nav nav { display: flex; gap: 22px; }
+.site-nav nav { display: flex; gap: 18px; }
 .site-nav nav a { color: var(--muted); text-decoration: none; }
 .site-nav nav a:hover { color: var(--ink); }
 
-/* Stats bar */
+/* Stats bar — single line, horizontal scroll on small screens */
 .stats-bar {
-  background: var(--ink); color: #FAF8F3; padding: 10px 36px;
-  display: flex; gap: 28px; flex-wrap: wrap;
-  font-family: var(--sans); font-size: 12px; align-items: center;
+  background: var(--ink); color: #FAF8F3; padding: 6px 20px;
+  display: flex; gap: 16px;
+  font-family: var(--sans); font-size: 11px; align-items: center;
+  overflow-x: auto; white-space: nowrap;
+  scrollbar-width: none;
 }
+.stats-bar::-webkit-scrollbar { display: none; }
 .stats-bar .stat-val { font-weight: 600; margin-right: 3px; }
 .stats-bar .stat-sep { color: #444; }
 
-/* Panel grid */
+/* 12-col panel grid */
 .dash-grid {
-  display: grid; grid-template-columns: 1fr 1fr;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
   gap: 1px; background: var(--rule);
+  max-width: 1600px; margin: 0 auto;
 }
-.panel { background: var(--bg); padding: 20px 22px 16px; }
-.panel.wide { grid-column: span 2; }
+.panel {
+  background: var(--bg);
+  padding: 12px 14px 10px;
+  grid-column: span 6;
+  min-width: 0;
+}
+.panel.s4  { grid-column: span 4; }
+.panel.s6  { grid-column: span 6; }
+.panel.s8  { grid-column: span 8; }
+.panel.s12 { grid-column: span 12; }
 
 /* Panel header */
 .panel-header {
   display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--rule);
+  margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--rule);
+  gap: 10px; flex-wrap: wrap;
 }
 .panel-label {
-  font-family: var(--sans); font-size: 10px; letter-spacing: .14em;
+  font-family: var(--sans); font-size: 9.5px; letter-spacing: .14em;
   text-transform: uppercase; font-weight: 600; color: var(--muted);
 }
-
-/* Caption */
-.panel-caption {
-  font-family: var(--sans); font-size: 11px; color: var(--muted);
-  margin-top: 12px; line-height: 1.5;
+.panel-meta {
+  font-family: var(--sans); font-size: 10.5px; color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
-/* Kicker */
+.panel-caption {
+  font-family: var(--sans); font-size: 11px; color: var(--muted);
+  margin-top: 8px; line-height: 1.45;
+}
+
 .kicker {
   font-family: var(--sans);
-  font-size: 11px;
+  font-size: 9.5px;
   letter-spacing: .16em;
   text-transform: uppercase;
   color: var(--muted);
   font-weight: 500;
-  margin-bottom: 22px;
+  margin-bottom: 8px;
 }
 
 /* Chip toggles */
 .chip-row {
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  margin-bottom: 24px; padding-bottom: 18px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 10px; padding-bottom: 8px;
   border-bottom: 1px solid var(--rule);
   font-family: var(--sans); font-size: 11px;
 }
@@ -119,9 +136,9 @@ body {
   font-weight: 500; color: var(--muted);
 }
 .chip {
-  font-family: var(--sans); font-size: 12px;
+  font-family: var(--sans); font-size: 11px;
   color: var(--muted);
-  padding: 5px 13px;
+  padding: 3px 10px;
   border: 1px solid var(--rule); border-radius: 999px;
   background: transparent; cursor: pointer;
   transition: background .15s, color .15s;
@@ -132,48 +149,142 @@ body {
 
 /* Tag pills */
 .tag {
-  font-family: var(--sans); font-size: 10px;
+  font-family: var(--sans); font-size: 9.5px;
   color: var(--muted); background: var(--wash);
-  padding: 2px 7px; border-radius: 999px;
-  margin-left: 8px; vertical-align: middle;
+  padding: 1px 6px; border-radius: 999px;
+  margin-left: 6px; vertical-align: middle;
 }
 .tag.person { background: #F4E8E5; color: #B8432F; }
 
-/* Rank list */
+/* Rank list — generic */
 .rank-list { display: flex; flex-direction: column; }
-.rank-header {
-  display: grid;
-  grid-template-columns: 36px 1fr 220px 56px;
-  gap: 14px; align-items: center;
-  padding-bottom: 10px;
-  border-bottom: 1.5px solid var(--ink);
-  font-family: var(--sans); font-size: 10px;
-  letter-spacing: .12em; text-transform: uppercase;
-  color: var(--muted); font-weight: 500;
-}
 .rank-row {
   display: grid;
-  grid-template-columns: 36px 1fr 220px 56px;
-  align-items: center; gap: 14px;
-  padding: 9px 0;
+  align-items: center; gap: 10px;
+  padding: 4px 0;
   border-bottom: 1px solid var(--wash);
+  break-inside: avoid;
 }
 .rank-row:last-child { border-bottom: none; }
 .rank-num {
-  font-family: var(--sans); font-size: 11px;
+  font-family: var(--sans); font-size: 10.5px;
   color: var(--muted); text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.rank-name { font-family: var(--serif); font-size: 16px; }
+/* Street names rendered as Romanian street-sign plaques:
+   white lettering on signal-blue (the RO street-sign convention),
+   with a faint inset top highlight and a soft drop shadow so the
+   plate reads as slightly raised. Type carries a dual text-shadow
+   (subtle top darkening + soft cast below) for an engraved feel.
+   `width: max-content` + `justify-self: start` keeps plaques sized to
+   their content even inside `1fr` grid columns; `max-width: 100%` lets
+   the longest names truncate cleanly with an ellipsis. */
+.rank-name, .street-tag {
+  font-family: var(--street);
+  font-weight: 700;
+  font-size: 12.5px;
+  letter-spacing: .045em;
+  display: inline-block;
+  padding: 2px 9px;
+  background: var(--plaque);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 2px;
+  text-shadow:
+    0 -0.5px 0 rgba(0, 0, 0, .30),
+    0 1px 1.5px rgba(0, 0, 0, .50);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .12),
+    0 2px 3px rgba(0, 0, 0, .26);
+  line-height: 1.25;
+  vertical-align: middle;
+  width: max-content;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  justify-self: start;
+}
+.street-tag.small {
+  font-size: 11.5px;
+  padding: 1px 7px;
+}
+/* Person names: clean, bold sans, no plaque */
+.rank-name.person {
+  display: inline;
+  padding: 0; border: none; background: transparent; border-radius: 0;
+  font-family: var(--sans); font-weight: 600;
+  font-size: 12.5px; letter-spacing: 0;
+  color: var(--ink);
+  text-shadow: none;
+  box-shadow: none;
+  max-width: none; overflow: visible;
+  width: auto;
+  justify-self: auto;
+}
 .rank-count {
-  font-family: var(--sans); font-size: 12px;
+  font-family: var(--sans); font-size: 11.5px;
   color: var(--muted); text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-/* Bar */
+/* 2-column rank list inside a wide panel.
+   Override display:block so column-count works (flex containers ignore multicol). */
+.rank-2col {
+  display: block;
+  column-count: 2; column-gap: 32px;
+  column-rule: 1px solid var(--rule);
+}
+.rank-2col .rank-row { break-inside: avoid; }
+
+/* Per-section row templates */
+.s2-list .rank-row     { grid-template-columns: 24px minmax(0, 1fr) 110px 48px; gap: 8px; }
+.s3-tower .rank-row    { grid-template-columns: minmax(0, 1fr) minmax(60px, 1fr) 38px; }
+.s4-list .rank-row     { grid-template-columns: minmax(0, 1fr) minmax(60px, 1fr) 60px 56px; }
+
+/* Row cell containing the street-name plaque and (optionally) a category tag */
+.name-cell {
+  display: flex; align-items: center; gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+.name-cell .rank-name { flex: 0 1 auto; min-width: 0; }
+.name-cell .tag { flex: 0 0 auto; }
+
+/* Contest row: fixed plaque column so bars share a left edge across rows.
+   The 140px column fits every label we ship (longest ~ "Trandafirilor",
+   "Privighetorii", "Răsăritului") at the small plaque size. */
+.contest-row {
+  display: grid;
+  grid-template-columns: 14px 140px minmax(50px, 1fr) 36px;
+  gap: 8px;
+  align-items: center;
+  padding: 3px 0;
+}
+.contest-row + .contest-row { border-top: 1px solid var(--wash); }
+.contest-row .rank-num-mini {
+  font-family: var(--sans); font-size: 9.5px;
+  color: var(--muted); text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.contest-row .rank-count-mini {
+  font-family: var(--sans); font-size: 10.5px;
+  color: var(--muted); text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Internal 3-col grids inside wide panels (amprente, conteste). Collapse at narrow widths. */
+.subgrid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+}
+
+/* Bars */
 .bar-wrap {
-  height: 6px; background: var(--wash);
+  height: 3px; background: var(--wash);
   border-radius: 1px; position: relative;
 }
 .bar {
@@ -184,13 +295,47 @@ body {
 .bar.accent { background: var(--accent); opacity: .65; }
 .bar.female { background: var(--accent); opacity: .5; }
 
-/* Mobile */
-@media (max-width: 768px) {
-  .dash-grid { grid-template-columns: 1fr; }
-  .panel.wide { grid-column: span 1; }
-  .stats-bar { padding: 10px 20px; gap: 16px; }
-  .site-nav { padding: 12px 20px; }
+/* Display numbers (sans, tabular) */
+.display-num {
+  font-family: var(--sans); font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em; line-height: 1;
+}
+
+/* Map fingerprint right rail */
+.map-grid {
+  display: grid;
+  grid-template-columns: 8fr 4fr;
+  gap: 24px;
+}
+.map-grid .fingerprint {
+  border-left: 1px solid var(--rule);
+  padding-left: 18px;
+}
+
+/* Tablet: collapse aggressive 3-up to 2-up, stack map, soften subgrids */
+@media (max-width: 1024px) {
+  .panel.s4, .panel.s6, .panel.s8 { grid-column: span 6; }
+  .panel.s12 { grid-column: span 12; }
+  .map-grid { grid-template-columns: 1fr; }
+  .map-grid .fingerprint {
+    border-left: none;
+    border-top: 1px solid var(--rule);
+    padding-left: 0;
+    padding-top: 14px;
+    margin-top: 4px;
+  }
+  .subgrid-3 { grid-template-columns: 1fr 1fr; }
+}
+
+/* Mobile: single column, single-col rank lists, fully collapsed subgrids */
+@media (max-width: 640px) {
+  .panel { grid-column: span 12 !important; padding: 10px 12px 8px; }
+  .dash-grid { gap: 0; max-width: 100%; }
+  .rank-2col { column-count: 1; column-rule: none; }
   .site-nav nav { display: none; }
+  .stats-bar { padding: 6px 12px; gap: 12px; }
+  .subgrid-3 { grid-template-columns: 1fr; }
 }
   </style>
 </head>
@@ -231,14 +376,17 @@ body {
 
 <div class="dash-grid">
 
-{# PANEL: CELE MAI FRECVENTE (wide) #}
-<div class="panel wide" id="cele-mai-intalnite">
+{# PANEL: CELE MAI FRECVENTE (s12, 2-col rank list) #}
+<div class="panel s12" id="cele-mai-intalnite">
   <div class="panel-header">
-    <span class="panel-label">Cele mai frecvente</span>
-    <div style="position:relative;">
-      <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;pointer-events:none;">⌕</span>
-      <input id="s2-search" type="text" placeholder="Căutați un nume de stradă…"
-        style="border:1.5px solid var(--rule);border-radius:3px;padding:7px 14px 7px 34px;font-family:var(--sans);font-size:13px;color:var(--ink);background:var(--bg);outline:none;width:280px;">
+    <span class="panel-label">Cele mai frecvente · Top 30</span>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <span class="panel-meta"><strong style="color:var(--ink);">Strada Principală</strong> · <strong id="s2-principal-count">—</strong> apariții · exclusă</span>
+      <div style="position:relative;">
+        <span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:12px;pointer-events:none;">⌕</span>
+        <input id="s2-search" type="text" placeholder="Căutați un nume de stradă…"
+          style="border:1px solid var(--rule);border-radius:3px;padding:4px 10px 4px 26px;font-family:var(--sans);font-size:11.5px;color:var(--ink);background:var(--bg);outline:none;width:220px;">
+      </div>
     </div>
   </div>
   <div class="chip-row" id="s2-judet-row">
@@ -246,55 +394,49 @@ body {
     <button class="chip active" data-judet="all">Toate</button>
     {# Județ chips loaded by JS #}
   </div>
-  <div style="font-family:var(--sans);font-size:12px;color:var(--muted);margin-bottom:12px;">
-    <strong style="color:var(--ink);">Strada Principală</strong> · <strong id="s2-principal-count">—</strong> apariții · exclusă din scară
-  </div>
-  <div class="rank-list" id="s2-list">
-    <div class="rank-header">
-      <span></span><span>Nume</span><span>Frecvență relativă</span><span style="text-align:right">Apariții</span>
-    </div>
+  <div class="rank-list rank-2col s2-list" id="s2-list">
     {# Populated by JS #}
   </div>
-  <div style="font-family:var(--sans);font-size:11px;color:var(--muted);padding:10px 0 0;" id="s2-footer"></div>
+  <div style="font-family:var(--sans);font-size:10.5px;color:var(--muted);padding:8px 0 0;" id="s2-footer"></div>
 </div>
 
-{# PANEL: REPARTIȚIE TEMATICĂ (left) #}
+{# PANEL: REPARTIȚIE TEMATICĂ (s4) #}
 {% set theme_total = section5.theme_dist | sum(attribute='count') %}
 {% set theme_colors = ['#C04F35','#A0826A','#8BA888','#6E6E70','#B8A090','#3A3A3D','#DDDCD7'] %}
 {% set ns = namespace(cumulative=0) %}
-<div class="panel" id="tematica">
+<div class="panel s4" id="tematica">
   <div class="panel-header">
     <span class="panel-label">Repartiție tematică</span>
-    <span style="font-family:var(--sans);font-size:11px;color:var(--muted);">{{ "{:,.0f}".format(theme_total).replace(",", ".") }} clasificate</span>
+    <span class="panel-meta">{{ "{:,.0f}".format(theme_total).replace(",", ".") }} clasif.</span>
   </div>
-  <div style="display:flex;gap:32px;align-items:start;">
-    <div style="position:relative;width:140px;height:140px;flex-shrink:0;">
-      <div style="width:140px;height:140px;border-radius:50%;background:conic-gradient(
+  <div style="display:flex;gap:18px;align-items:center;">
+    <div style="position:relative;width:96px;height:96px;flex-shrink:0;">
+      <div style="width:96px;height:96px;border-radius:50%;background:conic-gradient(
         {% for t in section5.theme_dist %}
         {% set pct = (t.count / theme_total * 100) | round(1) %}
         {{ theme_colors[loop.index0 % theme_colors|length] }} {{ ns.cumulative }}% {{ ns.cumulative + pct }}%{{ ',' if not loop.last }}
         {% set ns.cumulative = ns.cumulative + pct %}
         {% endfor %}
       );"></div>
-      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:78px;height:78px;background:var(--bg);border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;">
-        <div style="font-family:var(--serif);font-weight:500;font-size:18px;line-height:1;">{{ "{:,.0f}".format(theme_total).replace(",", ".") }}</div>
-        <div style="font-family:var(--sans);font-size:9px;color:var(--muted);">total</div>
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:56px;height:56px;background:var(--bg);border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;">
+        <div class="display-num" style="font-size:15px;">{{ "{:,.0f}".format(theme_total).replace(",", ".") }}</div>
+        <div style="font-family:var(--sans);font-size:8.5px;color:var(--muted);letter-spacing:.06em;">total</div>
       </div>
     </div>
-    <div style="display:flex;flex-direction:column;gap:10px;padding-top:4px;flex:1;">
+    <div style="display:flex;flex-direction:column;gap:5px;flex:1;min-width:0;">
       {% for t in section5.theme_dist %}
       {% set pct = (t.count / theme_total * 100) | round(1) %}
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div style="width:10px;height:10px;border-radius:1px;background:{{ theme_colors[loop.index0 % theme_colors|length] }};flex-shrink:0;"></div>
-        <span style="font-family:var(--sans);font-size:13px;flex:1;">{{ t.category }}</span>
-        <span style="font-family:var(--sans);font-size:13px;font-weight:600;">{{ pct }}%</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="width:8px;height:8px;border-radius:1px;background:{{ theme_colors[loop.index0 % theme_colors|length] }};flex-shrink:0;"></div>
+        <span style="font-family:var(--sans);font-size:11.5px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ t.category }}</span>
+        <span style="font-family:var(--sans);font-size:11.5px;font-weight:600;font-variant-numeric:tabular-nums;">{{ pct }}%</span>
       </div>
       {% endfor %}
     </div>
   </div>
 </div>
 
-{# PANEL: SUBTIPURI NATURĂ (right) #}
+{# PANEL: SUBTIPURI NATURĂ (s4) #}
 {% set nature_ro = {
   'flower':'flori','tree':'copaci','water':'apă','plant':'plante',
   'bird':'păsări','sky':'cer','geography':'geografie','forest':'pădure',
@@ -303,21 +445,21 @@ body {
   'orchard':'livadă','valley':'vale','peak':'vârf','mountain':'munte',
   'mountain_peak':'vârf de munte'
 } %}
-<div class="panel">
+<div class="panel s4">
   <div class="panel-header">
     <span class="panel-label">Subtipuri · Natură</span>
   </div>
   {% set max_n = section5.nature_subtypes[0].n if section5.nature_subtypes else 1 %}
   {% for row in section5.nature_subtypes %}
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-    <span style="font-family:var(--sans);font-size:13px;flex:1;">{{ nature_ro.get(row.nature_type, row.nature_type) }}</span>
-    <div class="bar-wrap" style="width:120px;height:5px;"><div class="bar" style="width:{{ (row.n / max_n * 100)|int }}%;background:#A0826A;opacity:.7;"></div></div>
-    <span style="font-family:var(--sans);font-size:11px;color:var(--muted);width:28px;text-align:right;">{{ row.n }}</span>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+    <span style="font-family:var(--sans);font-size:11.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ nature_ro.get(row.nature_type, row.nature_type) }}</span>
+    <div class="bar-wrap" style="width:80px;"><div class="bar" style="width:{{ (row.n / max_n * 100)|int }}%;background:#A0826A;opacity:.7;"></div></div>
+    <span style="font-family:var(--sans);font-size:10.5px;color:var(--muted);width:26px;text-align:right;font-variant-numeric:tabular-nums;">{{ row.n }}</span>
   </div>
   {% endfor %}
 </div>
 
-{# PANEL: TOKENI IDEOLOGICI (left) #}
+{# PANEL: TOKENI IDEOLOGICI (s4) #}
 {% set ideo_ro = {
   'victory':'victorie','national_day':'zi națională','brotherhood':'frăție',
   'youth':'tinerețe','workers':'muncitori','unification':'unire',
@@ -329,62 +471,111 @@ body {
   'emancipation':'emancipare','democracy':'democrație','cooperative':'cooperativă',
   'communist_press':'presă comunistă','commemorative':'comemorativ'
 } %}
-<div class="panel">
+<div class="panel s4">
   <div class="panel-header">
     <span class="panel-label">Tokeni ideologici</span>
   </div>
-  <div style="display:flex;flex-wrap:wrap;gap:8px;">
+  <div style="display:flex;flex-wrap:wrap;gap:5px;">
     {% for tok in section5.ideo_tokens %}
-    <span style="font-family:var(--sans);font-size:12px;padding:4px 11px;border:1px solid {{ 'var(--accent)' if tok.n > 30 else 'var(--rule)' }};border-radius:3px;color:{{ '#B8432F' if tok.n > 30 else 'var(--ink)' }};background:{{ '#FDF4F2' if tok.n > 30 else 'transparent' }};">
-      {{ ideo_ro.get(tok.token, tok.token) }} <span style="color:var(--muted);font-size:10px;margin-left:4px;">{{ tok.n }}</span>
+    <span style="font-family:var(--sans);font-size:11px;padding:2px 8px;border:1px solid {{ 'var(--accent)' if tok.n > 30 else 'var(--rule)' }};border-radius:3px;color:{{ '#B8432F' if tok.n > 30 else 'var(--ink)' }};background:{{ '#FDF4F2' if tok.n > 30 else 'transparent' }};">
+      {{ ideo_ro.get(tok.token, tok.token) }} <span style="color:var(--muted);font-size:9.5px;margin-left:3px;font-variant-numeric:tabular-nums;">{{ tok.n }}</span>
     </span>
     {% endfor %}
     {% if not section5.ideo_tokens %}
-    <span style="font-family:var(--sans);font-size:13px;font-style:italic;color:var(--muted);">Subcategorii în curs de completare.</span>
+    <span style="font-family:var(--sans);font-size:11.5px;font-style:italic;color:var(--muted);">Subcategorii în curs de completare.</span>
     {% endif %}
   </div>
 </div>
 
-{# PANEL: ECART DE GEN (right) #}
-<div class="panel" id="pe-cine-onoram">
+{# PANEL: ECART DE GEN (s4) #}
+<div class="panel s4" id="pe-cine-onoram">
   <div class="panel-header">
     <span class="panel-label">Ecart de gen</span>
-    <span style="font-family:var(--sans);font-size:11px;color:var(--muted);">{{ section3.total_m + section3.total_f }} persoane clasificate</span>
+    <span class="panel-meta">{{ section3.total_m + section3.total_f }} pers.</span>
   </div>
-  <div style="display:flex;gap:28px;align-items:start;">
+  <div style="display:flex;gap:16px;align-items:start;">
     <div>
-      <div style="font-family:var(--sans);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">Fiecare pătrat = 1 persoană</div>
-      <div id="s3-gap-grid" style="display:grid;grid-template-columns:repeat(10,16px);gap:3px;width:196px;"></div>
-      <div style="display:flex;gap:14px;margin-top:10px;font-family:var(--sans);font-size:11px;">
-        <div style="display:flex;align-items:center;gap:6px;">
-          <div style="width:10px;height:10px;border-radius:1px;background:var(--ink)"></div><span style="color:var(--muted)">Bărbat</span>
+      <div style="font-family:var(--sans);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Fiecare pătrat = 1 persoană</div>
+      <div id="s3-gap-grid" style="display:grid;grid-template-columns:repeat(10,11px);gap:2px;width:130px;"></div>
+      <div style="display:flex;gap:10px;margin-top:8px;font-family:var(--sans);font-size:10px;">
+        <div style="display:flex;align-items:center;gap:5px;">
+          <div style="width:8px;height:8px;border-radius:1px;background:var(--ink)"></div><span style="color:var(--muted)">Bărbat</span>
         </div>
-        <div style="display:flex;align-items:center;gap:6px;">
-          <div style="width:10px;height:10px;border-radius:1px;background:var(--accent)"></div><span style="color:var(--muted)">Femeie</span>
+        <div style="display:flex;align-items:center;gap:5px;">
+          <div style="width:8px;height:8px;border-radius:1px;background:var(--accent)"></div><span style="color:var(--muted)">Femeie</span>
         </div>
       </div>
     </div>
     <div>
-      <div style="font-family:var(--serif);font-weight:500;font-size:48px;line-height:1;letter-spacing:-.02em;margin-bottom:4px;">
-        {{ section3.total_m }}<span style="font-size:26px;color:var(--muted);">/{{ section3.total_m + section3.total_f }}</span>
+      <div class="display-num" style="font-size:36px;margin-bottom:2px;">
+        {{ section3.total_m }}<span style="font-size:20px;color:var(--muted);font-weight:500;">/{{ section3.total_m + section3.total_f }}</span>
       </div>
-      <div style="font-family:var(--sans);font-size:12px;color:var(--muted);">bărbați din total</div>
+      <div style="font-family:var(--sans);font-size:10.5px;color:var(--muted);">bărbați din total</div>
     </div>
   </div>
 </div>
 
-{# PANEL: TOP PERSOANE (wide) #}
-<div class="panel wide">
+{# PANEL: PROFESII (s4) #}
+{% set prof_ro = {
+  'writer':'scriitor','poet':'poet','politician':'politician',
+  'voievod':'voievod','revolutionary':'revoluționar','military':'militar',
+  'royalty':'rege / regină','scientist':'om de știință','painter':'pictor',
+  'ruler':'conducător','historian':'istoric','composer':'compozitor',
+  'engineer':'inginer','educator':'pedagog','clergy':'cleric',
+  'philosopher':'filosof','actor':'actor','architect':'arhitect',
+  'doctor':'medic','economist':'economist','jurist':'jurist',
+  'linguist':'lingvist','mathematician':'matematician','lawyer':'avocat'
+} %}
+<div class="panel s4">
+  <div class="panel-header">
+    <span class="panel-label">Profesia persoanei onorate</span>
+  </div>
+  {% set max_prof = section3.profession_dist[0].n if section3.profession_dist else 1 %}
+  {% for row in section3.profession_dist %}
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+    <span style="font-family:var(--sans);font-size:11.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ prof_ro.get(row.profession, row.profession) }}</span>
+    <div class="bar-wrap" style="width:80px;">
+      <div class="bar" style="width:{{ (row.n / max_prof * 100)|int }}%"></div>
+    </div>
+    <span style="font-family:var(--sans);font-size:10.5px;color:var(--muted);width:22px;text-align:right;font-variant-numeric:tabular-nums;">{{ row.n }}</span>
+  </div>
+  {% endfor %}
+</div>
+
+{# PANEL: EPOCI (s4) #}
+{% set era_ro = {
+  'ancient':'antichitate','medieval':'medieval','premodern':'premodern (1700–1900)',
+  '1848':'generația de la 1848','interwar':'interbelic (1900–1947)',
+  'communist':'comunism (1947–1989)'
+} %}
+<div class="panel s4">
+  <div class="panel-header">
+    <span class="panel-label">Epoca în care a trăit</span>
+  </div>
+  {% set max_era = section3.era_dist[0].n if section3.era_dist else 1 %}
+  {% for row in section3.era_dist %}
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+    <span style="font-family:var(--sans);font-size:11.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ era_ro.get(row.era, row.era or 'necunoscută') }}</span>
+    <div class="bar-wrap" style="width:80px;">
+      <div class="bar" style="width:{{ (row.n / max_era * 100)|int }}%"></div>
+    </div>
+    <span style="font-family:var(--sans);font-size:10.5px;color:var(--muted);width:22px;text-align:right;font-variant-numeric:tabular-nums;">{{ row.n }}</span>
+  </div>
+  {% endfor %}
+</div>
+
+{# PANEL: TOP PERSOANE (s12, 2-col internal) #}
+<div class="panel s12">
   <div class="panel-header">
     <span class="panel-label">Top persoane onorate · număr de străzi</span>
+    <span class="panel-meta">{{ section3.top_persons | length }} pers. · • feminin</span>
   </div>
-  <div class="rank-list" id="s3-tower">
+  <div class="rank-list rank-2col s3-tower">
     {% set max_count = section3.top_persons[0].street_count %}
     {% for p in section3.top_persons %}
-    <div class="rank-row" style="grid-template-columns:200px 1fr 54px;">
-      <span class="rank-name">
-        {{ p.full_name }}
-        {% if p.gender == 'F' %}<span style="display:inline-block;width:7px;height:7px;background:var(--accent);border-radius:50%;margin-left:7px;vertical-align:middle;"></span>{% endif %}
+    <div class="rank-row">
+      <span class="rank-name person">
+        {{ p.full_name }}{% if p.gender == 'F' %} <span style="display:inline-block;width:6px;height:6px;background:var(--accent);border-radius:50%;margin-left:4px;vertical-align:middle;"></span>{% endif %}
       </span>
       <div class="bar-wrap">
         <div class="{{ 'bar accent' if loop.first else ('bar female' if p.gender == 'F' else 'bar') }}"
@@ -396,98 +587,49 @@ body {
   </div>
 </div>
 
-{# PANEL: PROFESII (left) #}
-{% set prof_ro = {
-  'writer':'scriitor','poet':'poet','politician':'politician',
-  'voievod':'voievod','revolutionary':'revoluționar','military':'militar',
-  'royalty':'rege / regină','scientist':'om de știință','painter':'pictor',
-  'ruler':'conducător','historian':'istoric','composer':'compozitor',
-  'engineer':'inginer','educator':'pedagog','clergy':'cleric',
-  'philosopher':'filosof','actor':'actor','architect':'arhitect',
-  'doctor':'medic','economist':'economist','jurist':'jurist',
-  'linguist':'lingvist','mathematician':'matematician','lawyer':'avocat'
-} %}
-<div class="panel">
-  <div class="panel-header">
-    <span class="panel-label">Profesia persoanei onorate</span>
-  </div>
-  {% set max_prof = section3.profession_dist[0].n if section3.profession_dist else 1 %}
-  {% for row in section3.profession_dist %}
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-    <span style="font-family:var(--sans);font-size:13px;flex:1;">{{ prof_ro.get(row.profession, row.profession) }}</span>
-    <div class="bar-wrap" style="width:120px;height:5px;">
-      <div class="bar" style="width:{{ (row.n / max_prof * 100)|int }}%"></div>
-    </div>
-    <span style="font-family:var(--sans);font-size:11px;color:var(--muted);width:24px;text-align:right;">{{ row.n }}</span>
-  </div>
-  {% endfor %}
-</div>
-
-{# PANEL: EPOCI (right) #}
-{% set era_ro = {
-  'ancient':'antichitate','medieval':'medieval','premodern':'premodern (1700–1900)',
-  '1848':'generația de la 1848','interwar':'interbelic (1900–1947)',
-  'communist':'comunism (1947–1989)'
-} %}
-<div class="panel">
-  <div class="panel-header">
-    <span class="panel-label">Epoca în care a trăit</span>
-  </div>
-  {% set max_era = section3.era_dist[0].n if section3.era_dist else 1 %}
-  {% for row in section3.era_dist %}
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-    <span style="font-family:var(--sans);font-size:13px;flex:1;">{{ era_ro.get(row.era, row.era or 'necunoscută') }}</span>
-    <div class="bar-wrap" style="width:120px;height:5px;">
-      <div class="bar" style="width:{{ (row.n / max_era * 100)|int }}%"></div>
-    </div>
-    <span style="font-family:var(--sans);font-size:11px;color:var(--muted);width:24px;text-align:right;">{{ row.n }}</span>
-  </div>
-  {% endfor %}
-</div>
-
-{# PANEL: RECUNOAȘTERE GLOBALĂ (left) #}
-<div class="panel" id="recunoastere">
+{# PANEL: RECUNOAȘTERE GLOBALĂ (s6) #}
+<div class="panel s6" id="recunoastere">
   <div class="panel-header">
     <span class="panel-label">Recunoaștere globală · Wikidata</span>
-    <span style="font-family:var(--sans);font-size:11px;color:var(--muted);">{{ wikidata_total }} persoane</span>
+    <span class="panel-meta">{{ wikidata_total }} persoane</span>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--rule);border:1px solid var(--rule);">
-    <div style="background:var(--ink);color:#FAF8F3;padding:20px 16px;">
-      <div style="font-family:var(--sans);font-size:9px;letter-spacing:.16em;text-transform:uppercase;font-weight:600;color:var(--accent);margin-bottom:10px;">Universal</div>
-      <div style="font-family:var(--serif);font-weight:500;font-size:40px;line-height:1;letter-spacing:-.02em;margin-bottom:4px;">{{ section4.tier_counts.universal }}</div>
-      <div style="font-family:var(--sans);font-size:10px;color:#C9C9CB;">≥ 50 limbi Wikipedia</div>
+    <div style="background:var(--ink);color:#FAF8F3;padding:12px 12px;">
+      <div style="font-family:var(--sans);font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;font-weight:600;color:var(--accent);margin-bottom:6px;">Universal</div>
+      <div class="display-num" style="font-size:32px;margin-bottom:2px;">{{ section4.tier_counts.universal }}</div>
+      <div style="font-family:var(--sans);font-size:9.5px;color:#C9C9CB;">≥ 50 limbi Wikipedia</div>
     </div>
-    <div style="background:var(--bg);padding:20px 16px;">
-      <div style="font-family:var(--sans);font-size:9px;letter-spacing:.16em;text-transform:uppercase;font-weight:600;color:var(--muted);margin-bottom:10px;">Național</div>
-      <div style="font-family:var(--serif);font-weight:500;font-size:40px;line-height:1;letter-spacing:-.02em;margin-bottom:4px;">{{ section4.tier_counts.national }}</div>
-      <div style="font-family:var(--sans);font-size:10px;color:var(--muted);">5–49 limbi</div>
+    <div style="background:var(--bg);padding:12px 12px;">
+      <div style="font-family:var(--sans);font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;font-weight:600;color:var(--muted);margin-bottom:6px;">Național</div>
+      <div class="display-num" style="font-size:32px;margin-bottom:2px;">{{ section4.tier_counts.national }}</div>
+      <div style="font-family:var(--sans);font-size:9.5px;color:var(--muted);">5–49 limbi</div>
     </div>
-    <div style="background:var(--bg);padding:20px 16px;">
-      <div style="font-family:var(--sans);font-size:9px;letter-spacing:.16em;text-transform:uppercase;font-weight:600;color:var(--muted);margin-bottom:10px;">Local</div>
-      <div style="font-family:var(--serif);font-weight:500;font-size:40px;line-height:1;letter-spacing:-.02em;margin-bottom:4px;">{{ section4.tier_counts.local }}</div>
-      <div style="font-family:var(--sans);font-size:10px;color:var(--muted);">sub 5 limbi</div>
+    <div style="background:var(--bg);padding:12px 12px;">
+      <div style="font-family:var(--sans);font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;font-weight:600;color:var(--muted);margin-bottom:6px;">Local</div>
+      <div class="display-num" style="font-size:32px;margin-bottom:2px;">{{ section4.tier_counts.local }}</div>
+      <div style="font-family:var(--sans);font-size:9.5px;color:var(--muted);">sub 5 limbi</div>
     </div>
   </div>
 </div>
 
-{# PANEL: RENUMIRI placeholder (right) #}
-<div class="panel" id="renumiri">
+{# PANEL: RENUMIRI placeholder (s6) #}
+<div class="panel s6" id="renumiri">
   <div class="panel-header">
     <span class="panel-label">Renumiri</span>
   </div>
   <div class="panel-caption">Secțiune în construcție — date indisponibile.</div>
 </div>
 
-{# PANEL: NOTORIETATE WIKIPEDIA (wide) #}
-<div class="panel wide">
+{# PANEL: NOTORIETATE WIKIPEDIA (s12, 2-col internal) #}
+<div class="panel s12">
   <div class="panel-header">
     <span class="panel-label">Notorietate Wikipedia · vizualizări lunare medii · ro.wikipedia.org · 12 luni</span>
   </div>
-  <div class="rank-list">
+  <div class="rank-list rank-2col s4-list">
     {% set max_pv = section4.top_pageviews[0].wiki_ro_views if section4.top_pageviews else 1 %}
     {% for p in section4.top_pageviews %}
-    <div class="rank-row" style="grid-template-columns:200px 1fr 80px 90px;">
-      <span class="rank-name">{{ p.full_name }}</span>
+    <div class="rank-row">
+      <span class="rank-name person">{{ p.full_name }}</span>
       <div class="bar-wrap">
         <div class="{{ 'bar accent' if p.wiki_scope == 'universal' else 'bar' }}"
              style="width:{{ (p.wiki_ro_views / max_pv * 100)|int }}%"></div>
@@ -499,147 +641,190 @@ body {
   </div>
 </div>
 
-{# PANEL: HARTA (wide) #}
-<div class="panel wide" id="harta">
+{# PANEL: HARTA (s12, internal 8/4) #}
+<div class="panel s12" id="harta">
   <div class="panel-header">
     <span class="panel-label">Harta · statistici pe județ</span>
+    <div class="chip-row" id="s6-metric-row" style="margin:0;padding:0;border:none;">
+      <span class="label">Vedeți după</span>
+      <button class="chip active" data-metric="saint_pct">% sfinți</button>
+      <button class="chip" data-metric="numeric_pct">% numere</button>
+      <button class="chip" data-metric="female_pct">% femei</button>
+    </div>
   </div>
-  <div class="chip-row" id="s6-metric-row">
-    <span class="label">Vedeți după</span>
-    <button class="chip active" data-metric="saint_pct">% sfinți</button>
-    <button class="chip" data-metric="numeric_pct">% numere</button>
-    <button class="chip" data-metric="female_pct">% femei</button>
-  </div>
-  <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:40px;" id="s6-grid">
+  <div class="map-grid" id="s6-grid">
     <div style="position:relative;">
       <svg id="s6-map" style="width:100%;height:auto;display:block;"></svg>
-      <div style="margin-top:16px;display:flex;align-items:center;gap:14px;font-family:var(--sans);font-size:11px;color:var(--muted);">
+      <div style="margin-top:10px;display:flex;align-items:center;gap:12px;font-family:var(--sans);font-size:10.5px;color:var(--muted);">
         <span id="s6-scale-min">0%</span>
-        <div style="flex:1;height:6px;background:linear-gradient(to right,#F4EFE6 0%,#E8B299 35%,#D27A5C 65%,#A53A22 100%);border-radius:1px;"></div>
-        <span id="s6-scale-max">12%</span>
-        <span style="margin-left:14px;" id="s6-scale-label">% străzi cu prefix „Sf."</span>
+        <div style="flex:1;height:5px;background:linear-gradient(to right,#F4EFE6 0%,#E8B299 35%,#D27A5C 65%,#A53A22 100%);border-radius:1px;"></div>
+        <span id="s6-scale-max" style="font-variant-numeric:tabular-nums;">12%</span>
+        <span style="margin-left:10px;" id="s6-scale-label">% străzi cu prefix „Sf."</span>
       </div>
     </div>
-    <div style="border-left:1px solid var(--rule);padding-left:24px;" id="s6-fingerprint">
+    <div class="fingerprint" id="s6-fingerprint">
       <div class="kicker">Amprenta județului</div>
-      <p style="font-family:var(--sans);font-size:13px;color:var(--muted);padding-top:40px;">
+      <p style="font-family:var(--sans);font-size:12px;color:var(--muted);padding-top:20px;">
         Selectați un județ pe hartă.
       </p>
     </div>
   </div>
 </div>
 
-{# PANEL: CURIOZITĂȚI (wide) #}
-<div class="panel wide" id="curiozitati">
+{# PANEL: AMPRENTE JUDEȚENE (s12, internal 3-col) #}
+<div class="panel s12">
   <div class="panel-header">
-    <span class="panel-label">Curiozități</span>
+    <span class="panel-label">Amprente județene · trei caractere</span>
   </div>
-  <div style="display:grid;grid-template-columns:1fr auto;gap:48px;align-items:center;border-bottom:1px solid var(--rule);padding-bottom:20px;margin-bottom:20px;">
-    <div>
-      <div style="font-family:var(--sans);font-size:9px;letter-spacing:.18em;text-transform:uppercase;font-weight:600;color:var(--accent);margin-bottom:10px;">Comuna care a renunțat la nume</div>
-      <div style="font-family:var(--serif);font-weight:500;font-size:22px;line-height:1.12;margin:0 0 10px;">Cioranii de Jos, Prahova</div>
-      <p style="font-family:var(--sans);font-size:13px;line-height:1.6;color:var(--muted);max-width:500px;">
-        Din {{ section8.ciorani.total }} de străzi,
-        <strong style="color:var(--ink);">{{ section8.ciorani.numeric }} se cheamă printr-un număr</strong>.
-        Strada 1. Strada 2. Strada {{ section8.ciorani.numeric }}.
-        {% if section8.ciorani.total > section8.ciorani.numeric %}
-        Una singură are un nume propriu-zis.
-        {% endif %}
-      </p>
-    </div>
-    <div style="text-align:right;">
-      <span style="font-family:var(--serif);font-weight:500;font-size:{{ '64px' if section8.ciorani.numeric >= 100 else '80px' }};line-height:1;letter-spacing:-.03em;color:var(--accent);display:block;">{{ section8.ciorani.numeric }}</span>
-      <span style="font-family:var(--serif);font-size:24px;color:var(--muted);display:block;">din {{ section8.ciorani.total }}</span>
-    </div>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--rule);border:1px solid var(--rule);">
+  <div class="subgrid-3">
 
-    {# Longest names #}
-    <div style="background:var(--bg);padding:20px 18px;">
-      <div class="panel-label" style="margin-bottom:12px;">Cea mai poetică</div>
-      {% for item in section8.longest_names[:4] %}
-      <div style="font-family:var(--serif);font-size:{{ [18,15,14,13][loop.index0] }}px;line-height:1.3;margin-bottom:{{ 10 if loop.index0 < 3 else 0 }}px;">
-        {{ item.name }}
-      </div>
-      {% if not loop.last %}
-      <div style="font-family:var(--sans);font-size:10px;color:var(--muted);margin-bottom:8px;">{{ item.char_count }} caractere</div>
-      {% endif %}
-      {% endfor %}
-      {% if not section8.longest_names %}
-      <p style="font-family:var(--sans);font-size:12px;font-style:italic;color:var(--muted);">Niciun nume lung identificat.</p>
-      {% endif %}
-    </div>
-
-    {# Animal contest #}
-    <div style="background:var(--bg);padding:20px 18px;">
-      <div class="panel-label" style="margin-bottom:12px;">Concursul animalelor</div>
-      {% if section8.animal_names %}
-        {% set max_animal = section8.animal_names[0].n %}
-        {% for row in section8.animal_names %}
-        <div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:{{ '1px solid var(--wash)' if not loop.last else 'none' }};">
-          <span style="font-family:var(--sans);font-size:10px;color:var(--muted);width:16px;text-align:right;">{{ loop.index }}</span>
-          <span style="font-family:var(--sans);font-size:13px;flex:1;">{{ row.animal_ro or row.name_normalized }}</span>
-          <div class="bar-wrap" style="width:60px;height:4px;"><div class="bar" style="width:{{ (row.n / max_animal * 100)|int }}%;"></div></div>
-          <span style="font-family:var(--sans);font-size:11px;color:var(--muted);width:22px;text-align:right;">{{ row.n }}</span>
-        </div>
-        {% endfor %}
-      {% else %}
-        <p style="font-family:var(--sans);font-size:12px;font-style:italic;color:var(--muted);">Termeni în curs de completare.</p>
-      {% endif %}
-    </div>
-
-    {# Locally honored #}
-    <div style="background:var(--bg);padding:20px 18px;">
-      <div class="panel-label" style="margin-bottom:12px;">Onorat doar aici</div>
-      {% for item in section8.local_honorees %}
-      <div style="padding:8px 0;border-bottom:{{ '1px solid var(--wash)' if not loop.last else 'none' }};">
-        <div style="font-family:var(--sans);font-size:13px;margin-bottom:2px;">
-          <span style="display:inline-block;width:5px;height:5px;background:var(--accent);border-radius:50%;margin-right:5px;vertical-align:middle;"></span>
-          {{ item.full_name }}
-        </div>
-        {% if item.profession %}
-        <div style="font-family:var(--sans);font-size:10.5px;color:var(--muted);">{{ item.profession }}</div>
-        {% endif %}
-        <div style="font-family:var(--sans);font-size:10px;color:var(--muted);margin-top:2px;">{{ item.uat }} · {{ item.judet }}</div>
+    {# Most "exclusivist" - judete with most names found nowhere else #}
+    <div style="background:var(--bg);padding:12px 14px;">
+      <div class="panel-label" style="margin-bottom:6px;">Cele mai exclusiviste</div>
+      <div class="panel-caption" style="margin:0 0 8px;">Județe cu cele mai multe nume găsite doar acolo · ≥3 străzi local</div>
+      {% set max_d = section8.judet_distinctive[0].n if section8.judet_distinctive else 1 %}
+      {% for row in section8.judet_distinctive %}
+      <div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:{{ '1px solid var(--wash)' if not loop.last else 'none' }};">
+        <span style="font-family:var(--sans);font-size:9.5px;color:var(--muted);width:14px;text-align:right;font-variant-numeric:tabular-nums;">{{ loop.index }}</span>
+        <span style="font-family:var(--sans);font-size:12px;font-weight:600;letter-spacing:.04em;width:30px;">{{ row.judet }}</span>
+        <div class="bar-wrap" style="flex:1;"><div class="bar accent" style="width:{{ (row.n / max_d * 100)|int }}%;"></div></div>
+        <span style="font-family:var(--sans);font-size:10.5px;color:var(--muted);width:30px;text-align:right;font-variant-numeric:tabular-nums;">{{ row.n }}</span>
       </div>
       {% endfor %}
-      {% if not section8.local_honorees %}
-      <p style="font-family:var(--sans);font-size:12px;font-style:italic;color:var(--muted);">Persoane locale în curs de identificare.</p>
-      {% endif %}
+    </div>
+
+    {# Most "rural-poetic" - highest nature % #}
+    <div style="background:var(--bg);padding:12px 14px;">
+      <div class="panel-label" style="margin-bottom:6px;">Cele mai «rurale-poetice»</div>
+      <div class="panel-caption" style="margin:0 0 8px;">Cota de străzi cu nume din natură (flori, copaci, ape, animale…)</div>
+      {% set max_r = section8.judet_rural[0].pct if section8.judet_rural else 1 %}
+      {% for row in section8.judet_rural %}
+      <div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:{{ '1px solid var(--wash)' if not loop.last else 'none' }};">
+        <span style="font-family:var(--sans);font-size:9.5px;color:var(--muted);width:14px;text-align:right;font-variant-numeric:tabular-nums;">{{ loop.index }}</span>
+        <span style="font-family:var(--sans);font-size:12px;font-weight:600;letter-spacing:.04em;width:30px;">{{ row.judet }}</span>
+        <div class="bar-wrap" style="flex:1;"><div class="bar" style="width:{{ (row.pct / max_r * 100)|int }}%;background:#8BA888;opacity:.75;"></div></div>
+        <span style="font-family:var(--sans);font-size:10.5px;color:var(--muted);width:46px;text-align:right;font-variant-numeric:tabular-nums;">{{ row.pct }}%</span>
+      </div>
+      {% endfor %}
+    </div>
+
+    {# Most ideological #}
+    <div style="background:var(--bg);padding:12px 14px;">
+      <div class="panel-label" style="margin-bottom:6px;">Cele mai «ideologice»</div>
+      <div class="panel-caption" style="margin:0 0 8px;">Cota de străzi cu nume ideologic (libertate, victorie, unire…)</div>
+      {% set max_i = section8.judet_ideo[0].pct if section8.judet_ideo else 1 %}
+      {% for row in section8.judet_ideo %}
+      <div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:{{ '1px solid var(--wash)' if not loop.last else 'none' }};">
+        <span style="font-family:var(--sans);font-size:9.5px;color:var(--muted);width:14px;text-align:right;font-variant-numeric:tabular-nums;">{{ loop.index }}</span>
+        <span style="font-family:var(--sans);font-size:12px;font-weight:600;letter-spacing:.04em;width:30px;">{{ row.judet }}</span>
+        <div class="bar-wrap" style="flex:1;"><div class="bar accent" style="width:{{ (row.pct / max_i * 100)|int }}%;"></div></div>
+        <span style="font-family:var(--sans);font-size:10.5px;color:var(--muted);width:46px;text-align:right;font-variant-numeric:tabular-nums;">{{ row.pct }}%</span>
+      </div>
+      {% endfor %}
     </div>
 
   </div>
 </div>
 
+{# PANEL: SEMNĂTURI REGIONALE (s6) + CURIOZITĂȚI UNICE NAȚIONALE (s6) #}
+<div class="panel s6">
+  <div class="panel-header">
+    <span class="panel-label">Semnături regionale · ≥80% concentrare într-un județ</span>
+    <span class="panel-meta">{{ section8.regional_signatures | length }} nume</span>
+  </div>
+  <div class="rank-list">
+    {% for r in section8.regional_signatures %}
+    <div class="rank-row" style="grid-template-columns: minmax(0, 1fr) 30px 70px; gap: 10px;">
+      <span class="rank-name">{{ r.display_name }}</span>
+      <span style="font-family:var(--sans);font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--ink);text-align:right;">{{ r.judet }}</span>
+      <span style="font-family:var(--sans);font-size:10.5px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums;">{{ r.local_total }}/{{ r.national_total }} · {{ r.pct }}%</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="panel s6" id="curiozitati">
+  <div class="panel-header">
+    <span class="panel-label">Curiozități unice naționale · doar într-un singur UAT</span>
+    <span class="panel-meta">selecție · geografice</span>
+  </div>
+  <div class="rank-list">
+    {% for r in section8.local_uniques %}
+    <div class="rank-row" style="grid-template-columns: minmax(0, 1fr) auto; gap: 10px;">
+      <span class="rank-name">{{ r.display_name }}</span>
+      <span style="font-family:var(--sans);font-size:10.5px;color:var(--muted);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;">{{ r.uat | title }} · <strong style="color:var(--ink);font-weight:600;letter-spacing:.04em;">{{ r.judet }}</strong></span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{# PANEL: CONTESTE TEMATICE (s12, internal 3-col × 2-row grid) #}
+{% set contest_labels = {
+  'animals': 'Animale',
+  'flowers': 'Flori',
+  'trees':   'Copaci',
+  'birds':   'Păsări',
+  'sky':     'Cer · lumină',
+  'trades':  'Meserii',
+} %}
+{% set contest_order = ['flowers', 'trees', 'birds', 'animals', 'sky', 'trades'] %}
+<div class="panel s12">
+  <div class="panel-header">
+    <span class="panel-label">Conteste tematice · top 7 din fiecare familie</span>
+  </div>
+  <div class="subgrid-3">
+    {% for key in contest_order %}
+    {% set entries = section8.contests[key] %}
+    <div style="background:var(--bg);padding:12px 14px;">
+      <div class="panel-label" style="margin-bottom:8px;">{{ contest_labels[key] }}</div>
+      {% if entries %}
+        {% set max_e = entries[0].n %}
+        {% for row in entries %}
+        <div class="contest-row">
+          <span class="rank-num-mini">{{ loop.index }}</span>
+          <span class="street-tag small">{{ row.label }}</span>
+          <div class="bar-wrap"><div class="bar" style="width:{{ (row.n / max_e * 100)|int }}%;"></div></div>
+          <span class="rank-count-mini">{{ row.n }}</span>
+        </div>
+        {% endfor %}
+      {% else %}
+        <p style="font-family:var(--sans);font-size:11.5px;font-style:italic;color:var(--muted);">Date în curs de completare.</p>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+
 </div>{# end .dash-grid #}
 
 {# FOOTER #}
-<footer style="background:var(--ink);color:#FAF8F3;padding:36px 80px;">
-  <div style="max-width:1200px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr 1fr;gap:48px;">
+<footer style="background:var(--ink);color:#FAF8F3;padding:20px 24px;">
+  <div style="max-width:1600px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr 1fr;gap:32px;">
     <div>
-      <div style="font-family:var(--sans);font-size:10px;letter-spacing:.18em;text-transform:uppercase;font-weight:600;color:var(--accent);margin-bottom:12px;">Despre date</div>
-      <p style="font-family:var(--sans);font-size:13px;line-height:1.6;color:#C9C9CB;">
+      <div style="font-family:var(--sans);font-size:9px;letter-spacing:.18em;text-transform:uppercase;font-weight:600;color:var(--accent);margin-bottom:6px;">Despre date</div>
+      <p style="font-family:var(--sans);font-size:12px;line-height:1.55;color:#C9C9CB;">
         Registrul Secțiilor de Vot, Autoritatea Electorală Permanentă, 14.05.2025.
         Descriere adrese cu alegători înregistrați.
       </p>
     </div>
     <div>
-      <div style="font-family:var(--sans);font-size:10px;letter-spacing:.18em;text-transform:uppercase;font-weight:600;color:var(--accent);margin-bottom:12px;">Metodologie</div>
-      <p style="font-family:var(--sans);font-size:13px;line-height:1.6;color:#C9C9CB;">
+      <div style="font-family:var(--sans);font-size:9px;letter-spacing:.18em;text-transform:uppercase;font-weight:600;color:var(--accent);margin-bottom:6px;">Metodologie</div>
+      <p style="font-family:var(--sans);font-size:12px;line-height:1.55;color:#C9C9CB;">
         Clasificare: curation manual + LLM batch (Claude Haiku + Gemini).
         Recunoaștere: Wikidata + Wikipedia pageviews.
         Harta: GeoJSON județe, surse publice.
       </p>
     </div>
     <div>
-      <div style="font-family:var(--sans);font-size:10px;letter-spacing:.18em;text-transform:uppercase;font-weight:600;color:var(--accent);margin-bottom:12px;">Cod sursă</div>
-      <p style="font-family:var(--sans);font-size:13px;line-height:1.6;color:#C9C9CB;">
+      <div style="font-family:var(--sans);font-size:9px;letter-spacing:.18em;text-transform:uppercase;font-weight:600;color:var(--accent);margin-bottom:6px;">Cod sursă</div>
+      <p style="font-family:var(--sans);font-size:12px;line-height:1.55;color:#C9C9CB;">
         Proiect personal · pax@mioritics.ro
       </p>
     </div>
   </div>
-  <div style="max-width:1200px;margin:28px auto 0;border-top:1px solid #2A2C30;padding-top:16px;font-family:var(--sans);font-size:11px;color:var(--muted);">
-    Cum ne numim străzile · {{ section1.total_streets | default(0) | int | string }} adrese · ultima actualizare 14.05.2025
+  <div style="max-width:1600px;margin:14px auto 0;border-top:1px solid #2A2C30;padding-top:10px;font-family:var(--sans);font-size:10.5px;color:var(--muted);">
+    Cum ne numim străzile · variantă densă · {{ section1.total_streets | default(0) | int | string }} adrese · ultima actualizare 14.05.2025
   </div>
 </footer>
 
@@ -650,14 +835,14 @@ body {
   const principal = names[0];  // Principală is rank 1
   const rest = names.slice(1);
   const maxCount = rest[0]?.street_count || 1;
+  const LIMIT = 30;
 
   document.getElementById('s2-principal-count').textContent =
     principal.street_count.toLocaleString('ro-RO');
 
   function renderList(filtered) {
     const list = document.getElementById('s2-list');
-    // Remove old rows (keep header)
-    while (list.children.length > 1) list.removeChild(list.lastChild);
+    list.innerHTML = '';
 
     const CAT_RO = {
       'persoană':'persoană','natură':'natură','religios':'religios','dată':'dată',
@@ -666,7 +851,7 @@ body {
       'commemorative':'comemorativ','mythology':'mitologie','infrastructure':'infrastructură',
       'place':'loc','category':'categorie',
     };
-    filtered.slice(0, 25).forEach((row, i) => {
+    filtered.slice(0, LIMIT).forEach((row, i) => {
       const pct = Math.round(row.street_count / maxCount * 100);
       const isPerson = row.category === 'persoană';
       const catLabel = CAT_RO[row.category] || row.category;
@@ -676,14 +861,14 @@ body {
       list.insertAdjacentHTML('beforeend', `
         <div class="rank-row">
           <span class="rank-num">${i + 1}</span>
-          <span class="rank-name">${row.name_normalized}${tag}</span>
+          <span class="name-cell"><span class="rank-name">${row.name_normalized}</span>${tag}</span>
           <div class="bar-wrap"><div class="${barClass}" style="width:${pct}%"></div></div>
           <span class="rank-count">${row.street_count.toLocaleString('ro-RO')}</span>
         </div>
       `);
     });
     document.getElementById('s2-footer').textContent =
-      `Afișare 1–${Math.min(25, filtered.length)} din ${filtered.length} · Strada Principală exclusă din scară`;
+      `Afișare 1–${Math.min(LIMIT, filtered.length)} din ${filtered.length} · Strada Principală exclusă din scară`;
   }
 
   renderList(rest);
@@ -703,11 +888,10 @@ body {
 (function() {
   const total = DATA_S3.total_m + DATA_S3.total_f;
   const grid = document.getElementById('s3-gap-grid');
-  // Show 100 squares representing the ratio
   const femaleSquares = Math.max(1, Math.round(DATA_S3.total_f / total * 100));
   for (let i = 0; i < 100; i++) {
     const sq = document.createElement('div');
-    sq.style.cssText = `width:16px;height:16px;border-radius:1px;background:${
+    sq.style.cssText = `width:11px;height:11px;border-radius:1px;background:${
       i >= (100 - femaleSquares) ? 'var(--accent)' : 'var(--ink)'
     }`;
     grid.appendChild(sq);
@@ -756,13 +940,15 @@ body {
     btn.addEventListener('click', () => updateMetric(btn.dataset.metric));
   });
 
-  // Load GeoJSON and render map
   fetch('ro-counties.geojson')
     .then(r => r.json())
     .then(geo => {
       const svg = d3.select('#s6-map');
-      const width = svg.node().parentElement.clientWidth * 1.6 / 2.6;
-      const height = width * 0.65;
+      // The map cell is 8/12 of the panel content area minus the 24px gap.
+      // Use the actual rendered width of the SVG's containing cell.
+      const cellWidth = svg.node().parentElement.clientWidth;
+      const width = cellWidth;
+      const height = width * 0.62;
       svg.attr('viewBox', `0 0 ${width} ${height}`);
 
       const projection = d3.geoMercator().fitSize([width, height], geo);
@@ -784,7 +970,7 @@ body {
     })
     .catch(() => {
       document.getElementById('s6-map').insertAdjacentHTML('afterend',
-        '<p style="font-family:var(--sans);font-size:13px;color:var(--muted);padding:20px 0;">Harta indisponibilă — rulați build_site.py pentru a copia ro-counties.geojson în dist/</p>'
+        '<p style="font-family:var(--sans);font-size:12px;color:var(--muted);padding:14px 0;">Harta indisponibilă — rulați build_site.py pentru a copia ro-counties.geojson în dist/</p>'
       );
     });
 
@@ -799,43 +985,43 @@ body {
     const genderDot = g => g === 'F' ? '<span style="color:#C05E8A;">●</span>' : '<span style="color:#4A7FA5;">●</span>';
 
     const topRows = top.map((s, i) =>
-      `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--rule);">
-        <span style="color:var(--ink);font-weight:${i===0?'600':'400'}">${s.n}</span>
-        <span style="color:var(--muted);font-size:11px;">${s.c}</span>
+      `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--rule);">
+        <span class="street-tag small">${s.n}</span>
+        <span style="color:var(--muted);font-size:10.5px;font-variant-numeric:tabular-nums;">${s.c}</span>
       </div>`
     ).join('');
 
     const personsRows = persons.map((p, i) =>
-      `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--rule);">
+      `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px solid var(--rule);">
         <span style="display:flex;align-items:center;gap:5px;">
           ${genderDot(p.g)}
-          <span style="color:var(--ink);font-weight:${i===0?'600':'400'}">${p.n}</span>
+          <span style="font-family:var(--sans);color:var(--ink);font-weight:${i===0?'600':'500'};font-size:11.5px;">${p.n}</span>
         </span>
-        <span style="color:var(--muted);font-size:11px;">${p.c} ${p.s ? scopeDot(p.s) : ''}</span>
+        <span style="color:var(--muted);font-size:10.5px;font-variant-numeric:tabular-nums;">${p.c} ${p.s ? scopeDot(p.s) : ''}</span>
       </div>`
     ).join('');
 
     const rareRows = rare.map(s =>
-      `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--rule);">
-        <span style="color:var(--ink)">${s.n}</span>
-        <span style="color:var(--muted);font-size:11px;">${s.j === 1 ? 'unic' : s.j + ' județe'}</span>
+      `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--rule);">
+        <span class="street-tag small">${s.n}</span>
+        <span style="color:var(--muted);font-size:10.5px;">${s.j === 1 ? 'unic' : s.j + ' județe'}</span>
       </div>`
     ).join('');
 
     const fp = document.getElementById('s6-fingerprint');
     fp.innerHTML = `
       <div class="kicker">Amprenta județului · selectat</div>
-      <div style="font-family:var(--serif);font-weight:500;font-size:22px;margin:2px 0 2px;">${feature.properties?.name || code}</div>
-      <div style="font-family:var(--sans);font-size:11px;color:var(--muted);margin-bottom:18px;">${(row.total_streets || 0).toLocaleString('ro-RO')} de străzi · Sfinți ${(row.saint_pct || 0).toFixed(1)}% · Feminin ${(row.female_pct || 0).toFixed(1)}%</div>
+      <div style="font-family:var(--sans);font-weight:600;font-size:18px;margin:2px 0 2px;letter-spacing:-.005em;">${feature.properties?.name || code}</div>
+      <div style="font-family:var(--sans);font-size:10.5px;color:var(--muted);margin-bottom:12px;font-variant-numeric:tabular-nums;">${(row.total_streets || 0).toLocaleString('ro-RO')} de străzi · Sfinți ${(row.saint_pct || 0).toFixed(1)}% · Feminin ${(row.female_pct || 0).toFixed(1)}%</div>
 
-      <div class="kicker" style="margin-bottom:6px;">Cele mai frecvente</div>
-      <div style="font-family:var(--sans);font-size:12px;margin-bottom:16px;">${topRows || '<span style="color:var(--muted)">—</span>'}</div>
+      <div class="kicker" style="margin-bottom:4px;">Cele mai frecvente</div>
+      <div style="margin-bottom:12px;">${topRows || '<span style="color:var(--muted)">—</span>'}</div>
 
-      <div class="kicker" style="margin-bottom:6px;">Persoane omagiate</div>
-      <div style="font-family:var(--sans);font-size:12px;margin-bottom:16px;">${personsRows || '<span style="color:var(--muted)">—</span>'}</div>
+      <div class="kicker" style="margin-bottom:4px;">Persoane omagiate</div>
+      <div style="margin-bottom:12px;">${personsRows || '<span style="color:var(--muted)">—</span>'}</div>
 
-      <div class="kicker" style="margin-bottom:6px;">Cele mai rare (unice național)</div>
-      <div style="font-family:var(--sans);font-size:12px;">${rareRows || '<span style="color:var(--muted)">—</span>'}</div>
+      <div class="kicker" style="margin-bottom:4px;">Cele mai rare (unice național)</div>
+      <div>${rareRows || '<span style="color:var(--muted)">—</span>'}</div>
     `;
   }
 })();
