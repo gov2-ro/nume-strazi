@@ -17,6 +17,7 @@ const DATA_S4 = {{ section4 | tojson }};
 const DATA_S5 = {{ section5 | tojson }};
 const DATA_S6 = {{ section6 | tojson }};
 const DATA_S8 = {{ section8 | tojson }};
+const PORTRAITS = new Set({{ portraits | tojson }});
   </script>
   <style>
 :root {
@@ -1429,7 +1430,12 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       const isLeader = leaders.has(keyFn(r));
       const cnt = `<sup class="cnt-badge">${r.street_count.toLocaleString('ro-RO')}</sup>`;
       if (isPersons) {
+        const qid = r.wikidata_qid;
+        const portrait = (qid && PORTRAITS.has(qid))
+          ? `<span class="portrait"><img src="portraits/${qid}.jpg" alt="" loading="lazy"></span>`
+          : '';
         return `<span class="ctok person${isLeader ? ' leader' : ''}">`
+             + portrait
              + `<span class="chip" style="font-size:${fs}px;">${escapeHtml(labelFn(r))}</span>`
              + cnt + `</span>`;
       }
