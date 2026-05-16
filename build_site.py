@@ -43,6 +43,10 @@ def build(db_path: str = DB_PATH, variant: str = "default") -> None:
         }
         conn.close()
 
+        portraits_dir = DIST / "portraits"
+        data["portraits"] = [p.stem for p in sorted(portraits_dir.glob("*.jpg"))] \
+            if portraits_dir.exists() else []
+
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(str(TEMPLATES)),
         autoescape=jinja2.select_autoescape(["html"]),
