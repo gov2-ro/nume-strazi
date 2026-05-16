@@ -41,6 +41,7 @@ If asked to do something not covered by the above, ask before improvising.
 │   ├── seed_batch2.py          # batch 2 curation
 │   ├── llm_classify.py         # LLM batch classifier (Anthropic/Google/OpenRouter)
 │   ├── llm_compare.py          # compare two llm_classify CSVs for convergence
+│   ├── fetch_portraits.py      # Wikidata P18 → Wikimedia thumbnails → dist/portraits/
 │   ├── osm_ingest.py           # PBF → osm_streets (needs osmium + shapely)
 │   ├── osm_match.py            # streets_dedup ↔ osm_streets join
 │   ├── osm_score.py            # importance_v1 = highway × log(length) + ref bonus
@@ -86,6 +87,9 @@ python3 tools/wikidata_persons.py --replay-csv --force
 
 # Restore wiki scope/sitelinks (run in batches of ~40 to avoid rate limiting; see wiki_scope.py)
 python3 tools/wiki_scope.py --limit 40   # repeat until no output
+
+# Fetch/refresh portrait thumbnails (run once; idempotent; skips already-cached)
+python3 tools/fetch_portraits.py
 
 # Run all named queries from docs/queries.sql
 python3 run_queries.py

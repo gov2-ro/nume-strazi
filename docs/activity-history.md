@@ -1,5 +1,15 @@
 # Activity History
 
+## 2026-05-16 — Wire Wikimedia portrait thumbnails into Top Persoane panel
+
+Added `tools/fetch_portraits.py`: for each person with a Wikidata QID, fetches the P18 (image) claim from Wikidata, downloads a 64px thumbnail from Wikimedia Commons, and caches it to `dist/portraits/<qid>.jpg`. Idempotent, rate-limited, honours 429 Retry-After headers.
+
+Updated `site_queries.py` section3 queries (`top_men`, `top_women`, `_persons_by_judet`) to include `wikidata_qid` in results.
+
+Updated `build_site.py` to scan `dist/portraits/` at build time and bake a `PORTRAITS` JS Set into the template. Updated `renderFlat()` in `templates/index.html.j2` to prepend a 26px portrait `<img>` for persons with a cached thumbnail; persons without an image render name-only (no placeholder circle).
+
+The `.portrait` CSS class (26px circle, `overflow:hidden`, `object-fit:cover`) was already in place — no CSS changes needed.
+
 ## 2026-05-16 — Emoji size bumps + Top 50 expansion
 
 ### What was done
