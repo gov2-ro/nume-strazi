@@ -61,9 +61,13 @@ def section1(conn: sqlite3.Connection) -> dict:
 
 
 def section2(conn: sqlite3.Connection) -> dict:
+    # core_name preserves diacritics + capitalization for display ("Florilor",
+    # "Ștefan cel Mare"). name_normalized is the diacritic-folded lowercase key
+    # used for grouping and matching. Don't display the latter.
     top_names = _rows(conn, """
         SELECT
           sd.name_normalized,
+          MIN(sd.core_name) AS core_name,
           COUNT(*) AS street_count,
           CASE
             WHEN p.core_name_norm IS NOT NULL THEN 'persoană'
@@ -92,6 +96,7 @@ def section2(conn: sqlite3.Connection) -> dict:
             CASE WHEN sd.judet LIKE 'BUCURESTI%' OR sd.judet = 'B' THEN 'B'
                  ELSE sd.judet END AS judet,
             sd.name_normalized,
+            sd.core_name,
             CASE
               WHEN p.core_name_norm IS NOT NULL THEN 'persoană'
               WHEN nt.core_name_norm IS NOT NULL THEN 'natură'
@@ -107,13 +112,15 @@ def section2(conn: sqlite3.Connection) -> dict:
           WHERE sd.is_numeric = 0 AND sd.core_name IS NOT NULL
         ),
         ranked AS (
-          SELECT judet, name_normalized, category,
+          SELECT judet, name_normalized,
+                 MIN(core_name) AS core_name,
+                 MAX(category) AS category,
                  COUNT(*) AS street_count,
                  ROW_NUMBER() OVER (PARTITION BY judet ORDER BY COUNT(*) DESC) AS rn
           FROM judet_named
           GROUP BY judet, name_normalized
         )
-        SELECT judet, name_normalized, category, street_count
+        SELECT judet, name_normalized, core_name, category, street_count
         FROM ranked
         WHERE rn <= 30
         ORDER BY judet, street_count DESC
@@ -122,6 +129,7 @@ def section2(conn: sqlite3.Connection) -> dict:
     for r in by_judet_rows:
         by_judet.setdefault(r["judet"], []).append({
             "name_normalized": r["name_normalized"],
+            "core_name": r["core_name"],
             "street_count": r["street_count"],
             "category": r["category"],
         })
@@ -172,6 +180,63 @@ def section3(conn: sqlite3.Connection) -> dict:
         LIMIT 6
     """)
 
+    # Gender-specific top lists for the split Bărbați / Femei sub-panels.
+    top_men = _rows(conn, """
+        SELECT p.full_name, p.gender, COUNT(*) AS street_count
+        FROM streets_dedup sd
+        JOIN persons p ON p.core_name_norm = sd.core_name_norm
+        WHERE p.gender = 'M'
+        GROUP BY p.core_name_norm
+        ORDER BY street_count DESC
+        LIMIT 15
+    """)
+    top_women = _rows(conn, """
+        SELECT p.full_name, p.gender, COUNT(*) AS street_count
+        FROM streets_dedup sd
+        JOIN persons p ON p.core_name_norm = sd.core_name_norm
+        WHERE p.gender = 'F'
+        GROUP BY p.core_name_norm
+        ORDER BY street_count DESC
+        LIMIT 15
+    """)
+
+    def _persons_by_judet(gender_filter: str) -> dict[str, list[dict]]:
+        rows = _rows(conn, f"""
+            WITH per_judet AS (
+              SELECT
+                CASE WHEN sd.judet LIKE 'BUCURESTI%%' OR sd.judet = 'B' THEN 'B'
+                     ELSE sd.judet END AS judet,
+                p.core_name_norm,
+                MAX(p.full_name) AS full_name,
+                MAX(p.gender)    AS gender,
+                COUNT(*)         AS street_count
+              FROM streets_dedup sd
+              JOIN persons p ON p.core_name_norm = sd.core_name_norm
+              WHERE sd.is_numeric = 0
+                {gender_filter}
+              GROUP BY 1, 2
+            ),
+            ranked AS (
+              SELECT judet, full_name, gender, street_count,
+                     ROW_NUMBER() OVER (PARTITION BY judet ORDER BY street_count DESC) AS rn
+              FROM per_judet
+            )
+            SELECT judet, full_name, gender, street_count
+            FROM ranked WHERE rn <= 10
+            ORDER BY judet, street_count DESC
+        """)
+        out: dict[str, list[dict]] = {}
+        for r in rows:
+            out.setdefault(r["judet"], []).append({
+                "full_name": r["full_name"],
+                "gender": r["gender"],
+                "street_count": r["street_count"],
+            })
+        return out
+
+    men_by_judet   = _persons_by_judet("AND p.gender = 'M'")
+    women_by_judet = _persons_by_judet("AND p.gender = 'F'")
+
     # Top-20 persons per județ — drives the shared județ filter in the clusters variant.
     persons_by_judet_rows = _rows(conn, """
         WITH per_judet AS (
@@ -207,6 +272,10 @@ def section3(conn: sqlite3.Connection) -> dict:
     return {
         "top_persons": top_persons,
         "persons_by_judet": persons_by_judet,
+        "top_men": top_men,
+        "top_women": top_women,
+        "men_by_judet": men_by_judet,
+        "women_by_judet": women_by_judet,
         "total_m": counts.get("m", 0) or 0,
         "total_f": counts.get("f", 0) or 0,
         "profession_dist": profession_dist,

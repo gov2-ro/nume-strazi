@@ -24,6 +24,64 @@ Current coverage: **~57% classified** (105,107 deduped streets across 1,155 UATs
 
 ---
 
+## Pipeline
+
+End-to-end flow from raw registry to query catalog. OSM enrichment is an
+optional parallel branch.
+
+```mermaid
+flowchart LR
+    XLSX["AEP xlsx<br/>polling-section registry"]
+    PBF["Geofabrik PBF<br/>romania-latest.osm.pbf"]
+    BUILD["build_db.py<br/>ETL + normalisation"]
+    SEED["seed_lookups.py<br/>seed_top500.py<br/>seed_batch2.py"]
+    DB[("streets.db<br/>SQLite")]
+    EXP["export_unclassified.py"]
+    LLM["llm_classify.py<br/>Claude / Gemini"]
+    CSV["curation CSVs"]
+    IMP["import_csv.py<br/>upsert by core_name_norm"]
+    OSM["osm_ingest.py<br/>osm_match.py<br/>osm_score.py"]
+    Q["run_queries.py<br/>docs/queries.sql"]
+    OUT["dashboard /<br/>publication"]
+
+    XLSX --> BUILD --> DB
+    SEED --> DB
+    DB --> EXP --> LLM --> CSV --> IMP --> DB
+    PBF -.optional.-> OSM -.-> DB
+    DB --> Q --> OUT
+```
+
+### Normalisation and join keys
+
+`build_db.py` extracts two distinct normalisation keys from each raw street.
+Mixing them is the most common source of wrong results.
+
+```mermaid
+flowchart TB
+    RAW["artera_raw<br/>(raw xlsx row)"]
+    STRIP["strip street_type +<br/>title + rank"]
+    CORE[core_name]
+    NK["core_name_norm<br/>(join key for curation)"]
+    NN["name_normalized<br/>(dedup / group key)"]
+    DV[(streets_dedup view)]
+    P[persons]
+    NT[nature_terms]
+    NC[name_categories]
+    PR[place_refs]
+
+    RAW --> STRIP --> CORE --> NK
+    RAW --> NN --> DV
+    NK -. join .-> P
+    NK -. join .-> NT
+    NK -. join .-> NC
+    NK -. join .-> PR
+```
+
+Never count on `streets` directly — section-rows duplicate streets that span
+multiple polling sections. Always use the `streets_dedup` view.
+
+---
+
 ## Requirements
 
 Python 3.11+. Core dependencies:
@@ -86,6 +144,30 @@ Streets can be enriched with OpenStreetMap geometry, road class, and an
 importance score. This step is optional — the core registry analysis works
 without it.
 
+```mermaid
+flowchart LR
+    PBF["romania-latest.osm.pbf<br/>~300 MB"]
+    ING["osm_ingest.py<br/>osmium + shapely"]
+    OS[("osm_streets<br/>grouped per (uat × name)")]
+    SD[("streets_dedup")]
+    MAT[osm_match.py]
+    LINK[("street_osm_matches<br/>(link table)")]
+    SC[osm_score.py]
+    IMP["importance_v1<br/>highway × log(length) + ref<br/>z-scored per UAT"]
+    SAN["osm_sanity.py<br/>top-10 + coverage"]
+
+    PBF --> ING --> OS
+    OS --> MAT
+    SD --> MAT --> LINK
+    OS --> SC --> IMP
+    LINK --> SAN
+    IMP --> SAN
+```
+
+Motorways and trunks are filtered at ingest — OSM scope is populated areas only.
+Registry ↔ OSM is a link table, not a merge: a registry street can have 0, 1,
+or many OSM matches.
+
 ```bash
 # Requires: pip install osmium shapely
 # Requires: Romania PBF from Geofabrik (~300 MB) at data/reference/romania-latest.osm.pbf
@@ -118,7 +200,28 @@ wget https://download.geofabrik.de/europe/romania-latest.osm.pbf \
 ## Curation workflow
 
 Classification is stored in four lookup tables keyed on `core_name_norm`.
-The workflow is: export unclassified keys → classify → import.
+The workflow is: export unclassified keys → classify → import. The loop is
+idempotent — re-importing the same CSV is a no-op.
+
+```mermaid
+flowchart LR
+    DB[("streets.db")]
+    EXP["export_unclassified.py<br/>--limit 500"]
+    U["unclassified.csv"]
+    LLM["llm_classify.py<br/>Claude / Gemini / OpenRouter"]
+    MAN["manual review"]
+    C["classified.csv"]
+    IMP["import_csv.py<br/>ON CONFLICT DO UPDATE"]
+    COV["coverage % up<br/>(streets_classified_pct)"]
+
+    DB --> EXP --> U
+    U --> LLM --> C
+    U -. optional .-> MAN --> C
+    C --> IMP --> DB
+    DB --> COV
+    COV -. next batch .-> EXP
+```
+
 
 ```bash
 # Export top-500 unclassified keys to a CSV for manual review

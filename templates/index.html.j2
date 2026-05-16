@@ -733,9 +733,24 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
   border: 1px solid var(--rule-strong);
   border-radius: 4px;
 }
-.ctok.person .chip.female {
-  border-color: var(--accent);
-  box-shadow: inset 0 -2px 0 rgba(192,79,53,.18);
+.sub-section + .sub-section { margin-top: 14px; }
+.sub-eyebrow {
+  display: flex; align-items: baseline; gap: 8px;
+  font-family: var(--sans);
+  font-size: 10.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .18em;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.sub-eyebrow .dot {
+  width: 7px; height: 7px; border-radius: 999px;
+  display: inline-block;
+}
+.sub-eyebrow .meta {
+  color: var(--muted-2);
+  font-weight: 600; letter-spacing: .12em;
+  font-family: var(--mono); font-size: 10px;
+  margin-left: auto;
 }
 .ctok .cnt-badge {
   position: absolute;
@@ -896,18 +911,20 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
   <div class="panel-meta-tail" id="s2-footer"></div>
 </div>
 
-{# PANEL: TOP PERSOANE — moved up, flat cloud, s6 next to streets panel #}
+{# PANEL: TOP PERSOANE — moved up, flat cloud, s6 next to streets panel.
+   Split into stacked Bărbați / Femei sub-sections so women have their own top. #}
 <div class="panel s6 cluster-panel" id="top-persoane">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo md">👥</span> Top persoane onorate · {{ section3.top_persons | length }} pers.</span>
+    <span class="panel-label"><span class="emo md">👥</span> Top persoane onorate</span>
     <span class="panel-meta">filtrat de județ ↑</span>
   </div>
-  <div id="s3p-clusters">
-    {# Populated by JS #}
+  <div class="sub-section">
+    <div class="sub-eyebrow"><span class="dot" style="background:var(--plaque);"></span>Bărbați<span class="meta" id="s3p-men-count"></span></div>
+    <div id="s3p-men">{# Populated by JS #}</div>
   </div>
-  <div class="panel-meta-tail">
-    <span style="display:inline-block;width:7px;height:7px;background:var(--accent);border-radius:50%;margin-right:4px;vertical-align:middle;"></span>
-    contur roșu = femeie
+  <div class="sub-section">
+    <div class="sub-eyebrow"><span class="dot" style="background:var(--accent);"></span>Femei<span class="meta" id="s3p-women-count"></span></div>
+    <div id="s3p-women">{# Populated by JS #}</div>
   </div>
 </div>
 
@@ -1402,6 +1419,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       return;
     }
     const keyFn = r => isPersons ? r.full_name : r.name_normalized;
+    const labelFn = r => isPersons ? r.full_name : (r.core_name || r.name_normalized);
     const counts = rows.map(r => r.street_count);
     const lo = Math.min(...counts), hi = Math.max(...counts);
     const leaders = new Set(
@@ -1413,28 +1431,44 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       const isLeader = leaders.has(keyFn(r));
       const cnt = `<sup class="cnt-badge">${r.street_count.toLocaleString('ro-RO')}</sup>`;
       if (isPersons) {
-        const female = r.gender === 'F';
         return `<span class="ctok person${isLeader ? ' leader' : ''}">`
-             + `<span class="chip${female ? ' female' : ''}" style="font-size:${fs}px;">${escapeHtml(r.full_name)}</span>`
+             + `<span class="chip" style="font-size:${fs}px;">${escapeHtml(labelFn(r))}</span>`
              + cnt + `</span>`;
       }
       return `<span class="ctok street${isLeader ? ' leader' : ''}">`
-           + `<span class="plaque" style="font-size:${fs}px;">${escapeHtml(r.name_normalized)}</span>`
+           + `<span class="plaque" style="font-size:${fs}px;">${escapeHtml(labelFn(r))}</span>`
            + cnt + `</span>`;
     }).join('');
     root.innerHTML = `<div class="flat-tokens">${tokens}</div>`;
   }
 
+  function setSubCount(id, n) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = n ? (n + (n === 1 ? ' nume' : ' nume')) : '—';
+  }
+
   function render(code) {
     if (code === 'all') {
-      renderFlat(DATA_S2.top_names.slice(0, LIMIT_STREETS), 's2-clusters', false);
-      renderFlat(DATA_S3.top_persons, 's3p-clusters', true);
+      const streets = DATA_S2.top_names.slice(0, LIMIT_STREETS);
+      const men = DATA_S3.top_men || [];
+      const women = DATA_S3.top_women || [];
+      renderFlat(streets, 's2-clusters', false);
+      renderFlat(men,    's3p-men',    true);
+      renderFlat(women,  's3p-women',  true);
+      setSubCount('s3p-men-count', men.length);
+      setSubCount('s3p-women-count', women.length);
       document.getElementById('s2-footer').textContent =
-        `top ${Math.min(LIMIT_STREETS, DATA_S2.top_names.length)} · la nivel național`;
+        `top ${streets.length} · la nivel național`;
     } else {
       const label = (JUDET_NAMES[code] || code) + ' (' + code + ')';
-      renderFlat(DATA_S2.by_judet[code] || [], 's2-clusters', false);
-      renderFlat((DATA_S3.persons_by_judet || {})[code] || [], 's3p-clusters', true);
+      const streets = DATA_S2.by_judet[code] || [];
+      const men     = (DATA_S3.men_by_judet   || {})[code] || [];
+      const women   = (DATA_S3.women_by_judet || {})[code] || [];
+      renderFlat(streets, 's2-clusters', false);
+      renderFlat(men,    's3p-men',    true);
+      renderFlat(women,  's3p-women',  true);
+      setSubCount('s3p-men-count', men.length);
+      setSubCount('s3p-women-count', women.length);
       document.getElementById('s2-footer').textContent = `județul ${label}`;
     }
   }
