@@ -1752,7 +1752,24 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
     render(select.value, e.target.value);
     updateUrl(select.value, e.target.value);
   });
-  render('all', null);
+  (function initFromUrl() {
+    const p      = new URLSearchParams(window.location.search);
+    const judet  = p.get('judet');
+    const siruta = p.get('siruta');
+    if (judet && (DATA_S2.by_judet || {})[judet] !== undefined) {
+      select.value = judet;
+      syncUatSelect(judet);
+      const validSirute = ((DATA_MUNICIPII.by_judet || {})[judet] || []).map(m => String(m.s));
+      if (siruta && validSirute.includes(siruta)) {
+        uatSelect.value = siruta;
+        render(judet, siruta);
+      } else {
+        render(judet, null);
+      }
+    } else {
+      render('all', null);
+    }
+  })();
 })();
 </script>
 
