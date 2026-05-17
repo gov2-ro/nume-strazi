@@ -481,9 +481,11 @@ def section6(conn: sqlite3.Connection) -> dict:
                COUNT(*) AS total_streets,
                ROUND(100.0 * SUM(is_saint) / COUNT(*), 1) AS saint_pct,
                ROUND(100.0 * SUM(is_numeric) / COUNT(*), 1) AS numeric_pct,
-               ROUND(100.0 * SUM(CASE WHEN p.gender = 'F' THEN 1 ELSE 0 END) / COUNT(*), 2) AS female_pct
+               ROUND(100.0 * SUM(CASE WHEN p.gender = 'F' THEN 1 ELSE 0 END) / COUNT(*), 2) AS female_pct,
+               ROUND(100.0 * SUM(CASE WHEN nt.core_name_norm IS NOT NULL THEN 1 ELSE 0 END) / COUNT(*), 1) AS nature_pct
         FROM streets_dedup sd
         LEFT JOIN persons p ON p.core_name_norm = sd.core_name_norm
+        LEFT JOIN nature_terms nt ON nt.core_name_norm = sd.core_name_norm
         GROUP BY judet
         ORDER BY total_streets DESC
     """)
