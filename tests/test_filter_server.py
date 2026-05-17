@@ -1,6 +1,9 @@
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import pytest
+from http.server import HTTPServer
+import json
+import urllib.error
 
 import filter_server
 
@@ -101,3 +104,57 @@ class TestBuildFilterQuery:
             'street_type': ['Strada'],
         })
         assert " AND " in where
+
+
+import threading
+import urllib.request
+
+DB_PATH = "data/streets.db"
+DB_EXISTS = os.path.exists(DB_PATH)
+
+
+def _start_test_server(db_path: str) -> tuple:
+    """Start server on a random port, return (base_url, server)."""
+    conn = filter_server.get_db(db_path)
+    handler = filter_server.make_handler(conn)
+    server = HTTPServer(('localhost', 0), handler)
+    port = server.server_address[1]
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return f"http://localhost:{port}", server
+
+
+@pytest.mark.skipif(not DB_EXISTS, reason="streets.db not present")
+class TestServerIntegration:
+    @pytest.fixture(scope="class")
+    def base_url(self):
+        url, server = _start_test_server(DB_PATH)
+        yield url
+        server.shutdown()
+
+    def test_meta_returns_200(self, base_url):
+        with urllib.request.urlopen(f"{base_url}/api/meta") as r:
+            assert r.status == 200
+
+    def test_meta_has_required_keys(self, base_url):
+        with urllib.request.urlopen(f"{base_url}/api/meta") as r:
+            data = json.loads(r.read())
+        required = {
+            'judete', 'street_types', 'classifications',
+            'professions', 'nationalities', 'genders', 'eras', 'wiki_scopes',
+            'categories', 'subcategories', 'nature_types',
+            'place_types', 'place_countries',
+        }
+        assert required <= set(data.keys())
+
+    def test_meta_judete_non_empty(self, base_url):
+        with urllib.request.urlopen(f"{base_url}/api/meta") as r:
+            data = json.loads(r.read())
+        assert len(data['judete']) > 0
+
+    def test_unknown_path_returns_404(self, base_url):
+        try:
+            urllib.request.urlopen(f"{base_url}/nonexistent")
+            assert False, "Should have raised"
+        except urllib.error.HTTPError as e:
+            assert e.code == 404

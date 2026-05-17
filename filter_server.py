@@ -135,3 +135,111 @@ def build_filter_query(params: dict) -> tuple[str, list]:
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
     return where, values
+
+
+def get_db(db_path: str) -> sqlite3.Connection:
+    conn = sqlite3.connect(db_path, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def query_meta(conn: sqlite3.Connection) -> dict:
+    def distinct(sql):
+        return [r[0] for r in conn.execute(sql)]
+
+    return {
+        'judete': distinct(
+            "SELECT DISTINCT judet FROM streets WHERE judet IS NOT NULL ORDER BY judet"),
+        'street_types': distinct(
+            "SELECT DISTINCT street_type FROM streets WHERE street_type IS NOT NULL ORDER BY street_type"),
+        'classifications': [
+            'person', 'nature', 'place', 'category', 'saint', 'date', 'numeric'
+        ],
+        'professions': distinct(
+            "SELECT DISTINCT profession FROM persons WHERE profession IS NOT NULL ORDER BY profession"),
+        'nationalities': distinct(
+            "SELECT DISTINCT nationality FROM persons WHERE nationality IS NOT NULL ORDER BY nationality"),
+        'genders': distinct(
+            "SELECT DISTINCT gender FROM persons WHERE gender IS NOT NULL ORDER BY gender"),
+        'eras': distinct(
+            "SELECT DISTINCT era FROM persons WHERE era IS NOT NULL ORDER BY era"),
+        'wiki_scopes': distinct(
+            "SELECT DISTINCT wiki_scope FROM persons WHERE wiki_scope IS NOT NULL ORDER BY wiki_scope"),
+        'categories': distinct(
+            "SELECT DISTINCT category FROM name_categories WHERE category IS NOT NULL ORDER BY category"),
+        'subcategories': distinct(
+            "SELECT DISTINCT subcategory FROM name_categories WHERE subcategory IS NOT NULL ORDER BY subcategory"),
+        'nature_types': distinct(
+            "SELECT DISTINCT nature_type FROM nature_terms WHERE nature_type IS NOT NULL ORDER BY nature_type"),
+        'place_types': distinct(
+            "SELECT DISTINCT place_type FROM place_refs WHERE place_type IS NOT NULL ORDER BY place_type"),
+        'place_countries': distinct(
+            "SELECT DISTINCT country FROM place_refs WHERE country IS NOT NULL ORDER BY country"),
+    }
+
+
+def make_handler(conn: sqlite3.Connection):
+    class FilterHandler(BaseHTTPRequestHandler):
+        def log_message(self, fmt, *args):
+            pass  # silence per-request access log
+
+        def send_json(self, data, status: int = 200) -> None:
+            body = json.dumps(data, ensure_ascii=False).encode()
+            self.send_response(status)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_GET(self) -> None:
+            parsed = urlparse(self.path)
+            path = parsed.path.rstrip('/')
+
+            if path in ('', '/filter'):
+                if not UI_PATH.exists():
+                    self.send_json({'error': f'{UI_PATH} not found — run build_site.py first'}, 503)
+                    return
+                html = UI_PATH.read_bytes()
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/html; charset=utf-8')
+                self.send_header('Content-Length', str(len(html)))
+                self.end_headers()
+                self.wfile.write(html)
+
+            elif path == '/api/meta':
+                try:
+                    self.send_json(query_meta(conn))
+                except Exception as exc:
+                    self.send_json({'error': str(exc)}, 500)
+
+            elif path == '/api/filter':
+                try:
+                    params = parse_qs(parsed.query, keep_blank_values=False)
+                    self.send_json({'total': 0, 'limit': 200, 'offset': 0, 'rows': []})
+                except Exception as exc:
+                    self.send_json({'error': str(exc)}, 500)
+
+            else:
+                self.send_json({'error': 'not found'}, 404)
+
+    return FilterHandler
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description='Filter API server for streets.db')
+    parser.add_argument('--port', type=int, default=8765)
+    parser.add_argument('--db', default=DB_PATH)
+    args = parser.parse_args()
+
+    conn = get_db(args.db)
+    handler = make_handler(conn)
+    server = HTTPServer(('localhost', args.port), handler)
+    print(f'Filter server → http://localhost:{args.port}/')
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print('\nStopped.')
+
+
+if __name__ == '__main__':
+    main()
