@@ -1,5 +1,72 @@
 # Activity History
 
+## 2026-05-17 — Three-level landing-page filter (națonal → județ → municipiu)
+
+### What was built
+
+**Three-level filter in the navbar** — the sticky nav now has two `<select>` elements:
+- **Județ selector** (always visible) — selecting a județ rewrites all landing-page panels for that județ's data.
+- **Municipiu selector** (hidden until a județ is chosen) — once a județ is selected, a second `<select>` appears with all municipii for that județ; choosing one filters everything to that single city (identified by SIRUTA code).
+- Resetting the județ selector back to "toate județele" clears both selects and restores national data.
+
+**All panels now respond to the filter** — previously only the cluster cloud and top-persons list responded. Now wired:
+- Theme donut (`conic-gradient` rebuilt from per-județ/per-siruta counts)
+- Gender grid (100 squares recoloured by M/F ratio)
+- Wikipedia notoriety rank list (top-5 persons by `wiki_ro_views`, per-județ)
+- Cluster cloud + persons panel (already worked; now also responds at municipiu level)
+
+**`site_queries.py` additions:**
+- `section3()` extended with `gender_by_judet` — per-județ M/F street counts via JOIN with `persons`.
+- `section4()` extended with `top_pageviews_by_judet` — top-5 persons per județ by `wiki_ro_views` using `ROW_NUMBER() OVER (PARTITION BY judet)`.
+- `section5()` extended with `theme_by_judet` — per-județ CASE WHEN counts for all 6 macro categories.
+- New `municipii_index()` — returns compact per-SIRUTA data for 102 municipii: top-25 streets (ranked by national frequency, not per-UAT count), top-10 M/F persons, gender ratio, theme breakdown. Compact dict keys (`s`, `n`, `sl`, `c`, `cat`, `qid`, `nn`) to keep the JSON payload to ~380 KB extra (955 KB total page).
+
+**Streets within a municipiu ranked by national frequency** — `streets_dedup` has one row per `(siruta, name_normalized)`, so `COUNT(*)` is always 1 and can't be used as a sort key. Instead, a national CTE (`COUNT(DISTINCT siruta) AS nat_count`) provides the ranking, so universally common street names (Florilor 532, Trandafirilor 496, Morii 494) appear first rather than alphabetically.
+
+**Removed per-județ comparison panels from landing page** — HARTA, AMPRENTE JUDEȚENE, SEMNĂTURI REGIONALE, CURIOZITĂȚI UNICE panels removed from `index.html.j2`; their data lives on `/judete/` (built in the previous session). D3 script tag and DATA_S6/DATA_S8 globals also removed.
+
+**Nav CSS fix** — the județ `<select>` was white-on-white (border and text rendered in white against the white navbar). Fixed: `border: 1px solid var(--rule)`, `color: var(--ink)`, muted chevron via `var(--muted)`.
+
+### Non-obvious decisions
+- `uatSelect.style.display = 'inline-block'` (not `''`) — setting to empty string reverts to `display: none` from the CSS rule `#s2-uat-select { display: none }`, which would immediately re-hide it.
+- Gender-grid squares created once on first `updateGenderGrid` call, then recoloured on subsequent calls — avoids DOM thrash on every filter change.
+- Stats ticker (105.343 adrese, 203 persoane onorate) intentionally stays national — it is a scope descriptor, not a filtered count.
+
+### Backlog item added
+P2: Scope UAT detail page generation to județe capitals + county seats only (currently renders all 676 UATs with ≥50 streets; scoping would cut build time and storage substantially).
+
+### Files touched
+- `templates/index.html.j2` — filter UI, syncUatSelect, updateTheme, updateGenderGrid, updatePageviews, render(code, siruta)
+- `site_queries.py` — gender_by_judet, top_pageviews_by_judet, theme_by_judet, municipii_index()
+- `build_site.py` — passes `municipii` to template context
+- `docs/BACKLOG.md` — new P2 item
+- `tests/test_build.py` — DATA_S6 assertion inverted (nav select uses DATA_S2, not DATA_S6)
+
+### Verification
+All 14 tests pass. Manually verified Cluj-Napoca municipiu filter: streets show Florilor 532 / Trandafirilor 496 / Morii 494 / Primăverii 487; persons show Zaharia Stancu / Vlad Țepeș / Victor Babeș; theme donut and gender grid update correctly.
+
+## 2026-05-17 — Județe overview page + navbar county selector
+
+### What was built
+
+Added a `/judete/` overview page to replace the removed per-județ comparison panels from the landing page. The page has:
+- Choropleth map of Romania (D3 + TopoJSON) shaded by nature_pct (share of nature-named streets)
+- Summary stats table with columns: județ, streets, persons, nature %, numeric %, top street, rare street
+- "Amprente" section (most distinctive per-județ names)
+- Top 5 cities per județ by street count
+- `/judete/lista/` — plain alphabetical table of all 42 județe
+
+**Nav selector** — a `<select>` in the sticky navbar of the landing page (`index.html.j2`) that lets the user jump to a county-specific view. Implemented as a client-side filter (no page reload) that rewrites the cluster cloud and top-persons panels using `DATA_S2.by_judet`.
+
+### Files touched
+- `templates/judete-index.html.j2` (new) — overview page with D3 map + table
+- `templates/judete-lista.html.j2` (new) — plain listing
+- `templates/index.html.j2` — added nav `<select>` + client-side render(code) function
+- `site_queries.py` — extended `section6()` with `nature_pct`, `numeric_pct`, `top_street`, `rare_street`; added `section8()` top-cities-per-județ
+- `build_site.py` — wires section6/section8 for detail build; renders both judete pages
+
+---
+
 ## 2026-05-17 — Fix --detail-only hang + streets_dedup correctness
 
 ### Root cause
