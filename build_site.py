@@ -181,10 +181,17 @@ def build_detail_pages(db_path: str = DB_PATH) -> None:
     print("    → dist/teme/index.html")
 
     judete_list = sorted({u["judet"] for u in uats})
+    section6_data = site_queries.section6(conn)
+    section8_data = site_queries.section8(conn)
     _render(env, "judete-index.html.j2",
             DIST / "judete" / "index.html",
-            judete=judete_list, uats=uats)
+            section6=section6_data, section8=section8_data,
+            judete=judete_list, uats=uats, portraits=portraits)
     print("    → dist/judete/index.html")
+    _render(env, "judete-lista.html.j2",
+            DIST / "judete" / "lista" / "index.html",
+            judete=judete_list, uats=uats)
+    print("    → dist/judete/lista/index.html")
 
     # ── Explorer JSON + page ─────────────────────────────────────────────────
     indexes = site_queries.explorer_indexes(conn)
