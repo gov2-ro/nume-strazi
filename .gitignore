@@ -25,6 +25,9 @@ __pycache__/
 
 # Static site build output
 dist/
+# Filter UI is source, not a build artifact — track it
+!dist/filter/
+!dist/filter/index.html
 
 # Claude Code superpowers
 .superpowers/
