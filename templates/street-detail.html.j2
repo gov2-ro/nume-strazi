@@ -1,0 +1,85 @@
+{# templates/street-detail.html.j2 — detail page for a single street name #}
+{% extends "_detail-shell.html.j2" %}
+
+{% block title %}{{ display_name }} — Cum ne numim străzile{% endblock %}
+
+{% block body %}
+<div class="detail-page">
+
+  <div class="breadcrumb">
+    <a href="/">Acasă</a>
+    <span class="sep">›</span>
+    <span>Stradă</span>
+    <span class="sep">›</span>
+    <span>{{ display_name }}</span>
+  </div>
+
+  <div class="detail-hero">
+    <div class="kicker">
+      {% if theme == 'persoana' %}<span class="emo">👤</span> Persoană onorat{% if honoree and honoree.gender == 'F' %}ă{% else %}ă{% endif %}
+      {% elif theme == 'natura' %}<span class="emo">🌿</span> Natură
+      {% elif theme == 'religios' %}<span class="emo">⛪</span> Religios
+      {% elif theme == 'data' %}<span class="emo">📅</span> Dată / sărbătoare
+      {% elif theme == 'ideologic' %}<span class="emo">🚩</span> Ideologic
+      {% else %}<span class="emo">📍</span> Stradă
+      {% endif %}
+    </div>
+    <h1 class="plaque">{{ display_name }}</h1>
+    <div class="meta-row">
+      <span><strong>{{ uat_count }}</strong> localități</span>
+      <span><strong>{{ judet_count }}</strong> județe</span>
+      {% if honoree %}
+        <span>·
+          <a href="/persoana/{{ honoree.slug }}/">{{ honoree.full_name }}</a>
+          {% if honoree.profession %} · {{ honoree.profession }}{% endif %}
+          {% if honoree.era %} · {{ honoree.era }}{% endif %}
+        </span>
+      {% endif %}
+      {% if nature_type %}<span class="tag nature">{{ nature_type }}</span>{% endif %}
+      {% if ideo_subcat %}<span class="tag ideo">{{ ideo_subcat }}</span>{% endif %}
+    </div>
+  </div>
+
+  {% if honoree %}
+  <div class="detail-section">
+    <div class="detail-section-header">Persoana onorat{% if honoree.gender == 'F' %}ă{% else %}ă{% endif %}</div>
+    <div style="display:flex; align-items:center; gap:18px; flex-wrap:wrap;">
+      {% set qid = honoree.qid %}
+      {% if qid %}
+      <div class="portrait xl" id="hero-portrait">
+        <img src="/portraits/{{ qid }}.jpg" alt="{{ honoree.full_name }}"
+             onerror="this.parentElement.textContent='{{ honoree.full_name[:2] | upper }}'">
+      </div>
+      {% endif %}
+      <div>
+        <div style="font-size:20px; font-weight:700; margin-bottom:6px;">{{ honoree.full_name }}</div>
+        <div style="font-size:12px; color:var(--muted); line-height:1.7;">
+          {% if honoree.profession %}Profesie: <strong>{{ honoree.profession }}</strong><br>{% endif %}
+          {% if honoree.era %}Epocă: <strong>{{ honoree.era }}</strong><br>{% endif %}
+          {% if honoree.nationality and honoree.nationality != 'RO' %}Naționalitate: <strong>{{ honoree.nationality }}</strong><br>{% endif %}
+          {% if honoree.wiki_ro_url %}
+            <a href="{{ honoree.wiki_ro_url }}" target="_blank" rel="noopener">↗ Wikipedia (ro)</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="detail-section">
+    <div class="detail-section-header">Prezență geografică — {{ uat_count }} localități în {{ judet_count }} județe</div>
+
+    {% for bucket in per_judet %}
+    <div class="judet-section">
+      <div class="judet-label">{{ bucket.judet }} — {{ bucket.total }} stradă{% if bucket.total != 1 %}zi{% endif %}</div>
+      <div class="uat-cluster">
+        {% for u in bucket.uats %}
+          <a class="uat-pill" href="/oras/{{ bucket.judet | lower }}/{{ u.uat_slug }}/">{{ u.uat | title }}</a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+{% endblock %}

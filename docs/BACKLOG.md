@@ -79,6 +79,8 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [x] UI make emojis larger/icons, slightly larger than the text
 
+- [ ] OG image description
+
 - [ ] Harta · statistici pe județ – select random județ on load
 
 - [ ] add orașe / towns - top by population. SIRUTA?
@@ -100,6 +102,8 @@ Items detected during sessions. Each entry has enough context to act on cold.
 - [ ] **Validate dark-statbar direction with stakeholders.** The bold-restyle pass moved the stats band from a light cream to dark ink (Bloomberg-feel). User brief said "white background" — interpreted as the main panels, with the statbar as a structural masthead. If user pushes back, flip `.statbar` to `background: var(--bg)` + `color: var(--ink)` and the rest of the design holds (panels, leader highlights, type scale all read fine on white-on-white as well).
 
 ## Later
+
+- [ ] translate, localisation - translate UI and street names, where possible
 
 - [ ] Create analysis for each județ. also bigger cities, capitale de județ.. Compare regions. Have a look at the data and write the text.
 

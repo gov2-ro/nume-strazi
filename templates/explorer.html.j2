@@ -1,0 +1,167 @@
+{# templates/explorer.html.j2 — /cauta/ autocomplete explorer #}
+{% extends "_detail-shell.html.j2" %}
+
+{% block title %}Caută — Cum ne numim străzile{% endblock %}
+
+{% block head_extra %}
+<style>
+.search-wrap {
+  margin: 24px 0 32px;
+  position: relative;
+}
+.search-input {
+  width: 100%;
+  font-family: var(--sans);
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--bg);
+  border: 2px solid var(--ink);
+  border-radius: 3px;
+  padding: 14px 18px;
+  outline: none;
+  transition: box-shadow .12s ease;
+}
+.search-input:focus { box-shadow: 0 0 0 3px var(--warn-2); }
+.search-input::placeholder { color: var(--muted-2); font-weight: 400; }
+
+.results-section { margin-bottom: 28px; }
+.results-label {
+  font-size: 10px; letter-spacing: .22em; text-transform: uppercase;
+  font-weight: 700; color: var(--muted); border-bottom: 1px solid var(--rule);
+  padding-bottom: 8px; margin-bottom: 10px;
+}
+.result-row {
+  display: grid; grid-template-columns: minmax(0,1fr) 70px;
+  gap: 10px; align-items: center;
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--hairline);
+  cursor: pointer;
+  text-decoration: none; color: var(--ink);
+  transition: background .1s ease;
+}
+.result-row:hover { background: var(--surface-1); text-decoration: none; }
+.result-row .name { font-weight: 600; font-size: 13px; }
+.result-row .sub  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.result-row .cnt  { font-size: 12px; font-weight: 700; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.no-results { font-size: 13px; color: var(--muted); padding: 20px 0; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="detail-page">
+
+  <div class="breadcrumb">
+    <a href="/">Acasă</a>
+    <span class="sep">›</span>
+    <span>Caută</span>
+  </div>
+
+  <div class="detail-hero">
+    <div class="kicker"><span class="emo">🔍</span> Explorer</div>
+    <h1 style="font-size:28px; font-weight:700; font-family:var(--street);">Caută un nume de stradă sau localitate</h1>
+  </div>
+
+  <div class="search-wrap">
+    <input class="search-input" id="q" type="search" placeholder="ex. Eminescu, Timișoara, Florilor…" autocomplete="off" spellcheck="false">
+  </div>
+
+  <div id="streets-section" class="results-section" style="display:none;">
+    <div class="results-label">Străzi</div>
+    <div id="streets-results"></div>
+  </div>
+
+  <div id="uats-section" class="results-section" style="display:none;">
+    <div class="results-label">Localități</div>
+    <div id="uats-results"></div>
+  </div>
+
+  <div id="empty-state" class="no-results" style="display:none;">Nicio potrivire găsită.</div>
+
+</div>
+
+<script>
+let STREETS = null, UATS = null, loaded = false;
+
+async function loadIndexes() {
+  if (loaded) return;
+  loaded = true;
+  const [s, u] = await Promise.all([
+    fetch('/cauta/streets.json').then(r => r.json()),
+    fetch('/cauta/uats.json').then(r => r.json()),
+  ]);
+  STREETS = s;
+  UATS = u;
+  doSearch(document.getElementById('q').value);
+}
+
+function norm(s) {
+  return s.toLowerCase()
+    .replace(/[ăâ]/g, 'a').replace(/[îí]/g, 'i')
+    .replace(/[șş]/g, 's').replace(/[țţ]/g, 't')
+    .replace(/[éèê]/g, 'e').replace(/[óòô]/g, 'o')
+    .replace(/[úùû]/g, 'u')
+    .replace(/[^a-z0-9 ]/g, '');
+}
+
+function doSearch(q) {
+  q = (q || '').trim();
+  if (!q || !STREETS) {
+    document.getElementById('streets-section').style.display = 'none';
+    document.getElementById('uats-section').style.display = 'none';
+    document.getElementById('empty-state').style.display = 'none';
+    return;
+  }
+  const nq = norm(q);
+  const matchStreets = STREETS.filter(s => norm(s.n || '').includes(nq)).slice(0, 20);
+  const matchUats    = UATS.filter(u    => norm(u.n || '').includes(nq) || (u.j || '').toLowerCase().includes(q.toLowerCase())).slice(0, 20);
+
+  renderStreets(matchStreets);
+  renderUats(matchUats);
+
+  const any = matchStreets.length > 0 || matchUats.length > 0;
+  document.getElementById('empty-state').style.display = any ? 'none' : 'block';
+}
+
+function renderStreets(items) {
+  const sec = document.getElementById('streets-section');
+  const div = document.getElementById('streets-results');
+  if (!items.length) { sec.style.display = 'none'; return; }
+  sec.style.display = 'block';
+  div.innerHTML = items.map(s => `
+    <a class="result-row" href="/strada/${s.s}/">
+      <div>
+        <div class="name">${esc(s.n)}</div>
+        <div class="sub">${s.u} localități</div>
+      </div>
+      <div class="cnt">${s.t}</div>
+    </a>`).join('');
+}
+
+function renderUats(items) {
+  const sec = document.getElementById('uats-section');
+  const div = document.getElementById('uats-results');
+  if (!items.length) { sec.style.display = 'none'; return; }
+  sec.style.display = 'block';
+  div.innerHTML = items.map(u => `
+    <a class="result-row" href="/oras/${(u.j||'').toLowerCase()}/${u.s}/">
+      <div>
+        <div class="name">${esc(u.n)}</div>
+        <div class="sub">${u.j}</div>
+      </div>
+      <div class="cnt">${u.t}</div>
+    </a>`).join('');
+}
+
+function esc(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+const inp = document.getElementById('q');
+inp.addEventListener('focus', loadIndexes, {once: true});
+inp.addEventListener('input', e => {
+  if (!loaded) { loadIndexes(); return; }
+  doSearch(e.target.value);
+});
+</script>
+{% endblock %}

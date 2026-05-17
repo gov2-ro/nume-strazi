@@ -1,0 +1,43 @@
+{# templates/persons-index.html.j2 — alphabetical list of all persons with detail pages #}
+{% extends "_detail-shell.html.j2" %}
+
+{% block title %}Persoane onorate — Cum ne numim străzile{% endblock %}
+
+{% block body %}
+<div class="detail-page">
+
+  <div class="breadcrumb">
+    <a href="/">Acasă</a>
+    <span class="sep">›</span>
+    <span>Persoane</span>
+  </div>
+
+  <div class="detail-hero">
+    <div class="kicker"><span class="emo">👤</span> Persoane</div>
+    <h1 style="font-size:28px; font-weight:700; font-family:var(--street);">{{ persons | length }} personalități onorate pe străzi</h1>
+    <div class="meta-row">Ordonate după numărul de localități</div>
+  </div>
+
+  <div class="rank-list">
+    {% for p in persons %}
+    <div class="rank-row" style="grid-template-columns: 30px 32px minmax(0,1fr) 70px 60px;">
+      <div class="rank-num">{{ loop.index }}</div>
+      <div class="portrait">
+        {% if p.qid %}
+        <img src="/portraits/{{ p.qid }}.jpg" alt="{{ p.full_name }}"
+             onerror="this.parentElement.textContent='{{ p.full_name[:2] | upper }}'">
+        {% else %}
+        {{ p.full_name[:2] | upper }}
+        {% endif %}
+      </div>
+      <div>
+        <a href="/persoana/{{ p.slug }}/" style="font-weight:600; color:var(--ink);">{{ p.full_name }}</a>
+      </div>
+      <div style="font-size:11px; color:var(--muted);">{{ p.slug }}</div>
+      <div class="rank-count">{{ p.street_count }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+{% endblock %}

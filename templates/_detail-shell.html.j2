@@ -1,0 +1,282 @@
+{# templates/_detail-shell.html.j2 — shared chrome for all detail + index pages #}
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Cum ne numim străzile{% endblock %}</title>
+  {% block meta %}{% endblock %}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&family=Barlow+Semi+Condensed:wght@600;700&display=swap" rel="stylesheet">
+  {% block head_scripts %}{% endblock %}
+  <style>
+:root {
+  --bg: #FFFFFF;
+  --surface-1: #F7F9FC;
+  --surface-2: #ECF1F8;
+  --surface-blue: #DEE8F4;
+  --warn-1: #FFF7CC;
+  --warn-2: #FBE486;
+  --ink: #0B1118;
+  --ink-2: #2A313B;
+  --muted: #5A6573;
+  --muted-2: #8B95A2;
+  --rule: #E2E6EC;
+  --rule-strong: #BFC7D2;
+  --hairline: #EEF1F5;
+  --plaque: #0E4D92;
+  --plaque-deep: #08366D;
+  --accent: #C04F35;
+  --accent-dark: #8E3320;
+  --gold: #E8AE00;
+  --gold-soft: #F7D777;
+  --olive: #5F7A4E;
+  --teal: #2F6B6B;
+  --sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --mono: 'IBM Plex Mono', monospace;
+  --street: 'Barlow Semi Condensed', 'IBM Plex Sans', sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+a { color: var(--plaque); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Nav */
+.site-nav {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--bg);
+  border-bottom: 1px solid var(--ink);
+  padding: 10px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11.5px;
+  letter-spacing: .06em;
+}
+.site-nav .brand {
+  font-weight: 700; color: var(--ink);
+  letter-spacing: .14em; text-transform: uppercase;
+  text-decoration: none; font-size: 12.5px;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.site-nav .brand::before { content: '◆'; color: var(--gold); font-size: 10px; line-height: 1; }
+.site-nav nav { display: flex; gap: 22px; }
+.site-nav nav a {
+  color: var(--muted); text-decoration: none; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .1em; font-size: 10.5px;
+  padding-bottom: 2px; border-bottom: 2px solid transparent;
+  transition: color .12s ease, border-color .12s ease;
+}
+.site-nav nav a:hover { color: var(--ink); border-bottom-color: var(--gold); }
+.site-nav nav a.active { color: var(--ink); border-bottom-color: var(--gold); }
+
+/* Page layout */
+.detail-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px 60px;
+}
+
+/* Breadcrumb */
+.breadcrumb {
+  font-size: 11px; color: var(--muted); letter-spacing: .04em;
+  padding: 14px 0 0;
+  display: flex; align-items: center; gap: 6px;
+}
+.breadcrumb a { color: var(--muted); }
+.breadcrumb a:hover { color: var(--ink); text-decoration: none; }
+.breadcrumb .sep { color: var(--rule-strong); }
+
+/* Hero block */
+.detail-hero {
+  padding: 18px 0 20px;
+  border-bottom: 3px solid var(--gold);
+  margin-bottom: 28px;
+}
+.detail-hero .kicker {
+  font-size: 10px; letter-spacing: .22em; text-transform: uppercase;
+  font-weight: 700; color: var(--muted); margin-bottom: 8px;
+  display: flex; align-items: center; gap: 8px;
+}
+.detail-hero h1 {
+  font-family: var(--street);
+  font-weight: 700; font-size: 36px; letter-spacing: .03em;
+  color: var(--ink); line-height: 1.1;
+}
+.detail-hero h1.plaque {
+  display: inline-block;
+  background: var(--plaque); color: #fff;
+  padding: 4px 18px 6px;
+  border-radius: 3px;
+  text-shadow: 0 -0.5px 0 rgba(0,0,0,.3), 0 1px 2px rgba(0,0,0,.5);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 3px 5px rgba(0,0,0,.28);
+}
+.detail-hero .meta-row {
+  margin-top: 10px;
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  font-size: 12px; color: var(--muted);
+}
+.detail-hero .meta-row strong { color: var(--ink); font-weight: 700; }
+
+/* Section dividers */
+.detail-section {
+  margin: 28px 0 0;
+}
+.detail-section-header {
+  font-size: 10.5px; letter-spacing: .2em; text-transform: uppercase;
+  font-weight: 700; color: var(--muted);
+  border-bottom: 1px solid var(--rule); padding-bottom: 8px;
+  margin-bottom: 14px;
+}
+
+/* Portrait */
+.portrait {
+  width: 26px; height: 26px; border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--rule-strong);
+  flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--muted-2); font-size: 10px; font-weight: 700; letter-spacing: .02em;
+  overflow: hidden; vertical-align: middle;
+}
+.portrait.lg { width: 52px; height: 52px; font-size: 14px; }
+.portrait.xl { width: 80px; height: 80px; font-size: 20px; }
+.portrait img { width: 100%; height: 100%; object-fit: cover; }
+
+/* Street plaque tag */
+.street-tag {
+  font-family: var(--street);
+  font-weight: 700; font-size: 13.5px; letter-spacing: .045em;
+  display: inline-block;
+  padding: 2.5px 10px;
+  background: var(--plaque); color: #fff;
+  border-radius: 2px;
+  text-shadow: 0 -0.5px 0 rgba(0,0,0,.3), 0 1px 1.5px rgba(0,0,0,.5);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 2px 3px rgba(0,0,0,.26);
+  vertical-align: middle;
+}
+.street-tag.sm { font-size: 12px; padding: 1.5px 8px; }
+.street-tag.lg { font-size: 16px; padding: 4px 14px; }
+
+/* Rank list */
+.rank-list { display: flex; flex-direction: column; }
+.rank-row {
+  display: grid; align-items: center; gap: 10px;
+  padding: 5px 4px;
+  border-bottom: 1px solid var(--hairline);
+  transition: background .1s ease;
+}
+.rank-row:hover { background: var(--surface-1); }
+.rank-row:last-child { border-bottom: none; }
+.rank-list > .rank-row:first-child {
+  background: linear-gradient(to right, var(--warn-1), rgba(255,247,204,.35) 60%, transparent);
+  box-shadow: inset 3px 0 0 var(--gold);
+  padding-left: 7px;
+}
+.rank-num {
+  font-size: 11px; font-weight: 600; color: var(--muted);
+  text-align: right; font-variant-numeric: tabular-nums;
+}
+.rank-list > .rank-row:first-child .rank-num { color: var(--ink); font-weight: 700; }
+.rank-count {
+  font-size: 12.5px; font-weight: 700; color: var(--ink);
+  text-align: right; font-variant-numeric: tabular-nums;
+}
+
+/* Tag pills */
+.tag {
+  font-size: 10px; color: var(--ink-2); background: var(--surface-2);
+  padding: 2px 7px; border-radius: 2px; letter-spacing: .04em;
+  font-weight: 600; text-transform: lowercase;
+}
+.tag.person { background: #F8DAD0; color: var(--accent-dark); }
+.tag.ideo   { background: #FFF1C6; color: #7A5400; }
+.tag.nature { background: #E1ECDA; color: #3D5A2A; }
+
+/* Grid helpers */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+
+/* Delta badge */
+.delta {
+  font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.delta.pos { color: var(--accent); }
+.delta.neg { color: var(--olive); }
+
+/* Emoji */
+.emo { font-family: 'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif;
+       font-style: normal; font-weight: 400; line-height: 1; }
+
+/* Footer */
+.site-footer {
+  border-top: 1px solid var(--rule); padding: 20px 24px;
+  font-size: 11px; color: var(--muted);
+  display: flex; justify-content: space-between; align-items: center;
+  max-width: 1200px; margin: 0 auto;
+}
+.site-footer a { color: var(--muted); }
+
+/* UAT pill cluster */
+.uat-cluster { display: flex; flex-wrap: wrap; gap: 6px; }
+.uat-pill {
+  font-size: 11.5px; font-weight: 600;
+  padding: 3px 10px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  background: var(--surface-1);
+  color: var(--ink);
+  text-decoration: none;
+  transition: background .1s ease, border-color .1s ease;
+}
+.uat-pill:hover { background: var(--surface-blue); border-color: var(--plaque); text-decoration: none; }
+
+/* județ accordion */
+.judet-section { margin-bottom: 10px; }
+.judet-label {
+  font-size: 10px; letter-spacing: .18em; text-transform: uppercase;
+  font-weight: 700; color: var(--muted);
+  margin-bottom: 6px; padding-top: 10px;
+  border-top: 1px solid var(--rule);
+}
+.judet-section:first-child .judet-label { border-top: none; padding-top: 0; }
+
+@media (max-width: 700px) {
+  .grid-2 { grid-template-columns: 1fr; }
+  .grid-3 { grid-template-columns: 1fr 1fr; }
+  .detail-hero h1 { font-size: 26px; }
+  .site-nav nav { gap: 12px; }
+}
+  </style>
+  {% block head_extra %}{% endblock %}
+</head>
+<body>
+
+<header class="site-nav">
+  <a href="/" class="brand">Cum ne numim străzile</a>
+  <nav>
+    <a href="/">Acasă</a>
+    <a href="/cauta/">Caută</a>
+    <a href="/persoane/">Persoane</a>
+    <a href="/teme/">Teme</a>
+    <a href="/judete/">Județe</a>
+  </nav>
+</header>
+
+{% block body %}{% endblock %}
+
+<footer class="site-footer">
+  <span>Date: Autoritatea Electorală Permanentă · <a href="/metodologie.html">Metodologie</a></span>
+  <span>un proiect <a href="/">Cum ne numim străzile</a></span>
+</footer>
+
+</body>
+</html>

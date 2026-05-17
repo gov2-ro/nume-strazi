@@ -1,0 +1,63 @@
+{# templates/theme-detail.html.j2 — detail page for a theme category #}
+{% extends "_detail-shell.html.j2" %}
+
+{% block title %}{{ theme_meta.label }} — Teme — Cum ne numim străzile{% endblock %}
+
+{% block body %}
+<div class="detail-page">
+
+  <div class="breadcrumb">
+    <a href="/">Acasă</a>
+    <span class="sep">›</span>
+    <a href="/teme/">Teme</a>
+    <span class="sep">›</span>
+    <span>{{ theme_meta.label }}</span>
+  </div>
+
+  <div class="detail-hero">
+    <div class="kicker"><span class="emo">{{ theme_meta.emoji }}</span> {{ theme_meta.type | title }}</div>
+    <h1>{{ theme_meta.label }}</h1>
+    <div class="meta-row">
+      <span><strong>{{ total }}</strong> strad{% if total == 1 %}ă{% else %}ăzi{% endif %} în această categorie</span>
+      <span>{{ top_streets | length }} nume distincte</span>
+    </div>
+  </div>
+
+  <div class="grid-2" style="align-items:start;">
+
+    <div class="detail-section">
+      <div class="detail-section-header">Cele mai frecvente nume</div>
+      <div class="rank-list">
+        {% for i, s in top_streets | enumerate %}
+        <div class="rank-row" style="grid-template-columns: 26px minmax(0,1fr) 50px 50px;">
+          <div class="rank-num">{{ i + 1 }}</div>
+          <div>
+            <a href="/strada/{{ s.slug }}/" class="street-tag sm">{{ s.display or s.name_normalized }}</a>
+          </div>
+          <div class="rank-count" title="{{ s.uat_count }} localități">{{ s.total }}</div>
+          <div style="font-size:10.5px; color:var(--muted); text-align:right; font-variant-numeric:tabular-nums;">{{ s.uat_count }} loc.</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-header">Repartiție pe județe</div>
+      <div class="rank-list">
+        {% for j in per_judet %}
+        <div class="rank-row" style="grid-template-columns: 32px minmax(0,1fr) 50px;">
+          <div style="font-size:11px; font-weight:700; color:var(--muted);">{{ j.judet }}</div>
+          <div style="position:relative; height:6px; background:var(--surface-2); border-radius:1px;">
+            {% set pct = (j.n / total * 100) | round(1) %}
+            <div style="position:absolute; left:0; top:0; height:100%; width:{{ pct }}%; background:var(--plaque); border-radius:1px;"></div>
+          </div>
+          <div class="rank-count">{{ j.n }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}

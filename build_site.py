@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # build_site.py
 import argparse
+import json
 import shutil
 from pathlib import Path
 
@@ -47,10 +48,7 @@ def build(db_path: str = DB_PATH, variant: str = "default") -> None:
         data["portraits"] = [p.stem for p in sorted(portraits_dir.glob("*.jpg"))] \
             if portraits_dir.exists() else []
 
-    env = jinja2.Environment(
-        loader=jinja2.FileSystemLoader(str(TEMPLATES)),
-        autoescape=jinja2.select_autoescape(["html"]),
-    )
+    env = _make_env()
     template_name, output_name = VARIANTS[variant]
     tmpl = env.get_template(template_name)
     html = tmpl.render(**data)
@@ -64,6 +62,130 @@ def build(db_path: str = DB_PATH, variant: str = "default") -> None:
         print(f"  → {DIST}/ro-counties.geojson")
 
 
+def _make_env() -> jinja2.Environment:
+    env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader(str(TEMPLATES)),
+        autoescape=jinja2.select_autoescape(["html"]),
+    )
+    env.filters["enumerate"] = enumerate
+    return env
+
+
+def _render(env: jinja2.Environment, template_name: str, out_path: Path, **ctx) -> None:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(env.get_template(template_name).render(**ctx), encoding="utf-8")
+
+
+def build_detail_pages(db_path: str = DB_PATH) -> None:
+    """Render all per-entity detail pages and index pages into dist/."""
+    conn = site_queries.get_connection(db_path)
+    env = _make_env()
+    portraits_dir = DIST / "portraits"
+    portraits = [p.stem for p in sorted(portraits_dir.glob("*.jpg"))] \
+        if portraits_dir.exists() else []
+
+    # ── Streets ─────────────────────────────────────────────────────────────
+    streets = site_queries.enumerate_streets(conn)
+    print(f"  Rendering {len(streets)} street detail pages…")
+    seen: dict[str, str] = {}
+    for s in streets:
+        slug = s["slug"]
+        if slug in seen and seen[slug] != s["name_normalized"]:
+            print(f"  WARN: street slug collision '{slug}'")
+            continue
+        seen[slug] = s["name_normalized"]
+        detail = site_queries.street_detail(conn, s["name_normalized"])
+        if not detail:
+            continue
+        _render(env, "street-detail.html.j2",
+                DIST / "strada" / slug / "index.html",
+                portraits=portraits, **detail)
+    print(f"    → dist/strada/ ({len(streets)} pages)")
+
+    # ── Persons ──────────────────────────────────────────────────────────────
+    persons = site_queries.enumerate_persons(conn)
+    print(f"  Rendering {len(persons)} person detail pages…")
+    seen_p: dict[str, str] = {}  # slug → core_name_norm (first = highest street count)
+    rendered_p = 0
+    for p in persons:
+        slug = p["slug"]
+        if slug in seen_p:
+            continue  # duplicate QID — keep the first (higher street_count) rendering
+        seen_p[slug] = p["core_name_norm"]
+        detail = site_queries.person_detail(conn, p["core_name_norm"])
+        if not detail:
+            continue
+        _render(env, "person-detail.html.j2",
+                DIST / "persoana" / slug / "index.html",
+                portraits=portraits, slug=slug, **detail)
+        rendered_p += 1
+    print(f"    → dist/persoana/ ({rendered_p} pages)")
+
+    # ── UATs ─────────────────────────────────────────────────────────────────
+    uats = site_queries.enumerate_uats(conn)
+    print(f"  Rendering {len(uats)} UAT detail pages…")
+    for u in uats:
+        detail = site_queries.uat_detail(conn, str(u["siruta"]))
+        if not detail:
+            continue
+        _render(env, "uat-detail.html.j2",
+                DIST / "oras" / u["judet"].lower() / u["slug"] / "index.html",
+                portraits=portraits, **detail)
+    print(f"    → dist/oras/ ({len(uats)} pages)")
+
+    # ── Themes ───────────────────────────────────────────────────────────────
+    themes = site_queries.enumerate_themes(conn)
+    print(f"  Rendering {len(themes)} theme detail pages…")
+    seen_t: dict[str, str] = {}
+    for t in themes:
+        slug = t["slug"]
+        key = f"{t['type']}/{t['key']}"
+        if slug in seen_t:
+            print(f"  WARN: theme slug collision '{slug}'")
+            continue
+        seen_t[slug] = key
+        detail = site_queries.theme_detail(conn, t["type"], t["key"])
+        if not detail:
+            continue
+        _render(env, "theme-detail.html.j2",
+                DIST / "tema" / slug / "index.html",
+                portraits=portraits, theme_meta=t, **detail)
+    print(f"    → dist/tema/ ({len(themes)} pages)")
+
+    # ── Index pages ──────────────────────────────────────────────────────────
+    _render(env, "persons-index.html.j2",
+            DIST / "persoane" / "index.html",
+            persons=persons, portraits=portraits)
+    print("    → dist/persoane/index.html")
+
+    _render(env, "themes-index.html.j2",
+            DIST / "teme" / "index.html",
+            themes=themes)
+    print("    → dist/teme/index.html")
+
+    judete_list = sorted({u["judet"] for u in uats})
+    _render(env, "judete-index.html.j2",
+            DIST / "judete" / "index.html",
+            judete=judete_list, uats=uats)
+    print("    → dist/judete/index.html")
+
+    # ── Explorer JSON + page ─────────────────────────────────────────────────
+    indexes = site_queries.explorer_indexes(conn)
+    cauta_dir = DIST / "cauta"
+    cauta_dir.mkdir(parents=True, exist_ok=True)
+    (cauta_dir / "streets.json").write_text(
+        json.dumps(indexes["streets"], ensure_ascii=False), encoding="utf-8")
+    (cauta_dir / "uats.json").write_text(
+        json.dumps(indexes["uats"], ensure_ascii=False), encoding="utf-8")
+    _render(env, "explorer.html.j2",
+            cauta_dir / "index.html")
+    print(f"    → dist/cauta/ ({len(indexes['streets'])} streets, {len(indexes['uats'])} uats)")
+
+    conn.close()
+    total = len(streets) + len(persons) + len(uats) + len(themes) + 4
+    print(f"  Detail build complete — {total} files written.")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build street names static site")
     parser.add_argument("--db", default=DB_PATH)
@@ -73,22 +195,28 @@ def main() -> None:
         default="default",
         help="Which template to render (default = cluster cloud | v1 | v2 = dense | methodology | both = default+v2 | all)",
     )
-    parser.add_argument("--serve", action="store_true", help="Build then serve on localhost:8000")
+    parser.add_argument("--serve", action="store_true", help="Build then serve on localhost")
+    parser.add_argument("--port", type=int, default=8000, help="Port for --serve (default: 8000)")
+    parser.add_argument("--detail", action="store_true", help="Also build per-entity detail pages")
+    parser.add_argument("--detail-only", action="store_true", help="Build only detail pages, skip main index")
     args = parser.parse_args()
-    if args.variant == "both":
-        variants = ["default", "v2"]
-    elif args.variant == "all":
-        variants = ["default", "v1", "v2", "methodology"]
-    else:
-        variants = [args.variant]
-    for v in variants:
-        build(db_path=args.db, variant=v)
+    if not args.detail_only:
+        if args.variant == "both":
+            variants = ["default", "v2"]
+        elif args.variant == "all":
+            variants = ["default", "v1", "v2", "methodology"]
+        else:
+            variants = [args.variant]
+        for v in variants:
+            build(db_path=args.db, variant=v)
+    if args.detail or args.detail_only:
+        build_detail_pages(db_path=args.db)
     if args.serve:
         import http.server
         import os
         os.chdir("dist")
-        print("Serving at http://localhost:8000 …")
-        http.server.test(HandlerClass=http.server.SimpleHTTPRequestHandler, port=8000, bind="127.0.0.1")
+        print(f"Serving at http://localhost:{args.port} …")
+        http.server.test(HandlerClass=http.server.SimpleHTTPRequestHandler, port=args.port, bind="127.0.0.1")
 
 
 if __name__ == "__main__":

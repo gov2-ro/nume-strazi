@@ -948,6 +948,10 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
     <div class="sub-eyebrow"><span class="dot" style="background:var(--accent);"></span>Femei<span class="meta" id="s3p-women-count"></span></div>
     <div id="s3p-women">{# Populated by JS #}</div>
   </div>
+  <div class="sub-section">
+    <div class="sub-eyebrow"><span class="dot" style="background:#6B8E23;"></span>Non-române<span class="meta" id="s3p-foreigners-count"></span></div>
+    <div id="s3p-foreigners">{# Populated by JS #}</div>
+  </div>
 </div>
 
 {# PANEL: REPARTIȚIE TEMATICĂ (s4) #}
@@ -983,7 +987,11 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       <div style="display:flex;align-items:center;gap:8px;">
         <div style="width:10px;height:10px;border-radius:2px;background:{{ theme_colors[loop.index0 % theme_colors|length] }};flex-shrink:0;"></div>
         <span class="emo xxl">{{ theme_emoji.get(t.category, '·') }}</span>
+        {% if t.slug %}
+        <a href="/tema/{{ t.slug }}/" style="font-family:var(--sans);font-size:22px;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);text-decoration:none;">{{ t.category }}</a>
+        {% else %}
         <span style="font-family:var(--sans);font-size:22px;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ t.category }}</span>
+        {% endif %}
         <span style="font-family:var(--sans);font-size:24px;font-weight:500;font-variant-numeric:tabular-nums;letter-spacing:-.01em;">{{ pct }}%</span>
       </div>
       {% endfor %}
@@ -1014,7 +1022,11 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
   {% for row in section5.nature_subtypes %}
   <div style="display:flex;align-items:center;gap:8px;padding:3px 0;{% if not loop.first %}border-top:1px solid var(--hairline);{% endif %}">
     <span class="emo xxl" style="width:24px;text-align:center;">{{ nature_emoji.get(row.nature_type, '·') }}</span>
+    {% if row.slug %}
+    <a href="/tema/{{ row.slug }}/" style="font-family:var(--sans);font-size:22px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);text-decoration:none;">{{ nature_ro.get(row.nature_type, row.nature_type) }}</a>
+    {% else %}
     <span style="font-family:var(--sans);font-size:22px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ nature_ro.get(row.nature_type, row.nature_type) }}</span>
+    {% endif %}
     <div class="bar-wrap" style="width:90px;"><div class="bar olive" style="width:{{ (row.n / max_n * 100)|int }}%;"></div></div>
     <span style="font-family:var(--sans);font-size:22px;font-weight:500;color:var(--ink);width:56px;text-align:right;font-variant-numeric:tabular-nums;letter-spacing:-.005em;">{{ row.n }}</span>
   </div>
@@ -1039,9 +1051,16 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
   </div>
   <div style="display:flex;flex-wrap:wrap;gap:6px;">
     {% for tok in section5.ideo_tokens %}
+    {% set tok_inner %}<span>{{ ideo_ro.get(tok.token, tok.token) }} <span style="color:var(--muted);font-size:16px;margin-left:6px;font-variant-numeric:tabular-nums;font-weight:500;">{{ tok.n }}</span></span>{% endset %}
+    {% if tok.slug %}
+    <a href="/tema/{{ tok.slug }}/" style="font-family:var(--sans);font-size:20px;font-weight:500;padding:7px 14px;border:1.5px solid {{ 'var(--accent)' if tok.n > 30 else 'var(--rule-strong)' }};border-radius:3px;color:{{ 'var(--accent-dark)' if tok.n > 30 else 'var(--ink)' }};background:{{ '#FFF1ED' if tok.n > 30 else 'var(--bg)' }};text-decoration:none;display:inline-flex;align-items:center;">
+      {{ ideo_ro.get(tok.token, tok.token) }} <span style="color:var(--muted);font-size:16px;margin-left:6px;font-variant-numeric:tabular-nums;font-weight:500;">{{ tok.n }}</span>
+    </a>
+    {% else %}
     <span style="font-family:var(--sans);font-size:20px;font-weight:500;padding:7px 14px;border:1.5px solid {{ 'var(--accent)' if tok.n > 30 else 'var(--rule-strong)' }};border-radius:3px;color:{{ 'var(--accent-dark)' if tok.n > 30 else 'var(--ink)' }};background:{{ '#FFF1ED' if tok.n > 30 else 'var(--bg)' }};">
       {{ ideo_ro.get(tok.token, tok.token) }} <span style="color:var(--muted);font-size:16px;margin-left:6px;font-variant-numeric:tabular-nums;font-weight:500;">{{ tok.n }}</span>
     </span>
+    {% endif %}
     {% endfor %}
     {% if not section5.ideo_tokens %}
     <span style="font-family:var(--sans);font-size:20px;font-style:italic;color:var(--muted);">Subcategorii în curs de completare.</span>
@@ -1104,7 +1123,11 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
   {% for row in section3.profession_dist %}
   <div style="display:flex;align-items:center;gap:8px;padding:3px 0;{% if not loop.first %}border-top:1px solid var(--hairline);{% endif %}">
     <span class="emo xxl" style="width:24px;text-align:center;">{{ prof_emoji.get(row.profession, '·') }}</span>
+    {% if row.slug %}
+    <a href="/tema/{{ row.slug }}/" style="font-family:var(--sans);font-size:22px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);text-decoration:none;">{{ prof_ro.get(row.profession, row.profession) }}</a>
+    {% else %}
     <span style="font-family:var(--sans);font-size:22px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ prof_ro.get(row.profession, row.profession) }}</span>
+    {% endif %}
     <div class="bar-wrap" style="width:90px;">
       <div class="bar" style="width:{{ (row.n / max_prof * 100)|int }}%"></div>
     </div>
@@ -1142,6 +1165,52 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 
 {# (Top persoane panel removed — moved up to sit beside #cele-mai-intalnite as an s6 cluster cloud.) #}
 
+{# PANEL: PERSONALITĂȚI STRĂINE (s8) #}
+{% if section3.top_foreigners %}
+{% set nat_flag = {
+  'HU':'🇭🇺','FR':'🇫🇷','DE':'🇩🇪','IT':'🇮🇹','GB':'🇬🇧',
+  'RU':'🇷🇺','AT':'🇦🇹','PL':'🇵🇱','TR':'🇹🇷','US':'🇺🇸',
+  'GR':'🇬🇷','SR':'🇷🇸','UA':'🇺🇦','CZ':'🇨🇿','SK':'🇸🇰',
+  'BG':'🇧🇬','MD':'🇲🇩','HR':'🇭🇷','SI':'🇸🇮','CH':'🇨🇭',
+  'ES':'🇪🇸','PT':'🇵🇹','NL':'🇳🇱','BE':'🇧🇪','SE':'🇸🇪',
+  'NO':'🇳🇴','DK':'🇩🇰','FI':'🇫🇮','IL':'🇮🇱','JP':'🇯🇵',
+} %}
+{% set prof_ro = {
+  'poet':'poet','writer':'scriitor','composer':'compozitor',
+  'royalty':'rege / voievod','politician':'politician',
+  'military':'militar','revolutionary':'revoluționar',
+  'scientist':'om de știință','painter':'pictor','philosopher':'filozof',
+} %}
+<div class="panel s8">
+  <div class="panel-header">
+    <span class="panel-label"><span class="emo xl">🌍</span> Personalități non-române honorate pe străzi</span>
+    <span class="panel-meta">{{ section3.top_foreigners | length }} persoane</span>
+  </div>
+  {% set max_f = section3.top_foreigners[0].street_count if section3.top_foreigners else 1 %}
+  <div class="rank-list">
+    {% for p in section3.top_foreigners %}
+    <div class="rank-row" style="grid-template-columns:32px minmax(0,1fr) minmax(50px,0.9fr) 48px 80px;">
+      <span style="font-size:20px;line-height:1;text-align:center;">{{ nat_flag.get(p.nationality, '🏳️') }}</span>
+      <span class="rank-name person" style="display:flex;align-items:center;gap:7px;">
+        {% if p.wikidata_qid and p.wikidata_qid in portraits %}
+        <span class="portrait" style="width:22px;height:22px;border-radius:50%;overflow:hidden;flex-shrink:0;display:inline-flex;">
+          <img src="portraits/{{ p.wikidata_qid }}.jpg" alt="" style="width:100%;height:100%;object-fit:cover;" loading="lazy">
+        </span>
+        {% endif %}
+        {% if p.slug %}<a href="/persoana/{{ p.slug }}/" style="color:inherit;text-decoration:none;">{{ p.full_name }}</a>{% else %}{{ p.full_name }}{% endif %}
+      </span>
+      <span style="font-family:var(--sans);font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ prof_ro.get(p.profession, p.profession or '—') }}</span>
+      <div class="bar-wrap">
+        <div class="bar" style="width:{{ (p.street_count / max_f * 100)|int }}%"></div>
+      </div>
+      <span class="rank-count">{{ p.street_count }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="panel-caption" style="margin-top:10px;">Concentrate predominant în județele cu comunități maghiare istorice (Harghita, Covasna, Mureș, Bihor).</div>
+</div>
+{% endif %}
+
 {# PANEL: NOTORIETATE WIKIPEDIA (s12, 2-col internal) #}
 <div class="panel s12">
   <div class="panel-header">
@@ -1151,7 +1220,8 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
     {% set max_pv = section4.top_pageviews[0].wiki_ro_views if section4.top_pageviews else 1 %}
     {% for p in section4.top_pageviews %}
     <div class="rank-row">
-      <span class="rank-name person">{{ p.full_name }}</span>
+      {% if p.slug %}<a href="/persoana/{{ p.slug }}/" style="color:inherit;text-decoration:none;"><span class="rank-name person">{{ p.full_name }}</span></a>
+      {% else %}<span class="rank-name person">{{ p.full_name }}</span>{% endif %}
       <div class="bar-wrap">
         <div class="{{ 'bar accent' if p.wiki_scope == 'universal' else 'bar' }}"
              style="width:{{ (p.wiki_ro_views / max_pv * 100)|int }}%"></div>
@@ -1458,19 +1528,21 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
         const portrait = hasPortrait
           ? `<span class="portrait"><img src="portraits/${qid}.jpg" alt="" loading="lazy"></span>`
           : '';
-        return `<span class="ctok person${isLeader ? ' leader' : ''}${hasPortrait ? ' has-portrait' : ''}">`
-             + portrait
-             + `<span class="chip" style="font-size:${fs}px;">${escapeHtml(labelFn(r))}</span>`
-             + cnt + `</span>`;
+        const personSlug = r.slug || (qid ? qid.toLowerCase() : '');
+        const personHref = personSlug ? `/persoana/${personSlug}/` : null;
+        const chip = `<span class="chip" style="font-size:${fs}px;">${escapeHtml(labelFn(r))}</span>`;
+        const inner = portrait + (personHref ? `<a href="${personHref}" style="color:inherit;text-decoration:none;">${chip}</a>` : chip) + cnt;
+        return `<span class="ctok person${isLeader ? ' leader' : ''}${hasPortrait ? ' has-portrait' : ''}">${inner}</span>`;
       }
       const sqid = r.wikidata_qid;
       const sPortrait = (sqid && PORTRAITS.has(sqid))
         ? `<span class="portrait"><img src="portraits/${sqid}.jpg" alt="" loading="lazy"></span>`
         : '';
-      return `<span class="ctok street${isLeader ? ' leader' : ''}${sPortrait ? ' has-portrait' : ''}">`
-           + sPortrait
-           + `<span class="plaque" style="font-size:${fs}px;">${escapeHtml(labelFn(r))}</span>`
-           + cnt + `</span>`;
+      const streetSlug = r.slug || '';
+      const streetHref = streetSlug ? `/strada/${streetSlug}/` : null;
+      const plaque = `<span class="plaque" style="font-size:${fs}px;">${escapeHtml(labelFn(r))}</span>`;
+      const innerS = sPortrait + (streetHref ? `<a href="${streetHref}" style="color:inherit;text-decoration:none;">${plaque}</a>` : plaque) + cnt;
+      return `<span class="ctok street${isLeader ? ' leader' : ''}${sPortrait ? ' has-portrait' : ''}">${innerS}</span>`;
     }).join('');
     root.innerHTML = `<div class="flat-tokens">${tokens}</div>`;
   }
@@ -1485,11 +1557,14 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       const streets = DATA_S2.top_names.slice(0, LIMIT_STREETS);
       const men = DATA_S3.top_men || [];
       const women = DATA_S3.top_women || [];
+      const foreigners = DATA_S3.top_foreigners || [];
       renderFlat(streets, 's2-clusters', false);
       renderFlat(men,    's3p-men',    true);
       renderFlat(women,  's3p-women',  true);
+      renderFlat(foreigners, 's3p-foreigners', true);
       setSubCount('s3p-men-count', men.length);
       setSubCount('s3p-women-count', women.length);
+      setSubCount('s3p-foreigners-count', foreigners.length);
       document.getElementById('s2-footer').textContent =
         `top ${streets.length} · la nivel național`;
     } else {
@@ -1497,11 +1572,14 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       const streets = DATA_S2.by_judet[code] || [];
       const men     = (DATA_S3.men_by_judet   || {})[code] || [];
       const women   = (DATA_S3.women_by_judet || {})[code] || [];
+      const foreigners = (DATA_S3.foreigners_by_judet || {})[code] || [];
       renderFlat(streets, 's2-clusters', false);
       renderFlat(men,    's3p-men',    true);
       renderFlat(women,  's3p-women',  true);
+      renderFlat(foreigners, 's3p-foreigners', true);
       setSubCount('s3p-men-count', men.length);
       setSubCount('s3p-women-count', women.length);
+      setSubCount('s3p-foreigners-count', foreigners.length);
       document.getElementById('s2-footer').textContent = `județul ${label}`;
     }
   }
@@ -1594,6 +1672,10 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
         .on('mouseleave', function() { d3.select(this).attr('stroke-width', 0.9).attr('stroke', '#FAF8F3'); });
 
       updateMetric('saint_pct');
+
+      // Select random județ on page load
+      const randomFeature = geo.features[Math.floor(Math.random() * geo.features.length)];
+      renderFingerprint(randomFeature);
     })
     .catch(() => {
       document.getElementById('s6-map').insertAdjacentHTML('afterend',
@@ -1611,29 +1693,33 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
     const scopeDot = s => ({ universal: '🌍', national: '🇷🇴', local: '·' }[s] || '·');
     const genderDot = g => g === 'F' ? '<span style="color:#C05E8A;">●</span>' : '<span style="color:#4A7FA5;">●</span>';
 
-    const topRows = top.map((s, i) =>
-      `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--rule);">
-        <span class="street-tag small">${s.n}</span>
+    const topRows = top.map((s, i) => {
+      const tag = s.sl ? `<a href="/strada/${s.sl}/" style="text-decoration:none;"><span class="street-tag small">${escapeHtml(s.n)}</span></a>`
+                        : `<span class="street-tag small">${escapeHtml(s.n)}</span>`;
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--rule);">
+        ${tag}
         <span style="color:var(--muted);font-size:10.5px;font-variant-numeric:tabular-nums;">${s.c}</span>
-      </div>`
-    ).join('');
+      </div>`;
+    }).join('');
 
-    const personsRows = persons.map((p, i) =>
-      `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px solid var(--rule);">
-        <span style="display:flex;align-items:center;gap:5px;">
-          ${genderDot(p.g)}
-          <span style="font-family:var(--sans);color:var(--ink);font-weight:${i===0?'600':'500'};font-size:11.5px;">${p.n}</span>
-        </span>
+    const personsRows = persons.map((p, i) => {
+      const nameEl = p.sl
+        ? `<a href="/persoana/${p.sl}/" style="color:var(--ink);text-decoration:none;font-weight:${i===0?'600':'500'};font-size:11.5px;">${escapeHtml(p.n)}</a>`
+        : `<span style="font-family:var(--sans);color:var(--ink);font-weight:${i===0?'600':'500'};font-size:11.5px;">${escapeHtml(p.n)}</span>`;
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px solid var(--rule);">
+        <span style="display:flex;align-items:center;gap:5px;">${genderDot(p.g)}${nameEl}</span>
         <span style="color:var(--muted);font-size:10.5px;font-variant-numeric:tabular-nums;">${p.c} ${p.s ? scopeDot(p.s) : ''}</span>
-      </div>`
-    ).join('');
+      </div>`;
+    }).join('');
 
-    const rareRows = rare.map(s =>
-      `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--rule);">
-        <span class="street-tag small">${s.n}</span>
+    const rareRows = rare.map(s => {
+      const tag = s.sl ? `<a href="/strada/${s.sl}/" style="text-decoration:none;"><span class="street-tag small">${escapeHtml(s.n)}</span></a>`
+                        : `<span class="street-tag small">${escapeHtml(s.n)}</span>`;
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--rule);">
+        ${tag}
         <span style="color:var(--muted);font-size:10.5px;">${s.j === 1 ? 'unic' : s.j + ' județe'}</span>
-      </div>`
-    ).join('');
+      </div>`;
+    }).join('');
 
     const fp = document.getElementById('s6-fingerprint');
     fp.innerHTML = `

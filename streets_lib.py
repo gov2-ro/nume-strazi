@@ -30,6 +30,21 @@ def normalize_match(s):
     return "".join(c for c in nfkd if not unicodedata.combining(c)).lower().strip()
 
 
+_SLUG_NONALNUM = re.compile(r"[^a-z0-9]+")
+
+
+def slugify(s):
+    """URL-safe slug: ASCII-lowered, î≡â folded, runs of non-alphanumerics → '-'.
+
+    Empty / None / whitespace-only input returns "".
+    Trailing/leading hyphens are trimmed. Used for street/person/uat/theme URLs.
+    """
+    base = normalize_match(s)
+    if not base:
+        return ""
+    return _SLUG_NONALNUM.sub("-", base).strip("-")
+
+
 # Street-type prefixes used both during ingest (build_db) and when normalizing OSM
 # `name` tags before joining to the registry. Sorted longest-first so greedy
 # stripping doesn't match "Strada" inside "Stradela".

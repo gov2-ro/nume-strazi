@@ -1,0 +1,48 @@
+{# templates/themes-index.html.j2 — list of all theme pages #}
+{% extends "_detail-shell.html.j2" %}
+
+{% block title %}Teme — Cum ne numim străzile{% endblock %}
+
+{% block body %}
+<div class="detail-page">
+
+  <div class="breadcrumb">
+    <a href="/">Acasă</a>
+    <span class="sep">›</span>
+    <span>Teme</span>
+  </div>
+
+  <div class="detail-hero">
+    <div class="kicker"><span class="emo">🏷️</span> Teme</div>
+    <h1 style="font-size:28px; font-weight:700; font-family:var(--street);">{{ themes | length }} categorii tematice</h1>
+  </div>
+
+  {% set groups = [
+    ('macro',    'Macro-teme',              '🗂️'),
+    ('profesie', 'Profesii',                '🎓'),
+    ('natura',   'Tipuri de natură',        '🌿'),
+    ('ideologic','Subcategorii ideologice', '🚩'),
+  ] %}
+
+  {% for type_key, type_label, type_emo in groups %}
+  {% set group_themes = themes | selectattr('type', 'equalto', type_key) | list %}
+  {% if group_themes %}
+  <div class="detail-section">
+    <div class="detail-section-header"><span class="emo">{{ type_emo }}</span> {{ type_label }}</div>
+    <div class="rank-list">
+      {% for t in group_themes | sort(attribute='count', reverse=true) %}
+      <div class="rank-row" style="grid-template-columns: minmax(0,1fr) 70px;">
+        <div>
+          <span class="emo">{{ t.emoji }}</span>
+          <a href="/tema/{{ t.slug }}/" style="font-weight:600; color:var(--ink); margin-left:6px;">{{ t.label }}</a>
+        </div>
+        <div class="rank-count">{{ t.count }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  {% endfor %}
+
+</div>
+{% endblock %}

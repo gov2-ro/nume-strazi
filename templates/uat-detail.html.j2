@@ -1,0 +1,111 @@
+{# templates/uat-detail.html.j2 — detail page for a UAT (city/commune) #}
+{% extends "_detail-shell.html.j2" %}
+
+{% block title %}{{ uat | title }} ({{ judet }}) — Cum ne numim străzile{% endblock %}
+
+{% block body %}
+<div class="detail-page">
+
+  <div class="breadcrumb">
+    <a href="/">Acasă</a>
+    <span class="sep">›</span>
+    <a href="/judete/">Județe</a>
+    <span class="sep">›</span>
+    <span>{{ judet }}</span>
+    <span class="sep">›</span>
+    <span>{{ uat | title }}</span>
+  </div>
+
+  <div class="detail-hero">
+    <div class="kicker"><span class="emo">🏘️</span> Localitate · {{ judet }}</div>
+    <h1>{{ uat | title }}</h1>
+    <div class="meta-row">
+      <span><strong>{{ total }}</strong> strad{% if total == 1 %}ă{% else %}ăzi{% endif %} înregistrate</span>
+      <span>Județ: <strong>{{ judet }}</strong></span>
+      {% if saint_pct is not none %}
+      <span>Religios: <strong>{{ saint_pct }}%</strong>
+        {% set d = delta_saint %}
+        <span class="delta {% if d > 0.5 %}pos{% elif d < -0.5 %}neg{% endif %}">
+          ({% if d > 0 %}+{% endif %}{{ d }}% față de medie)
+        </span>
+      </span>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="grid-2" style="align-items:start;">
+
+    <div class="detail-section">
+      <div class="detail-section-header">Tematică</div>
+      <div class="rank-list">
+        {% for t in themes %}
+        <div class="rank-row" style="grid-template-columns: minmax(0,1fr) 50px;">
+          <div>
+            {% if t.theme == 'persoana' %}<span class="emo">👤</span>
+            {% elif t.theme == 'natura' %}<span class="emo">🌿</span>
+            {% elif t.theme == 'religios' %}<span class="emo">⛪</span>
+            {% elif t.theme == 'data' %}<span class="emo">📅</span>
+            {% elif t.theme == 'ideologic' %}<span class="emo">🚩</span>
+            {% else %}<span class="emo">📍</span>{% endif %}
+            {{ t.theme | title }}
+          </div>
+          <div class="rank-count">{{ t.n }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div>
+      <div class="detail-section">
+        <div class="detail-section-header">Cele mai frecvente nume</div>
+        <div class="rank-list">
+          {% for i, s in top_streets | enumerate %}
+          <div class="rank-row" style="grid-template-columns: 24px minmax(0,1fr) 44px;">
+            <div class="rank-num">{{ i + 1 }}</div>
+            <div>
+              <a href="/strada/{{ s.slug }}/" class="street-tag sm">{{ s.display or s.name_normalized }}</a>
+            </div>
+            <div class="rank-count">{{ s.n }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {% if top_persons %}
+      <div class="detail-section">
+        <div class="detail-section-header">Persoane onorate</div>
+        <div class="rank-list">
+          {% for pr in top_persons %}
+          <div class="rank-row" style="grid-template-columns: minmax(0,1fr) 44px;">
+            <div>
+              {% if pr.wikidata_qid %}
+              <span class="portrait" style="margin-right:6px;">
+                <img src="/portraits/{{ pr.wikidata_qid }}.jpg" alt="{{ pr.full_name }}"
+                     onerror="this.parentElement.textContent='{{ pr.full_name[:2] | upper }}'">
+              </span>
+              {% endif %}
+              <a href="/persoana/{{ pr.slug }}/">{{ pr.full_name }}</a>
+            </div>
+            <div class="rank-count">{{ pr.n }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+
+  {% if distinctive %}
+  <div class="detail-section">
+    <div class="detail-section-header">Nume distinctive (rare la nivel național)</div>
+    <div class="uat-cluster">
+      {% for d in distinctive %}
+        <a class="uat-pill" href="/strada/{{ d.slug }}/" title="prezent în {{ d.uat_n }} UAT-uri național">{{ d.display or d.name_normalized }}</a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

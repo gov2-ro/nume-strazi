@@ -1,0 +1,39 @@
+{# templates/judete-index.html.j2 — list of UATs grouped by județ #}
+{% extends "_detail-shell.html.j2" %}
+
+{% block title %}Județe — Cum ne numim străzile{% endblock %}
+
+{% block body %}
+<div class="detail-page">
+
+  <div class="breadcrumb">
+    <a href="/">Acasă</a>
+    <span class="sep">›</span>
+    <span>Județe</span>
+  </div>
+
+  <div class="detail-hero">
+    <div class="kicker"><span class="emo">🗺️</span> Județe</div>
+    <h1 style="font-size:28px; font-weight:700; font-family:var(--street);">{{ uats | length }} localități cu pagini proprii</h1>
+    <div class="meta-row">Localități cu minim 50 de străzi înregistrate</div>
+  </div>
+
+  {% for j in judete %}
+  {% set j_uats = uats | selectattr('judet', 'equalto', j) | sort(attribute='total', reverse=true) | list %}
+  {% if j_uats %}
+  <div class="detail-section">
+    <div class="detail-section-header">{{ j }} — {{ j_uats | length }} localități</div>
+    <div class="uat-cluster">
+      {% for u in j_uats %}
+        <a class="uat-pill" href="/oras/{{ j | lower }}/{{ u.slug }}/">
+          {{ u.uat | title }}
+          <span style="font-size:10px; color:var(--muted); font-weight:500; margin-left:4px;">{{ u.total }}</span>
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  {% endfor %}
+
+</div>
+{% endblock %}

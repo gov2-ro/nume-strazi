@@ -1,5 +1,56 @@
 # Activity History
 
+## 2026-05-17 — Detail-page browsing (Phase 1)
+
+Implemented navigable detail pages for all four entity types: streets, persons, UATs (towns), and themes. Pages have real URLs and are statically generated at build time.
+
+### What was built
+
+**site_queries.py**
+- Added `slugify` import from `streets_lib`
+- Added `enumerate_streets/persons/uats/themes()` — enumerator functions for the build loop (2464, 211, 672, 72 entities respectively)
+- Added `street_detail()`, `person_detail()`, `uat_detail()`, `theme_detail()` — per-entity drilldown queries
+- Added `explorer_indexes()` — compact JSON for `/cauta/` autocomplete
+- Added `slug` fields to section2 (top_names, by_judet), section3 (top_persons, top_men, top_women, top_foreigners, by-judet dicts), section4 (top_pageviews), section5 (theme_dist, nature_subtypes, ideo_tokens), section6 (top_per_judet, rare_per_judet, persons_per_judet)
+- Fixed `_theme_where()` helper that replaced duplicate `_macro_where`/`_macro_where_impl` definitions; fixed `theme_detail()` `params` bug; fixed double-join conflict for person-themed queries
+
+**templates/ (new)**
+- `_detail-shell.html.j2` — shared base: CSS variables, sticky nav (Acasă · Caută · Persoane · Teme · Județe), footer, portrait/rank-list/uat-pill CSS
+- `street-detail.html.j2` — street page: hero plaque, honoree bio, UAT pills grouped by județ
+- `person-detail.html.j2` — person page: portrait, bio, geographic footprint, peers sidebar
+- `uat-detail.html.j2` — UAT page: theme breakdown, top streets, top persons, distinctive names
+- `theme-detail.html.j2` — theme page: top streets ranked, județ heatmap bars
+- `explorer.html.j2` — `/cauta/` autocomplete: loads JSON on first keystroke, fuzzy match with diacritics normalization
+- `persons-index.html.j2`, `themes-index.html.j2`, `judete-index.html.j2` — alphabetical/grouped index pages
+
+**build_site.py**
+- Added `_make_env()` with `enumerate` custom filter; `build()` now uses it
+- Added `_render()` helper
+- Added `build_detail_pages()` — renders all entity pages + JSON indexes; deduplicates person slugs (some share QID)
+- Added `--detail` and `--detail-only` flags
+
+**templates/index.html.j2** (wiring existing UI)
+- `renderFlat()`: chips now wrap in `<a href>` to `/strada/<slug>/` and `/persoana/<slug>/`
+- Fingerprint panel (map sidebar): top streets, persons, rare names are all linked
+- Profession dist rows → `/tema/profesie-<slug>/`
+- Nature subtype rows → `/tema/natura-<slug>/`
+- Ideological tokens → `/tema/ideologic-<slug>/`
+- Theme dist pie labels → `/tema/<macro-slug>/`
+- Wikipedia notoriety panel persons → `/persoana/<slug>/`
+- Foreigners panel persons → `/persoana/<slug>/`
+
+### URL scheme
+- `/strada/<slug>/` — 2464 pages
+- `/persoana/<slug>/` — 204 unique pages (QID-based slugs; 7 entries deduplicated)
+- `/oras/<judet>/<slug>/` — 672 pages
+- `/tema/<slug>/` — 72 pages (prefixed: `profesie-*`, `natura-*`, `ideologic-*`, macro keys)
+- `/cauta/` — autocomplete explorer with `streets.json` (~1.8MB) and `uats.json` (~74KB)
+- `/persoane/`, `/teme/`, `/judete/` — index listing pages
+
+### Build
+- `python3 build_site.py --detail-only` — ~3,424 HTML files in ~60s
+- `python3 build_site.py --variant default` — main index (666KB) clean
+
 ## 2026-05-16 — Wire Wikimedia portrait thumbnails into Top Persoane panel
 
 Added `tools/fetch_portraits.py`: for each person with a Wikidata QID, fetches the P18 (image) claim from Wikidata, downloads a 64px thumbnail from Wikimedia Commons, and caches it to `dist/portraits/<qid>.jpg`. Idempotent, rate-limited, honours 429 Retry-After headers.
