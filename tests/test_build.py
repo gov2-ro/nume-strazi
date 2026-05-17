@@ -43,11 +43,40 @@ def test_section5_theme_donut():
     assert "conic-gradient" in html
 
 
-def test_section6_map():
+def test_section6_in_index_for_select():
+    """Nav select must be in landing page; judete panels must not be."""
     html = Path("dist/index.html").read_text(encoding="utf-8")
-    assert "harta" in html
-    assert "s6-map" in html
-    assert "% sfinți" in html
+    assert "s2-judet-select" in html
+    # Nav select is driven by DATA_S2, not DATA_S6 — DATA_S6 no longer in landing
+    assert "DATA_S6" not in html
+    # Harta panel must NOT be in the landing page any more
+    assert 'id="harta"' not in html
+    assert "s6-map" not in html
+
+
+def test_judete_overview_builds():
+    """dist/judete/index.html — overview page with map, table, amprente, top cities."""
+    result = subprocess.run(
+        [sys.executable, "build_site.py", "--db", "data/streets.db", "--detail-only"],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    out = Path("dist/judete/index.html")
+    assert out.exists(), "dist/judete/index.html not found"
+    html = out.read_text(encoding="utf-8")
+    assert 'id="s6-map"' in html,        "map SVG container missing"
+    assert 'id="judet-table"' in html,   "sortable table missing"
+    assert "judet_distinctive" in html,  "amprente data missing (DATA_S8)"
+    assert "top-cities" in html,         "top cities section missing"
+
+
+def test_judete_lista_builds():
+    """dist/judete/lista/index.html — full UAT alphabetical list."""
+    out = Path("dist/judete/lista/index.html")
+    assert out.exists(), "dist/judete/lista/index.html not found"
+    html = out.read_text(encoding="utf-8")
+    assert "localități" in html
+    assert "/oras/" in html
 
 
 def test_section7_renumiri():
@@ -101,6 +130,8 @@ def test_default_is_cluster_cloud():
     # Flat-cloud markup present, old leaderboard markup gone
     assert "flat-tokens" in html
     assert 'rank-list rank-2col s2-list' not in html
+    # Harta panel removed from landing
+    assert 'id="harta"' not in html
 
 
 def test_v2_dashboard_builds():
