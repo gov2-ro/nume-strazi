@@ -1734,13 +1734,23 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
     if (contestsPanel) contestsPanel.style.display = isNat ? '' : 'none';
   }
 
+  function updateUrl(code, siruta) {
+    const p = new URLSearchParams();
+    if (code && code !== 'all') p.set('judet', code);
+    if (siruta && siruta !== 'all') p.set('siruta', String(siruta));
+    const qs = p.toString();
+    history.replaceState({}, '', qs ? '?' + qs : location.pathname);
+  }
+
   select.addEventListener('change', e => {
     syncUatSelect(e.target.value);
     uatSelect.value = 'all';
     render(e.target.value, null);
+    updateUrl(e.target.value, null);
   });
   uatSelect.addEventListener('change', e => {
     render(select.value, e.target.value);
+    updateUrl(select.value, e.target.value);
   });
   render('all', null);
 })();
