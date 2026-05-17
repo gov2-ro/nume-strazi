@@ -601,7 +601,11 @@ async function runQuery() {
   }
 }
 
-document.getElementById('uat-input').addEventListener('input', onFilterChange);
+document.getElementById('uat-input').addEventListener('input', () => {
+  state.offset = 0;
+  clearTimeout(state.debounceTimer);
+  state.debounceTimer = setTimeout(runQuery, 300);
+});
 
 document.getElementById('btn-prev').addEventListener('click', () => {
   state.offset = Math.max(0, state.offset - state.limit);
