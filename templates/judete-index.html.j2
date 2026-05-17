@@ -1,10 +1,23 @@
-{# templates/judete-index.html.j2 — list of UATs grouped by județ #}
+{# templates/judete-index.html.j2 — Județe overview page #}
 {% extends "_detail-shell.html.j2" %}
 
 {% block title %}Județe — Cum ne numim străzile{% endblock %}
 
+{% block head_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+{% endblock %}
+
 {% block body %}
-<div class="detail-page">
+<script>
+const DATA_S6 = {{ section6 | tojson }};
+const DATA_S8 = {{ section8 | tojson }};
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+</script>
+
+<div class="detail-page" style="max-width:1640px;">
 
   <div class="breadcrumb">
     <a href="/">Acasă</a>
@@ -14,26 +27,353 @@
 
   <div class="detail-hero">
     <div class="kicker"><span class="emo">🗺️</span> Județe</div>
-    <h1 style="font-size:28px; font-weight:700; font-family:var(--street);">{{ uats | length }} localități cu pagini proprii</h1>
-    <div class="meta-row">Localități cu minim 50 de străzi înregistrate</div>
+    <h1 style="font-size:32px; font-weight:700; font-family:var(--street);">Statistici pe județ</h1>
+    <div class="meta-row">{{ section6.by_judet | length }} județe · date din registrul secțiilor de vot</div>
   </div>
 
-  {% for j in judete %}
-  {% set j_uats = uats | selectattr('judet', 'equalto', j) | sort(attribute='total', reverse=true) | list %}
-  {% if j_uats %}
-  <div class="detail-section">
-    <div class="detail-section-header">{{ j }} — {{ j_uats | length }} localități</div>
-    <div class="uat-cluster">
-      {% for u in j_uats %}
-        <a class="uat-pill" href="/oras/{{ j | lower }}/{{ u.slug }}/">
-          {{ u.uat | title }}
-          <span style="font-size:10px; color:var(--muted); font-weight:500; margin-left:4px;">{{ u.total }}</span>
-        </a>
-      {% endfor %}
+  {# ── 1. HARTA ─────────────────────────────────────────────────────────── #}
+  <div class="panel s12" id="harta" style="background:var(--surface-1);border:1px solid var(--rule);border-radius:6px;padding:16px 20px;margin-bottom:16px;">
+    <div class="panel-header">
+      <span class="panel-label"><span class="emo xl">🗺️</span> Harta · statistici pe județ</span>
+      <div class="chip-row" id="s6-metric-row" style="margin:0;padding:0;border:none;">
+        <span class="label">Vedeți după</span>
+        <button class="chip active" data-metric="saint_pct">% sfinți</button>
+        <button class="chip" data-metric="numeric_pct">% numere</button>
+        <button class="chip" data-metric="female_pct">% femei</button>
+      </div>
+    </div>
+    <div class="map-grid" id="s6-grid">
+      <div style="position:relative;">
+        <svg id="s6-map" style="width:100%;height:auto;display:block;"></svg>
+        <div style="margin-top:10px;display:flex;align-items:center;gap:12px;font-family:var(--sans);font-size:10.5px;color:var(--muted);">
+          <span id="s6-scale-min">0%</span>
+          <div style="flex:1;height:5px;background:linear-gradient(to right,#F4EFE6 0%,#E8B299 35%,#D27A5C 65%,#A53A22 100%);border-radius:1px;"></div>
+          <span id="s6-scale-max" style="font-variant-numeric:tabular-nums;">12%</span>
+          <span style="margin-left:10px;" id="s6-scale-label">% străzi cu prefix „Sf."</span>
+        </div>
+      </div>
+      <div class="fingerprint" id="s6-fingerprint">
+        <div class="kicker"><span class="emo lg">🧬</span> Amprenta județului</div>
+        <p style="font-family:var(--sans);font-size:12.5px;color:var(--muted);padding-top:20px;line-height:1.55;">
+          Selectați un județ pe hartă.
+        </p>
+      </div>
     </div>
   </div>
-  {% endif %}
-  {% endfor %}
 
-</div>
+  {# ── 2. TABEL COMPARATIV ──────────────────────────────────────────────── #}
+  <div class="panel s12" style="background:var(--surface-1);border:1px solid var(--rule);border-radius:6px;padding:16px 20px;margin-bottom:16px;">
+    <div class="panel-header">
+      <span class="panel-label"><span class="emo xl">📊</span> Comparație județe</span>
+      <span class="panel-meta">click pe coloană pentru sortare</span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table id="judet-table" style="width:100%;border-collapse:collapse;font-family:var(--sans);font-size:11.5px;">
+        <thead>
+          <tr>
+            <th data-col="judet"         data-label="Județ"    style="text-align:left;padding:6px 10px;background:var(--surface-1);border-bottom:2px solid var(--rule-strong);cursor:pointer;white-space:nowrap;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);">Județ ▾</th>
+            <th data-col="total_streets" data-label="Străzi"   style="text-align:right;padding:6px 10px;background:var(--surface-1);border-bottom:2px solid var(--rule-strong);cursor:pointer;white-space:nowrap;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);">Străzi</th>
+            <th data-col="saint_pct"     data-label="% sfinți" style="text-align:right;padding:6px 10px;background:var(--surface-1);border-bottom:2px solid var(--rule-strong);cursor:pointer;white-space:nowrap;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);">% sfinți</th>
+            <th data-col="nature_pct"    data-label="% natură" style="text-align:right;padding:6px 10px;background:var(--surface-1);border-bottom:2px solid var(--rule-strong);cursor:pointer;white-space:nowrap;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);">% natură</th>
+            <th data-col="female_pct"    data-label="% femei"  style="text-align:right;padding:6px 10px;background:var(--surface-1);border-bottom:2px solid var(--rule-strong);cursor:pointer;white-space:nowrap;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);">% femei</th>
+            <th data-col="numeric_pct"   data-label="% numere" style="text-align:right;padding:6px 10px;background:var(--surface-1);border-bottom:2px solid var(--rule-strong);cursor:pointer;white-space:nowrap;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);">% numere</th>
+          </tr>
+        </thead>
+        <tbody id="judet-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  {# ── 3. AMPRENTE JUDEȚENE ─────────────────────────────────────────────── #}
+  <div class="panel s12" style="background:var(--surface-1);border:1px solid var(--rule);border-radius:6px;padding:16px 20px;margin-bottom:16px;">
+    <div class="panel-header">
+      <span class="panel-label"><span class="emo xl">🧬</span> Amprente județene · trei caractere</span>
+    </div>
+    <div class="subgrid-3">
+
+      <div style="background:var(--bg);padding:14px 16px;">
+        <div class="panel-label" style="margin-bottom:6px;"><span class="emo xl">💎</span> Cele mai exclusiviste</div>
+        <div class="panel-caption" style="margin:0 0 8px;">Județe cu cele mai multe nume găsite doar acolo · ≥3 străzi local</div>
+        {% set max_d = section8.judet_distinctive[0].n if section8.judet_distinctive else 1 %}
+        {% for row in section8.judet_distinctive %}
+        <div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:{{ '1px solid var(--wash)' if not loop.last else 'none' }};">
+          <span style="font-family:var(--sans);font-size:9.5px;color:var(--muted);width:14px;text-align:right;font-variant-numeric:tabular-nums;">{{ loop.index }}</span>
+          <span style="font-family:var(--sans);font-size:12px;font-weight:600;letter-spacing:.04em;width:30px;">{{ row.judet }}</span>
+          <div class="bar-wrap" style="flex:1;"><div class="bar accent" style="width:{{ (row.n / max_d * 100)|int }}%;"></div></div>
+          <span style="font-family:var(--sans);font-size:10.5px;color:var(--muted);width:30px;text-align:right;font-variant-numeric:tabular-nums;">{{ row.n }}</span>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div style="background:var(--bg);padding:14px 16px;">
+        <div class="panel-label" style="margin-bottom:6px;"><span class="emo xl">🌾</span> Cele mai «rurale-poetice»</div>
+        <div class="panel-caption" style="margin:0 0 8px;">Cota de străzi cu nume din natură (flori, copaci, ape, animale…)</div>
+        {% set max_r = section8.judet_rural[0].pct if section8.judet_rural else 1 %}
+        {% for row in section8.judet_rural %}
+        <div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:{{ '1px solid var(--wash)' if not loop.last else 'none' }};">
+          <span style="font-family:var(--sans);font-size:9.5px;color:var(--muted);width:14px;text-align:right;font-variant-numeric:tabular-nums;">{{ loop.index }}</span>
+          <span style="font-family:var(--sans);font-size:12px;font-weight:600;letter-spacing:.04em;width:30px;">{{ row.judet }}</span>
+          <div class="bar-wrap" style="flex:1;"><div class="bar" style="width:{{ (row.pct / max_r * 100)|int }}%;background:#8BA888;opacity:.75;"></div></div>
+          <span style="font-family:var(--sans);font-size:10.5px;color:var(--muted);width:46px;text-align:right;font-variant-numeric:tabular-nums;">{{ row.pct }}%</span>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div style="background:var(--bg);padding:14px 16px;">
+        <div class="panel-label" style="margin-bottom:6px;"><span class="emo xl">🚩</span> Cele mai «ideologice»</div>
+        <div class="panel-caption" style="margin:0 0 8px;">Cota de străzi cu nume ideologic (libertate, victorie, unire…)</div>
+        {% set max_i = section8.judet_ideo[0].pct if section8.judet_ideo else 1 %}
+        {% for row in section8.judet_ideo %}
+        <div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:{{ '1px solid var(--wash)' if not loop.last else 'none' }};">
+          <span style="font-family:var(--sans);font-size:9.5px;color:var(--muted);width:14px;text-align:right;font-variant-numeric:tabular-nums;">{{ loop.index }}</span>
+          <span style="font-family:var(--sans);font-size:12px;font-weight:600;letter-spacing:.04em;width:30px;">{{ row.judet }}</span>
+          <div class="bar-wrap" style="flex:1;"><div class="bar accent" style="width:{{ (row.pct / max_i * 100)|int }}%;"></div></div>
+          <span style="font-family:var(--sans);font-size:10.5px;color:var(--muted);width:46px;text-align:right;font-variant-numeric:tabular-nums;">{{ row.pct }}%</span>
+        </div>
+        {% endfor %}
+      </div>
+
+    </div>
+  </div>
+
+  {# ── 4. SEMNĂTURI + CURIOZITĂȚI ───────────────────────────────────────── #}
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+
+    <div class="panel s6" style="background:var(--surface-1);border:1px solid var(--rule);border-radius:6px;padding:16px 20px;">
+      <div class="panel-header">
+        <span class="panel-label"><span class="emo xl">📜</span> Semnături regionale · ≥80% concentrare într-un județ</span>
+        <span class="panel-meta">{{ section8.regional_signatures | length }} nume</span>
+      </div>
+      <div class="rank-list">
+        {% for r in section8.regional_signatures %}
+        <div class="rank-row" style="grid-template-columns: minmax(0, 1fr) 30px 70px; gap: 10px;">
+          <span class="rank-name">{{ r.display_name }}</span>
+          <span style="font-family:var(--sans);font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--ink);text-align:right;">{{ r.judet }}</span>
+          <span style="font-family:var(--sans);font-size:10.5px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums;">{{ r.local_total }}/{{ r.national_total }} · {{ r.pct }}%</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="panel s6" id="curiozitati" style="background:var(--surface-1);border:1px solid var(--rule);border-radius:6px;padding:16px 20px;">
+      <div class="panel-header">
+        <span class="panel-label"><span class="emo xl">🔎</span> Curiozități unice naționale · doar într-un singur UAT</span>
+        <span class="panel-meta">selecție · geografice</span>
+      </div>
+      <div class="rank-list">
+        {% for r in section8.local_uniques %}
+        <div class="rank-row" style="grid-template-columns: minmax(0, 1fr) auto; gap: 10px;">
+          <span class="rank-name">{{ r.display_name }}</span>
+          <span style="font-family:var(--sans);font-size:10.5px;color:var(--muted);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;">{{ r.uat | title }} · <strong style="color:var(--ink);font-weight:600;letter-spacing:.04em;">{{ r.judet }}</strong></span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+  </div>
+
+  {# ── 5. TOP 20 LOCALITĂȚI ─────────────────────────────────────────────── #}
+  {% set top_uats = uats | sort(attribute='total', reverse=true) | list %}
+  <div class="panel s12" id="top-cities" style="background:var(--surface-1);border:1px solid var(--rule);border-radius:6px;padding:16px 20px;margin-bottom:24px;">
+    <div class="panel-header">
+      <span class="panel-label"><span class="emo xl">🏙️</span> Cele mai mari localități · top 20</span>
+      <span class="panel-meta">după număr de străzi</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;padding-top:4px;">
+      {% for u in top_uats[:20] %}
+      <a href="/oras/{{ u.judet | lower }}/{{ u.slug }}/"
+         style="display:inline-flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--rule);border-radius:4px;padding:6px 12px;text-decoration:none;color:var(--ink);">
+        <span style="font-family:var(--sans);font-weight:600;font-size:12px;">{{ u.uat | title }}</span>
+        <span style="font-family:var(--sans);font-size:10px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;">{{ u.judet }}</span>
+        <span style="font-family:var(--mono);font-size:11px;color:var(--gold);font-weight:700;">{{ u.total }}</span>
+      </a>
+      {% endfor %}
+    </div>
+    <div style="margin-top:14px;font-family:var(--sans);font-size:11px;color:var(--muted);">
+      <a href="/judete/lista/" style="color:var(--plaque);">Vezi toate {{ uats | length }} localitățile →</a>
+    </div>
+  </div>
+
+</div>{# end detail-page #}
+
+{# ── D3 MAP JS (moved from index.html.j2) ────────────────────────────────── #}
+<script>
+(function() {
+  const byJudet = {};
+  DATA_S6.by_judet.forEach(d => { byJudet[d.judet] = d; });
+  const topPerJudet     = DATA_S6.top_per_judet     || {};
+  const rarePerJudet    = DATA_S6.rare_per_judet    || {};
+  const personsPerJudet = DATA_S6.persons_per_judet || {};
+
+  let activeMetric = 'saint_pct';
+  const metricLabels = {
+    saint_pct:   '% străzi cu prefix „Sf."',
+    numeric_pct: '% străzi anonime (numere)',
+    female_pct:  '% străzi cu nume feminin',
+  };
+
+  const colorScale = d3.scaleSequential()
+    .interpolator(d3.interpolateRgb('#F4EFE6', '#A53A22'));
+
+  function updateMetric(metric) {
+    activeMetric = metric;
+    document.querySelectorAll('#s6-metric-row .chip').forEach(c =>
+      c.classList.toggle('active', c.dataset.metric === metric)
+    );
+    const values = DATA_S6.by_judet.map(d => d[metric] || 0);
+    const maxVal = d3.max(values);
+    colorScale.domain([0, maxVal]);
+    document.getElementById('s6-scale-max').textContent = maxVal.toFixed(1) + '%';
+    document.getElementById('s6-scale-label').textContent = metricLabels[metric];
+    d3.selectAll('.judet-path').attr('fill', d => {
+      const code = d.properties?.cod;
+      const row  = byJudet[code];
+      return row ? colorScale(row[metric] || 0) : '#EEEAE0';
+    });
+  }
+
+  document.querySelectorAll('#s6-metric-row .chip').forEach(btn => {
+    btn.addEventListener('click', () => updateMetric(btn.dataset.metric));
+  });
+
+  fetch('../ro-counties.geojson')
+    .then(r => r.json())
+    .then(geo => {
+      const svg = d3.select('#s6-map');
+      const cellWidth = svg.node().parentElement.clientWidth;
+      const width  = cellWidth;
+      const height = width * 0.62;
+      svg.attr('viewBox', `0 0 ${width} ${height}`);
+
+      const projection = d3.geoMercator().fitSize([width, height], geo);
+      const path = d3.geoPath().projection(projection);
+
+      svg.selectAll('.judet-path')
+        .data(geo.features)
+        .join('path')
+        .attr('class', 'judet-path')
+        .attr('d', path)
+        .attr('stroke', '#FAF8F3')
+        .attr('stroke-width', 0.9)
+        .style('cursor', 'pointer')
+        .on('click', (event, d) => renderFingerprint(d))
+        .on('mouseenter', function() { d3.select(this).attr('stroke-width', 1.8).attr('stroke', '#15171A'); })
+        .on('mouseleave', function() { d3.select(this).attr('stroke-width', 0.9).attr('stroke', '#FAF8F3'); });
+
+      updateMetric('saint_pct');
+
+      const randomFeature = geo.features[Math.floor(Math.random() * geo.features.length)];
+      renderFingerprint(randomFeature);
+    })
+    .catch(() => {
+      document.getElementById('s6-map').insertAdjacentHTML('afterend',
+        '<p style="font-family:var(--sans);font-size:12px;color:var(--muted);padding:14px 0;">Harta indisponibilă.</p>'
+      );
+    });
+
+  function renderFingerprint(feature) {
+    const code    = feature.properties?.cod;
+    const row     = byJudet[code]         || {};
+    const top     = topPerJudet[code]     || [];
+    const rare    = rarePerJudet[code]    || [];
+    const persons = personsPerJudet[code] || [];
+
+    const scopeDot  = s => ({ universal: '🌍', national: '🇷🇴', local: '·' }[s] || '·');
+    const genderDot = g => g === 'F'
+      ? '<span style="color:#C05E8A;">●</span>'
+      : '<span style="color:#4A7FA5;">●</span>';
+
+    const topRows = top.map(s => {
+      const tag = s.sl
+        ? `<a href="/strada/${s.sl}/" style="text-decoration:none;"><span class="street-tag small">${escapeHtml(s.n)}</span></a>`
+        : `<span class="street-tag small">${escapeHtml(s.n)}</span>`;
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--rule);">
+        ${tag}
+        <span style="color:var(--muted);font-size:10.5px;font-variant-numeric:tabular-nums;">${s.c}</span>
+      </div>`;
+    }).join('');
+
+    const personsRows = persons.map((p, i) => {
+      const nameEl = p.sl
+        ? `<a href="/persoana/${p.sl}/" style="color:var(--ink);text-decoration:none;font-weight:${i===0?'600':'500'};font-size:11.5px;">${escapeHtml(p.n)}</a>`
+        : `<span style="font-family:var(--sans);color:var(--ink);font-weight:${i===0?'600':'500'};font-size:11.5px;">${escapeHtml(p.n)}</span>`;
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px solid var(--rule);">
+        <span style="display:flex;align-items:center;gap:5px;">${genderDot(p.g)}${nameEl}</span>
+        <span style="color:var(--muted);font-size:10.5px;font-variant-numeric:tabular-nums;">${p.c} ${p.s ? scopeDot(p.s) : ''}</span>
+      </div>`;
+    }).join('');
+
+    const rareRows = rare.map(s => {
+      const tag = s.sl
+        ? `<a href="/strada/${s.sl}/" style="text-decoration:none;"><span class="street-tag small">${escapeHtml(s.n)}</span></a>`
+        : `<span class="street-tag small">${escapeHtml(s.n)}</span>`;
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--rule);">
+        ${tag}
+        <span style="color:var(--muted);font-size:10.5px;">${s.j === 1 ? 'unic' : s.j + ' județe'}</span>
+      </div>`;
+    }).join('');
+
+    const fp = document.getElementById('s6-fingerprint');
+    fp.innerHTML = `
+      <div class="kicker"><span class="emo lg">🧬</span> Amprenta județului</div>
+      <div style="font-family:var(--sans);font-weight:700;font-size:20px;margin:2px 0 4px;letter-spacing:-.015em;color:var(--ink);">${feature.properties?.name || code}</div>
+      <div style="font-family:var(--sans);font-size:11px;color:var(--muted);margin-bottom:14px;font-variant-numeric:tabular-nums;font-weight:500;">${(row.total_streets||0).toLocaleString('ro-RO')} de străzi · Sfinți ${(row.saint_pct||0).toFixed(1)}% · Feminin ${(row.female_pct||0).toFixed(1)}%</div>
+      <div class="kicker" style="margin-bottom:6px;"><span class="emo lg">🔝</span> Cele mai frecvente</div>
+      <div style="margin-bottom:14px;">${topRows || '<span style="color:var(--muted)">—</span>'}</div>
+      <div class="kicker" style="margin-bottom:6px;"><span class="emo lg">👤</span> Persoane omagiate</div>
+      <div style="margin-bottom:14px;">${personsRows || '<span style="color:var(--muted)">—</span>'}</div>
+      <div class="kicker" style="margin-bottom:6px;"><span class="emo lg">💎</span> Cele mai rare (unice național)</div>
+      <div>${rareRows || '<span style="color:var(--muted)">—</span>'}</div>
+    `;
+  }
+})();
+</script>
+
+{# ── SORTABLE TABLE JS ────────────────────────────────────────────────────── #}
+<script>
+(function() {
+  const data    = DATA_S6.by_judet.slice();
+  let sortCol   = 'total_streets';
+  let sortAsc   = false;
+
+  function render() {
+    const sorted = data.slice().sort((a, b) => {
+      const va = a[sortCol] ?? 0;
+      const vb = b[sortCol] ?? 0;
+      if (typeof va === 'string') return sortAsc ? va.localeCompare(vb, 'ro') : vb.localeCompare(va, 'ro');
+      return sortAsc ? va - vb : vb - va;
+    });
+    const tbody = document.getElementById('judet-table-body');
+    tbody.innerHTML = sorted.map(row => `
+      <tr style="border-bottom:1px solid var(--rule);">
+        <td style="padding:5px 10px;font-weight:600;">${escapeHtml(row.judet)}</td>
+        <td style="padding:5px 10px;text-align:right;font-variant-numeric:tabular-nums;">${(row.total_streets||0).toLocaleString('ro-RO')}</td>
+        <td style="padding:5px 10px;text-align:right;font-variant-numeric:tabular-nums;">${(row.saint_pct||0).toFixed(1)}%</td>
+        <td style="padding:5px 10px;text-align:right;font-variant-numeric:tabular-nums;">${(row.nature_pct||0).toFixed(1)}%</td>
+        <td style="padding:5px 10px;text-align:right;font-variant-numeric:tabular-nums;">${(row.female_pct||0).toFixed(1)}%</td>
+        <td style="padding:5px 10px;text-align:right;font-variant-numeric:tabular-nums;">${(row.numeric_pct||0).toFixed(1)}%</td>
+      </tr>
+    `).join('');
+  }
+
+  document.querySelectorAll('#judet-table th[data-col]').forEach(th => {
+    th.addEventListener('click', () => {
+      if (sortCol === th.dataset.col) {
+        sortAsc = !sortAsc;
+      } else {
+        sortCol = th.dataset.col;
+        sortAsc = (sortCol === 'judet');
+      }
+      document.querySelectorAll('#judet-table th[data-col]').forEach(h => {
+        const indicator = h.dataset.col === sortCol ? (sortAsc ? ' ▴' : ' ▾') : '';
+        h.textContent = h.dataset.label + indicator;
+      });
+      render();
+    });
+  });
+
+  render();
+})();
+</script>
+
 {% endblock %}
