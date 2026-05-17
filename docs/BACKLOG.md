@@ -34,6 +34,8 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 ## P2
 
+- [ ] **Reconsider static export strategy for all entities** — Phase 1 pre-renders ~3,400 detail pages (2,464 streets + 211 persons + 672 UATs + 72 themes) at build time. This is a significant storage and build-time overhead for long-tail entities that may receive very few visits. Consider: (a) reduce static thresholds (render only top-N per category), (b) render on-demand (Datasette or dynamic handler for missing slugs), or (c) hybrid (static for top-100 streets, dynamic for long tail). Measure traffic patterns first to justify the export cost.
+
 - [ ] **Renaming data source for Section 7 (Renumiri)** — Section 7 of the static site needs before/after rename pairs with substitution type labels. Source candidates: (a) street name version comparison across two registry exports; (b) manual curation CSV; (c) external renamed-streets dataset. Currently the section renders with static illustrative data. When data is available, add `renamings` table to `build_db.py` and implement `site_queries.section7()`.
 
 - [ ] **Gender story needs curation before it can be told** — Current data has very few women classified. The gender gap is a headline finding for the publication but requires meaningful person-table coverage first. Priority curation target: female honorees in the top-500 unclassified names.
