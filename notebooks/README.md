@@ -29,6 +29,7 @@ jupyter notebook
 | `03_ideological_names.ipynb` | **Moștenirea ideologică** — Tokeni comuniști, distribuție județeană, tipare |
 | `04_nature_themes.ipynb` | **Dominanța naturii** — Flori și copaci vs. voievozi și poeți |
 | `05_regional_patterns.ipynb` | **Amprente județene** — Ce face fiecare județ altfel |
+| `06_eminescu.ipynb` | **Eminescu — anatomia unei prezențe ubicue** — 421 străzi în 411 UAT-uri. Studiu de caz al celei mai onorate persoane. |
 
 ## Notă metodologică
 
