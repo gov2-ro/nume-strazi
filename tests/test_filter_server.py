@@ -158,3 +158,60 @@ class TestServerIntegration:
             assert False, "Should have raised"
         except urllib.error.HTTPError as e:
             assert e.code == 404
+
+    def test_filter_no_params_returns_rows(self, base_url):
+        with urllib.request.urlopen(f"{base_url}/api/filter") as r:
+            data = json.loads(r.read())
+        assert data['total'] > 0
+        assert len(data['rows']) > 0
+        assert data['limit'] == 200
+        assert data['offset'] == 0
+
+    def test_filter_judet_constrains_results(self, base_url):
+        with urllib.request.urlopen(f"{base_url}/api/filter?judet=HR") as r:
+            data = json.loads(r.read())
+        assert all(row['judet'] == 'HR' for row in data['rows'])
+        assert data['total'] > 0
+
+    def test_filter_classification_person_rows_only(self, base_url):
+        url = f"{base_url}/api/filter?classification=person&limit=10"
+        with urllib.request.urlopen(url) as r:
+            data = json.loads(r.read())
+        assert all(row['classification'] == 'person' for row in data['rows'])
+
+    def test_filter_profession_poet_in_HR(self, base_url):
+        url = f"{base_url}/api/filter?judet=HR&profession=poet&limit=50"
+        with urllib.request.urlopen(url) as r:
+            data = json.loads(r.read())
+        assert all(row['judet'] == 'HR' for row in data['rows'])
+        assert all(row['profession'] == 'poet' for row in data['rows'])
+
+    def test_filter_pagination_no_overlap(self, base_url):
+        with urllib.request.urlopen(f"{base_url}/api/filter?limit=10&offset=0") as r:
+            p1 = json.loads(r.read())
+        with urllib.request.urlopen(f"{base_url}/api/filter?limit=10&offset=10") as r:
+            p2 = json.loads(r.read())
+        keys1 = {(r['name'], r['uat']) for r in p1['rows']}
+        keys2 = {(r['name'], r['uat']) for r in p2['rows']}
+        assert len(keys1 & keys2) == 0
+
+    def test_filter_rows_have_street_slug(self, base_url):
+        with urllib.request.urlopen(f"{base_url}/api/filter?limit=5") as r:
+            data = json.loads(r.read())
+        assert all('street_slug' in row for row in data['rows'])
+
+    def test_filter_rows_have_uat_slug(self, base_url):
+        with urllib.request.urlopen(f"{base_url}/api/filter?limit=5") as r:
+            data = json.loads(r.read())
+        assert all('uat_slug' in row for row in data['rows'])
+
+    def test_filter_limit_respected(self, base_url):
+        with urllib.request.urlopen(f"{base_url}/api/filter?limit=7") as r:
+            data = json.loads(r.read())
+        assert len(data['rows']) <= 7
+        assert data['limit'] == 7
+
+    def test_filter_limit_capped_at_1000(self, base_url):
+        with urllib.request.urlopen(f"{base_url}/api/filter?limit=9999") as r:
+            data = json.loads(r.read())
+        assert data['limit'] == 1000

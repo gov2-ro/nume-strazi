@@ -178,6 +178,37 @@ def query_meta(conn: sqlite3.Connection) -> dict:
     }
 
 
+def query_filter(conn: sqlite3.Connection, params: dict) -> dict:
+    limit = min(int((params.get('limit') or ['200'])[0]), 1000)
+    offset = int((params.get('offset') or ['0'])[0])
+
+    where, values = build_filter_query(params)
+
+    count_sql = f"SELECT COUNT(*) {_BASE_FROM} {where}"
+    total = conn.execute(count_sql, values).fetchone()[0]
+
+    select_sql = (
+        f"SELECT {_SELECT_COLS} {_BASE_FROM} {where} "
+        f"ORDER BY sd.judet, sd.uat, sd.name LIMIT ? OFFSET ?"
+    )
+    rows = conn.execute(select_sql, [*values, limit, offset]).fetchall()
+
+    def serialize(r: sqlite3.Row) -> dict:
+        d = dict(r)
+        core = d.pop('core_name', None)
+        name_norm = d.get('name_normalized', '')
+        d['street_slug'] = slugify(core or name_norm)
+        d['uat_slug'] = slugify(fix_diacritics(d.get('uat') or ''))
+        return d
+
+    return {
+        'total': total,
+        'limit': limit,
+        'offset': offset,
+        'rows': [serialize(r) for r in rows],
+    }
+
+
 def make_handler(conn: sqlite3.Connection):
     class FilterHandler(BaseHTTPRequestHandler):
         def log_message(self, fmt, *args):
@@ -215,7 +246,7 @@ def make_handler(conn: sqlite3.Connection):
             elif path == '/api/filter':
                 try:
                     params = parse_qs(parsed.query, keep_blank_values=False)
-                    self.send_json({'total': 0, 'limit': 200, 'offset': 0, 'rows': []})
+                    self.send_json(query_filter(conn, params))
                 except Exception as exc:
                     self.send_json({'error': str(exc)}, 500)
 
