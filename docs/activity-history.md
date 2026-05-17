@@ -1,5 +1,25 @@
 # Activity History
 
+## 2026-05-17 — All landing-page panels now filter by județ/municipiu
+
+Extended the nav filter to cover every content panel. Previously only the cluster cloud, persons, theme donut, gender grid, and pageviews list responded to the selector. Now all panels update:
+
+- **Subtipuri Natură** — per-județ `nature_by_judet` dict from new SQL query
+- **Tokeni Ideologici** — per-județ `ideo_by_judet` dict
+- **Profesia persoanei** — per-județ `profession_by_judet` dict
+- **Epoca în care a trăit** — per-județ `era_by_judet` dict
+- **Personalități non-române** (full s8 panel) — re-renders from `foreigners_by_judet`; profession field was missing from that query and was added
+- **Conteste tematice** — hidden when any filter is active (data is national-only, too costly to precompute per-județ)
+
+At municipiu (SIRUTA) level, the four breakdown panels show "(date insuficiente)" — per-siruta breakdown at that granularity isn't precomputed.
+
+### JS architecture
+Added generic `_renderBarRows()` helper shared by nature subtypes, professions, and eras (all are emoji + label + bar + count). Separate `updateIdeoTokens()` for chip-cloud layout, `updateForeigners()` for the rank-list panel. Slug lookups for per-județ rows are built once from national `DATA_S5`/`DATA_S3` at init time (no slug field in the per-județ dicts).
+
+### Non-obvious decisions
+- Ideo token accent threshold lowered from `n > 30` to `n > 10` in the per-județ view — county-level counts are an order of magnitude smaller than national, so the original threshold would never trigger.
+- Contests panel hides rather than shows stale national data — showing national numbers when a județ is selected would be actively misleading.
+
 ## 2026-05-17 — Three-level landing-page filter (națonal → județ → municipiu)
 
 ### What was built
