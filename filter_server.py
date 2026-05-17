@@ -89,8 +89,9 @@ def build_filter_query(params: dict) -> tuple[str, list]:
         values.extend(judete)
 
     if uat := params.get('uat'):
-        conditions.append("sd.uat LIKE ?")
-        values.append(f"%{uat[0].upper()}%")
+        raw = uat[0].upper().replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+        conditions.append("sd.uat LIKE ? ESCAPE '\\\\'")
+        values.append(f"%{raw}%")
 
     if stypes := params.get('street_type'):
         conditions.append(f"sd.street_type IN ({', '.join('?' * len(stypes))})")
@@ -196,7 +197,7 @@ def query_filter(conn: sqlite3.Connection, params: dict) -> dict:
     def serialize(r: sqlite3.Row) -> dict:
         d = dict(r)
         core = d.pop('core_name', None)
-        name_norm = d.get('name_normalized', '')
+        name_norm = d.pop('name_normalized', '')
         d['street_slug'] = slugify(core or name_norm)
         d['uat_slug'] = slugify(fix_diacritics(d.get('uat') or ''))
         return d

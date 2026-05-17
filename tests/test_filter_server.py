@@ -107,6 +107,11 @@ class TestBuildFilterQuery:
         })
         assert " AND " in where
 
+    def test_uat_escapes_like_metacharacters(self):
+        where, vals = filter_server.build_filter_query({'uat': ['100%']})
+        assert "ESCAPE" in where
+        assert "%100\\%%" in vals
+
 
 DB_PATH = "data/streets.db"
 DB_EXISTS = os.path.exists(DB_PATH)
@@ -217,3 +222,8 @@ class TestServerIntegration:
         with urllib.request.urlopen(f"{base_url}/api/filter?limit=9999") as r:
             data = json.loads(r.read())
         assert data['limit'] == 1000
+
+    def test_filter_rows_do_not_expose_name_normalized(self, base_url):
+        with urllib.request.urlopen(f"{base_url}/api/filter?limit=5") as r:
+            data = json.loads(r.read())
+        assert all('name_normalized' not in row for row in data['rows'])
