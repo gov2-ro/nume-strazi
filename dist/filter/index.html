@@ -385,6 +385,7 @@ const state = {
   offset: 0,
   limit: 200,
   debounceTimer: null,
+  queryGen: 0,
 };
 
 function esc(s) {
@@ -585,13 +586,16 @@ function onFilterChange() {
 }
 
 async function runQuery() {
+  const gen = ++state.queryGen;
   const params = buildParams();
   pushUrl(params);
   document.getElementById('results-body').innerHTML = '<div class="loading">Se caută…</div>';
   try {
     const data = await fetchResults(params);
+    if (gen !== state.queryGen) return;
     renderResults(data);
   } catch (e) {
+    if (gen !== state.queryGen) return;
     document.getElementById('results-body').innerHTML =
       `<div class="empty-state">Eroare: ${esc(e.message)}</div>`;
   }
