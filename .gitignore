@@ -23,11 +23,9 @@ __pycache__/
 # macOS
 .DS_Store
 
-# Static site build output
-dist/
-# Filter UI is source, not a build artifact — track it
+# Static site build output (dist/filter/ is excluded — it's source, not a build artifact)
+dist/*
 !dist/filter/
-!dist/filter/index.html
 
 # Claude Code superpowers
 .superpowers/
