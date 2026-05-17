@@ -1,5 +1,9 @@
 # Activity History
 
+## 2026-05-18 — Permanent URLs for Landing-Page Filter
+
+Added query-string state persistence to the two-level județ/municipiu filter on the landing page. Selecting a județ updates the URL to `/?judet=CJ`; selecting a municipiu appends `&siruta=54984`. On page load, `URLSearchParams` is read and the filter is restored before the first `render()` call — with `updateUrl()` called after each branch to clean any stale params. `history.replaceState` (not `pushState`) is used — Back button is intentionally not wired to filter navigation. All changes in `templates/index.html.j2`.
+
 ## 2026-05-17 — All landing-page panels now filter by județ/municipiu
 
 Extended the nav filter to cover every content panel. Previously only the cluster cloud, persons, theme donut, gender grid, and pageviews list responded to the selector. Now all panels update:

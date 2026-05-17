@@ -103,7 +103,7 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [ ] top of foreigners foreign street names
 
-- [ ] lading page, permanent urls for selected judet / municipiu
+- [x] lading page, permanent urls for selected judet / municipiu
 
 - [ ] percent of nationalities of personalities. Universal. Local.
 
