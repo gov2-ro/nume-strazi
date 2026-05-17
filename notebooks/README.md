@@ -23,6 +23,7 @@ jupyter notebook
 
 | Fișier | Subiect |
 |--------|---------|
+| `00_data_tour.ipynb` | **Tur ghidat** — schema bazei, regulile critice (`streets_dedup`, `core_name_norm`), un join concret. Punct de plecare. |
 | `01_gender_gap.ipynb` | **Ecartul de gen** — 95 din 100 de români onorați sunt bărbați. Cine sunt cele 5%? |
 | `02_recognition_scope.ipynb` | **Recunoaștere locală vs. globală** — Wikidata sitelinks ca proxy pentru notorietate internațională |
 | `03_ideological_names.ipynb` | **Moștenirea ideologică** — Tokeni comuniști, distribuție județeană, tipare |
