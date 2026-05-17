@@ -62,7 +62,7 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [ ] **OSM: Bucharest sector coverage is low (~31%)** — Centroid-based UAT assignment is imprecise for Bucharest's 6 sectors because their boundaries interleave. Two options: (a) parse admin_level=9 boundaries from the PBF using osmium's area assembler to get sector polygons, then re-assign ways by polygon containment; (b) accept as-is for v1 (sector-level scoring is degraded but the rest of Romania is fine). Note: `osm_sanity.py` reference UAT for Bucharest is Sector 1 (SIRUTA 179141); re-run sanity after any fix.
 
-- [ ] **Person recognition scope via Wikipedia sitelinks** — For each honoree in the `persons` table, classify their recognition as `universal` / `national` / `local` / `unknown` based on how many Wikipedia language editions have an article for them. Sitelink count is a static, auth-free Wikidata API signal that proxies international recognition well.
+- [x] **Person recognition scope via Wikipedia sitelinks** — For each honoree in the `persons` table, classify their recognition as `universal` / `national` / `local` / `unknown` based on how many Wikipedia language editions have an article for them. Sitelink count is a static, auth-free Wikidata API signal that proxies international recognition well.
 
   Tiers (to calibrate after first run): `universal` ≥50 editions (Eminescu, Trajan, Curie), `national` 5–49 (most Romanian historical figures), `local` 1–4 (obscure outside RO), `unknown` no article found.
 
@@ -102,6 +102,8 @@ Items detected during sessions. Each entry has enough context to act on cold.
 - [ ] og image, og description, metadata
 
 - [ ] top of foreigners foreign street names
+
+- [ ] lading page, permanent urls for selected judet / municipiu
 
 - [ ] percent of nationalities of personalities. Universal. Local.
 
