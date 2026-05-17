@@ -1763,11 +1763,14 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       if (siruta && validSirute.includes(siruta)) {
         uatSelect.value = siruta;
         render(judet, siruta);
+        updateUrl(judet, siruta);
       } else {
         render(judet, null);
+        updateUrl(judet, null);
       }
     } else {
       render('all', null);
+      updateUrl('all', null);
     }
   })();
 })();
