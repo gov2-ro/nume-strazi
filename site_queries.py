@@ -283,6 +283,7 @@ def section3(conn: sqlite3.Connection) -> dict:
                 p.core_name_norm,
                 MAX(p.full_name)       AS full_name,
                 MAX(p.nationality)     AS nationality,
+                MAX(p.profession)      AS profession,
                 MAX(p.wikidata_qid)    AS wikidata_qid,
                 COUNT(*)               AS street_count
               FROM streets_dedup sd
@@ -293,11 +294,11 @@ def section3(conn: sqlite3.Connection) -> dict:
               GROUP BY 1, 2
             ),
             ranked AS (
-              SELECT judet, full_name, nationality, wikidata_qid, street_count,
+              SELECT judet, full_name, nationality, profession, wikidata_qid, street_count,
                      ROW_NUMBER() OVER (PARTITION BY judet ORDER BY street_count DESC) AS rn
               FROM per_judet
             )
-            SELECT judet, full_name, nationality, wikidata_qid, street_count
+            SELECT judet, full_name, nationality, profession, wikidata_qid, street_count
             FROM ranked WHERE rn <= 10
             ORDER BY judet, street_count DESC
         """)
@@ -305,7 +306,8 @@ def section3(conn: sqlite3.Connection) -> dict:
         for r in rows:
             out.setdefault(r["judet"], []).append({
                 "full_name":    r["full_name"],
-                "nationality": r["nationality"],
+                "nationality":  r["nationality"],
+                "profession":   r["profession"],
                 "wikidata_qid": r["wikidata_qid"],
                 "street_count": r["street_count"],
             })
@@ -319,6 +321,42 @@ def section3(conn: sqlite3.Connection) -> dict:
         _add_person_slugs(rows)
     for rows in foreigners_by_judet.values():
         _add_person_slugs(rows)
+
+    # Profession distribution per județ
+    prof_judet_rows = _rows(conn, """
+        SELECT CASE WHEN sd.judet LIKE 'BUCURESTI%%' OR sd.judet = 'B' THEN 'B'
+                    ELSE sd.judet END AS judet,
+               COALESCE(p.profession, 'necunoscut') AS profession,
+               COUNT(DISTINCT p.core_name_norm) AS n
+        FROM streets_dedup sd
+        JOIN persons p ON p.core_name_norm = sd.core_name_norm
+        WHERE p.profession IS NOT NULL
+        GROUP BY 1, 2
+        ORDER BY 1, 3 DESC
+    """)
+    profession_by_judet: dict[str, list[dict]] = {}
+    for r in prof_judet_rows:
+        profession_by_judet.setdefault(r["judet"], []).append(
+            {"profession": r["profession"], "n": r["n"]}
+        )
+
+    # Era distribution per județ
+    era_judet_rows = _rows(conn, """
+        SELECT CASE WHEN sd.judet LIKE 'BUCURESTI%%' OR sd.judet = 'B' THEN 'B'
+                    ELSE sd.judet END AS judet,
+               COALESCE(p.era, 'necunoscută') AS era,
+               COUNT(DISTINCT p.core_name_norm) AS n
+        FROM streets_dedup sd
+        JOIN persons p ON p.core_name_norm = sd.core_name_norm
+        WHERE p.era IS NOT NULL
+        GROUP BY 1, 2
+        ORDER BY 1, 3 DESC
+    """)
+    era_by_judet: dict[str, list[dict]] = {}
+    for r in era_judet_rows:
+        era_by_judet.setdefault(r["judet"], []).append(
+            {"era": r["era"], "n": r["n"]}
+        )
 
     gender_count_rows = _rows(conn, """
         SELECT CASE WHEN sd.judet LIKE 'BUCURESTI%%' OR sd.judet = 'B' THEN 'B'
@@ -372,6 +410,8 @@ def section3(conn: sqlite3.Connection) -> dict:
         "women_by_judet": women_by_judet,
         "foreigners_by_judet": foreigners_by_judet,
         "gender_by_judet": gender_by_judet,
+        "profession_by_judet": profession_by_judet,
+        "era_by_judet": era_by_judet,
         "total_m": counts.get("m", 0) or 0,
         "total_f": counts.get("f", 0) or 0,
         "profession_dist": profession_dist,
@@ -511,6 +551,43 @@ def section5(conn: sqlite3.Connection) -> dict:
     for r in ideo_tokens:
         r["slug"] = f"ideologic-{slugify(r['token'])}" if r.get("token") else ""
 
+    # Nature subtypes per județ
+    nature_judet_rows = _rows(conn, """
+        SELECT CASE WHEN sd.judet LIKE 'BUCURESTI%%' OR sd.judet = 'B' THEN 'B'
+                    ELSE sd.judet END AS judet,
+               COALESCE(nt.nature_type, 'altele') AS nature_type,
+               COUNT(DISTINCT sd.name_normalized) AS n
+        FROM streets_dedup sd
+        JOIN nature_terms nt ON nt.core_name_norm = sd.core_name_norm
+        WHERE sd.is_numeric = 0 AND sd.core_name IS NOT NULL
+        GROUP BY 1, 2
+        ORDER BY 1, 3 DESC
+    """)
+    nature_by_judet: dict[str, list[dict]] = {}
+    for r in nature_judet_rows:
+        nature_by_judet.setdefault(r["judet"], []).append(
+            {"nature_type": r["nature_type"], "n": r["n"]}
+        )
+
+    # Ideo tokens per județ
+    ideo_judet_rows = _rows(conn, """
+        SELECT CASE WHEN sd.judet LIKE 'BUCURESTI%%' OR sd.judet = 'B' THEN 'B'
+                    ELSE sd.judet END AS judet,
+               nc.subcategory AS token,
+               COUNT(DISTINCT sd.name_normalized) AS n
+        FROM streets_dedup sd
+        JOIN name_categories nc ON nc.core_name_norm = sd.core_name_norm
+        WHERE nc.category = 'ideological' AND nc.subcategory IS NOT NULL
+          AND sd.is_numeric = 0
+        GROUP BY 1, 2
+        ORDER BY 1, 3 DESC
+    """)
+    ideo_by_judet: dict[str, list[dict]] = {}
+    for r in ideo_judet_rows:
+        ideo_by_judet.setdefault(r["judet"], []).append(
+            {"token": r["token"], "n": r["n"]}
+        )
+
     theme_judet_rows = _rows(conn, """
         SELECT CASE WHEN sd.judet LIKE 'BUCURESTI%%' OR sd.judet = 'B' THEN 'B'
                     ELSE sd.judet END AS judet,
@@ -542,7 +619,9 @@ def section5(conn: sqlite3.Connection) -> dict:
         "theme_dist": theme_dist,
         "theme_by_judet": theme_by_judet,
         "nature_subtypes": nature_subtypes,
+        "nature_by_judet": nature_by_judet,
         "ideo_tokens": ideo_tokens,
+        "ideo_by_judet": ideo_by_judet,
     }
 
 

@@ -1005,6 +1005,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
   <div class="panel-header">
     <span class="panel-label"><span class="emo xl">🌿</span> Subtipuri · Natură</span>
   </div>
+  <div id="s5-nature-list">
   {% set max_n = section5.nature_subtypes[0].n if section5.nature_subtypes else 1 %}
   {% for row in section5.nature_subtypes %}
   <div style="display:flex;align-items:center;gap:8px;padding:3px 0;{% if not loop.first %}border-top:1px solid var(--hairline);{% endif %}">
@@ -1018,6 +1019,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
     <span style="font-family:var(--sans);font-size:22px;font-weight:500;color:var(--ink);width:56px;text-align:right;font-variant-numeric:tabular-nums;letter-spacing:-.005em;">{{ row.n }}</span>
   </div>
   {% endfor %}
+  </div>
 </div>
 
 {# PANEL: TOKENI IDEOLOGICI (s4) #}
@@ -1036,7 +1038,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
   <div class="panel-header">
     <span class="panel-label"><span class="emo xl">🚩</span> Tokeni ideologici</span>
   </div>
-  <div style="display:flex;flex-wrap:wrap;gap:6px;">
+  <div id="s5-ideo-list" style="display:flex;flex-wrap:wrap;gap:6px;">
     {% for tok in section5.ideo_tokens %}
     {% set tok_inner %}<span>{{ ideo_ro.get(tok.token, tok.token) }} <span style="color:var(--muted);font-size:16px;margin-left:6px;font-variant-numeric:tabular-nums;font-weight:500;">{{ tok.n }}</span></span>{% endset %}
     {% if tok.slug %}
@@ -1106,6 +1108,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
   <div class="panel-header">
     <span class="panel-label"><span class="emo xl">🎓</span> Profesia persoanei onorate</span>
   </div>
+  <div id="s3-prof-list">
   {% set max_prof = section3.profession_dist[0].n if section3.profession_dist else 1 %}
   {% for row in section3.profession_dist %}
   <div style="display:flex;align-items:center;gap:8px;padding:3px 0;{% if not loop.first %}border-top:1px solid var(--hairline);{% endif %}">
@@ -1121,6 +1124,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
     <span style="font-family:var(--sans);font-size:22px;font-weight:500;color:var(--ink);width:48px;text-align:right;font-variant-numeric:tabular-nums;letter-spacing:-.005em;">{{ row.n }}</span>
   </div>
   {% endfor %}
+  </div>
 </div>
 
 {# PANEL: EPOCI (s4) #}
@@ -1137,6 +1141,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
   <div class="panel-header">
     <span class="panel-label"><span class="emo xl">⏳</span> Epoca în care a trăit</span>
   </div>
+  <div id="s3-era-list">
   {% set max_era = section3.era_dist[0].n if section3.era_dist else 1 %}
   {% for row in section3.era_dist %}
   <div style="display:flex;align-items:center;gap:8px;padding:3px 0;{% if not loop.first %}border-top:1px solid var(--hairline);{% endif %}">
@@ -1148,6 +1153,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
     <span style="font-family:var(--sans);font-size:22px;font-weight:500;color:var(--ink);width:48px;text-align:right;font-variant-numeric:tabular-nums;letter-spacing:-.005em;">{{ row.n }}</span>
   </div>
   {% endfor %}
+  </div>
 </div>
 
 {# (Top persoane panel removed — moved up to sit beside #cele-mai-intalnite as an s6 cluster cloud.) #}
@@ -1168,13 +1174,13 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
   'military':'militar','revolutionary':'revoluționar',
   'scientist':'om de știință','painter':'pictor','philosopher':'filozof',
 } %}
-<div class="panel s8">
+<div id="s3-foreigners-panel" class="panel s8">
   <div class="panel-header">
     <span class="panel-label"><span class="emo xl">🌍</span> Personalități non-române honorate pe străzi</span>
-    <span class="panel-meta">{{ section3.top_foreigners | length }} persoane</span>
+    <span class="panel-meta" id="s3-foreigners-count">{{ section3.top_foreigners | length }} persoane</span>
   </div>
   {% set max_f = section3.top_foreigners[0].street_count if section3.top_foreigners else 1 %}
-  <div class="rank-list">
+  <div id="s3-foreigners-list" class="rank-list">
     {% for p in section3.top_foreigners %}
     <div class="rank-row" style="grid-template-columns:32px minmax(0,1fr) minmax(50px,0.9fr) 48px 80px;">
       <span style="font-size:20px;line-height:1;text-align:center;">{{ nat_flag.get(p.nationality, '🏳️') }}</span>
@@ -1275,7 +1281,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
   'trades':  '🔨',
 } %}
 {% set contest_order = ['flowers', 'trees', 'birds', 'animals', 'sky', 'trades'] %}
-<div class="panel s12">
+<div id="s8-contests-panel" class="panel s12">
   <div class="panel-header">
     <span class="panel-label"><span class="emo xl">🏟️</span> Conteste tematice · top 7 din fiecare familie</span>
   </div>
@@ -1394,6 +1400,115 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       uatSelect.appendChild(opt);
     });
     uatSelect.style.display = 'inline-block';
+  }
+
+  // ── Lookup tables (replicate Jinja2 dicts for JS-rendered panels) ─────────
+  const NATURE_RO  = {'flower':'flori','tree':'copaci','water':'apă','plant':'plante','bird':'păsări','sky':'cer','geography':'geografie','forest':'pădure','meadow':'câmpie','season':'anotimpuri','animal':'animale','weather':'vreme','fruit':'fructe','field':'câmp','hill':'deal','orchard':'livadă','valley':'vale','peak':'vârf','mountain':'munte','mountain_peak':'vârf de munte'};
+  const NATURE_EMO = {'flower':'🌸','tree':'🌳','water':'💧','plant':'🌱','bird':'🐦','sky':'☁️','geography':'🗺️','forest':'🌲','meadow':'🌾','season':'🍂','animal':'🦌','weather':'🌦️','fruit':'🍎','field':'🌾','hill':'⛰️','orchard':'🍒','valley':'🏞️','peak':'🏔️','mountain':'⛰️','mountain_peak':'🏔️'};
+  const NATURE_SLUG = Object.fromEntries((DATA_S5.nature_subtypes || []).map(r => [r.nature_type, r.slug]));
+
+  const PROF_RO  = {'writer':'scriitor','poet':'poet','politician':'politician','voievod':'voievod','revolutionary':'revoluționar','military':'militar','royalty':'rege / regină','scientist':'om de știință','painter':'pictor','ruler':'conducător','historian':'istoric','composer':'compozitor','engineer':'inginer','educator':'pedagog','clergy':'cleric','philosopher':'filosof','actor':'actor','architect':'arhitect','doctor':'medic','economist':'economist','jurist':'jurist','linguist':'lingvist','mathematician':'matematician','lawyer':'avocat'};
+  const PROF_EMO = {'writer':'✍️','poet':'🪶','politician':'🏛️','voievod':'🗡️','revolutionary':'✊','military':'🎖️','royalty':'👑','scientist':'🔬','painter':'🎨','ruler':'⚜️','historian':'📜','composer':'🎼','engineer':'⚙️','educator':'🎓','clergy':'✝️','philosopher':'🧠','actor':'🎭','architect':'📐','doctor':'🩺','economist':'💼','jurist':'⚖️','linguist':'🗣️','mathematician':'➗','lawyer':'⚖️'};
+  const PROF_SLUG = Object.fromEntries((DATA_S3.profession_dist || []).map(r => [r.profession, r.slug]));
+
+  const ERA_RO  = {'ancient':'antichitate','medieval':'medieval','premodern':'premodern (1700–1900)','1848':'generația de la 1848','interwar':'interbelic (1900–1947)','communist':'comunism (1947–1989)'};
+  const ERA_EMO = {'ancient':'🏺','medieval':'🏰','premodern':'🕯️','1848':'🗽','interwar':'🎩','communist':'⭐'};
+
+  const IDEO_RO   = {'victory':'victorie','national_day':'zi națională','brotherhood':'frăție','youth':'tinerețe','workers':'muncitori','unification':'unire','triumph':'triumf','solidarity':'solidaritate','revolution':'revoluție','republic':'republică','rebirth':'renaștere','progress':'progres','peace':'pace','liberation':'eliberare','labor':'muncă','independence':'independență','homeland':'patrie','glory':'glorie','freedom':'libertate','fraternity':'frăternitate','equality':'egalitate','emancipation':'emancipare','democracy':'democrație','cooperative':'cooperativă','communist_press':'presă comunistă','commemorative':'comemorativ'};
+  const IDEO_SLUG = Object.fromEntries((DATA_S5.ideo_tokens || []).map(r => [r.token, r.slug]));
+
+  const NAT_FLAG = {'HU':'🇭🇺','FR':'🇫🇷','DE':'🇩🇪','IT':'🇮🇹','GB':'🇬🇧','RU':'🇷🇺','AT':'🇦🇹','PL':'🇵🇱','TR':'🇹🇷','US':'🇺🇸','GR':'🇬🇷','SR':'🇷🇸','UA':'🇺🇦','CZ':'🇨🇿','SK':'🇸🇰','BG':'🇧🇬','MD':'🇲🇩','HR':'🇭🇷','SI':'🇸🇮','CH':'🇨🇭','ES':'🇪🇸','PT':'🇵🇹','NL':'🇳🇱','BE':'🇧🇪','SE':'🇸🇪','NO':'🇳🇴','DK':'🇩🇰','FI':'🇫🇮','IL':'🇮🇱','JP':'🇯🇵'};
+  const PROF_RO_SMALL = {'poet':'poet','writer':'scriitor','composer':'compozitor','royalty':'rege / voievod','politician':'politician','military':'militar','revolutionary':'revoluționar','scientist':'om de știință','painter':'pictor','philosopher':'filozof'};
+
+  // ── Generic bar-row renderer (nature, profession, era) ────────────────────
+  function _renderBarRows(rows, labelFn, emoFn, linkFn, barClass) {
+    if (!rows || !rows.length) return '<div style="color:var(--muted);font-size:11.5px;padding:6px 0;font-style:italic;">(date insuficiente)</div>';
+    const maxN = rows[0].n || 1;
+    return rows.slice(0, 8).map((r, i) => {
+      const label = escapeHtml(labelFn(r));
+      const emo   = emoFn(r);
+      const href  = linkFn(r);
+      const pct   = Math.round(r.n / maxN * 100);
+      const border = i > 0 ? 'border-top:1px solid var(--hairline);' : '';
+      const nameEl = href
+        ? `<a href="${href}" style="font-family:var(--sans);font-size:22px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);text-decoration:none;">${label}</a>`
+        : `<span style="font-family:var(--sans);font-size:22px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${label}</span>`;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;${border}"><span class="emo xxl" style="width:24px;text-align:center;">${emo}</span>${nameEl}<div class="bar-wrap" style="width:90px;"><div class="bar ${barClass}" style="width:${pct}%;"></div></div><span style="font-family:var(--sans);font-size:22px;font-weight:500;color:var(--ink);width:56px;text-align:right;font-variant-numeric:tabular-nums;letter-spacing:-.005em;">${r.n}</span></div>`;
+    }).join('');
+  }
+
+  function updateNatureSubtypes(rows) {
+    const el = document.getElementById('s5-nature-list');
+    if (el) el.innerHTML = _renderBarRows(rows,
+      r => NATURE_RO[r.nature_type] || r.nature_type,
+      r => NATURE_EMO[r.nature_type] || '·',
+      r => NATURE_SLUG[r.nature_type] ? `/tema/${NATURE_SLUG[r.nature_type]}/` : null,
+      'olive');
+  }
+
+  function updateProfessions(rows) {
+    const el = document.getElementById('s3-prof-list');
+    if (el) el.innerHTML = _renderBarRows(rows,
+      r => PROF_RO[r.profession] || r.profession,
+      r => PROF_EMO[r.profession] || '·',
+      r => PROF_SLUG[r.profession] ? `/tema/${PROF_SLUG[r.profession]}/` : null,
+      '');
+  }
+
+  function updateEras(rows) {
+    const el = document.getElementById('s3-era-list');
+    if (el) el.innerHTML = _renderBarRows(rows,
+      r => ERA_RO[r.era] || r.era || 'necunoscută',
+      r => ERA_EMO[r.era] || '·',
+      () => null,
+      '');
+  }
+
+  function updateIdeoTokens(rows) {
+    const el = document.getElementById('s5-ideo-list');
+    if (!el) return;
+    if (!rows || !rows.length) {
+      el.innerHTML = '<span style="font-style:italic;color:var(--muted);font-size:11.5px;">(date insuficiente)</span>';
+      return;
+    }
+    el.innerHTML = rows.slice(0, 12).map(r => {
+      const label = escapeHtml(IDEO_RO[r.token] || r.token);
+      const slug  = IDEO_SLUG[r.token] || '';
+      const isHigh = r.n > 10;
+      const style = `font-family:var(--sans);font-size:20px;font-weight:500;padding:7px 14px;border:1.5px solid ${isHigh ? 'var(--accent)' : 'var(--rule-strong)'};border-radius:3px;color:${isHigh ? 'var(--accent-dark)' : 'var(--ink)'};background:${isHigh ? '#FFF1ED' : 'var(--bg)'};`;
+      const inner = `${label} <span style="color:var(--muted);font-size:16px;margin-left:6px;font-variant-numeric:tabular-nums;font-weight:500;">${r.n}</span>`;
+      return slug
+        ? `<a href="/tema/${slug}/" style="${style}text-decoration:none;display:inline-flex;align-items:center;">${inner}</a>`
+        : `<span style="${style}">${inner}</span>`;
+    }).join('');
+  }
+
+  function updateForeigners(rows) {
+    const panel = document.getElementById('s3-foreigners-panel');
+    const list  = document.getElementById('s3-foreigners-list');
+    const cnt   = document.getElementById('s3-foreigners-count');
+    if (!list) return;
+    if (!rows || !rows.length) {
+      if (panel) panel.style.display = 'none';
+      return;
+    }
+    if (panel) panel.style.display = '';
+    if (cnt) cnt.textContent = rows.length + ' persoane';
+    const maxF = rows[0].street_count || 1;
+    list.innerHTML = rows.map(p => {
+      const flag = NAT_FLAG[p.nationality] || '🏳️';
+      const prof = escapeHtml(PROF_RO_SMALL[p.profession] || p.profession || '—');
+      const pct  = Math.round(p.street_count / maxF * 100);
+      const href = p.slug ? `/persoana/${p.slug}/` : null;
+      const portrait = (p.wikidata_qid && PORTRAITS.has(p.wikidata_qid))
+        ? `<span class="portrait" style="width:22px;height:22px;border-radius:50%;overflow:hidden;flex-shrink:0;display:inline-flex;"><img src="portraits/${p.wikidata_qid}.jpg" alt="" style="width:100%;height:100%;object-fit:cover;" loading="lazy"></span>`
+        : '';
+      const nameInner = portrait + escapeHtml(p.full_name);
+      const nameEl = href
+        ? `<a href="${href}" style="color:inherit;text-decoration:none;display:flex;align-items:center;gap:7px;"><span class="rank-name person">${nameInner}</span></a>`
+        : `<span class="rank-name person" style="display:flex;align-items:center;gap:7px;">${nameInner}</span>`;
+      return `<div class="rank-row" style="grid-template-columns:32px minmax(0,1fr) minmax(50px,0.9fr) 48px 80px;"><span style="font-size:20px;line-height:1;text-align:center;">${flag}</span>${nameEl}<span style="font-family:var(--sans);font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${prof}</span><div class="bar-wrap"><div class="bar" style="width:${pct}%"></div></div><span class="rank-count">${p.street_count}</span></div>`;
+    }).join('');
   }
 
   // ── Theme panel helpers ───────────────────────────────────────────────────
@@ -1521,12 +1636,13 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 
   function render(code, siruta) {
     let streets, men, women, foreigners, themeData, genderData, pvRows, footerText;
+    let natRows, ideoRows, profRows, eraRows, foreignersFull;
+    const isUat   = !!(siruta && siruta !== 'all');
+    const isNat   = (code === 'all' && !isUat);
 
-    if (siruta && siruta !== 'all') {
+    if (isUat) {
       // UAT level
       const m = DATA_MUNICIPII;
-      streets    = (m.streets || {})[siruta] || [];
-      // municipii streets use compact keys: n=core_name, nn=name_normalized, c=street_count, sl=slug
       const expandStreet = r => ({
         core_name: r.n, name_normalized: r.nn, street_count: r.c,
         wikidata_qid: null, slug: r.sl, category: r.cat
@@ -1534,34 +1650,46 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       const expandPerson = r => ({
         full_name: r.n, wikidata_qid: r.qid, street_count: r.c, slug: r.sl, gender: null
       });
-      streets    = streets.map(expandStreet);
-      men        = ((m.men  || {})[siruta] || []).map(expandPerson);
-      women      = ((m.women|| {})[siruta] || []).map(expandPerson);
-      foreigners = [];
-      themeData  = (m.themes || {})[siruta] || null;
-      genderData = (m.gender || {})[siruta] || null;
-      pvRows     = null;
+      streets       = ((m.streets || {})[siruta] || []).map(expandStreet);
+      men           = ((m.men  || {})[siruta] || []).map(expandPerson);
+      women         = ((m.women|| {})[siruta] || []).map(expandPerson);
+      foreigners    = [];
+      themeData     = (m.themes || {})[siruta] || null;
+      genderData    = (m.gender || {})[siruta] || null;
+      pvRows        = null;
+      natRows = ideoRows = profRows = eraRows = null;  // no UAT-level breakdown
+      foreignersFull = [];
       const uatName = uatSelect.options[uatSelect.selectedIndex]?.text?.split(' · ')[0] || siruta;
       footerText = `municipiul ${uatName}`;
-    } else if (code === 'all') {
-      streets    = DATA_S2.top_names.slice(0, LIMIT_STREETS);
-      men        = DATA_S3.top_men || [];
-      women      = DATA_S3.top_women || [];
-      foreigners = DATA_S3.top_foreigners || [];
-      themeData  = null;
-      genderData = null;
-      pvRows     = DATA_S4.top_pageviews || [];
+    } else if (isNat) {
+      streets        = DATA_S2.top_names.slice(0, LIMIT_STREETS);
+      men            = DATA_S3.top_men || [];
+      women          = DATA_S3.top_women || [];
+      foreigners     = DATA_S3.top_foreigners || [];
+      themeData      = null;
+      genderData     = null;
+      pvRows         = DATA_S4.top_pageviews || [];
+      natRows        = DATA_S5.nature_subtypes || [];
+      ideoRows       = DATA_S5.ideo_tokens || [];
+      profRows       = DATA_S3.profession_dist || [];
+      eraRows        = DATA_S3.era_dist || [];
+      foreignersFull = DATA_S3.top_foreigners || [];
       footerText = `top ${streets.length} · la nivel național`;
     } else {
       // Județ level
       const label = (JUDET_NAMES[code] || code) + ' (' + code + ')';
-      streets    = (DATA_S2.by_judet || {})[code] || [];
-      men        = (DATA_S3.men_by_judet || {})[code] || [];
-      women      = (DATA_S3.women_by_judet || {})[code] || [];
-      foreigners = (DATA_S3.foreigners_by_judet || {})[code] || [];
-      themeData  = (DATA_S5.theme_by_judet || {})[code] || null;
-      genderData = (DATA_S3.gender_by_judet || {})[code] || null;
-      pvRows     = (DATA_S4.top_pageviews_by_judet || {})[code] || [];
+      streets        = (DATA_S2.by_judet || {})[code] || [];
+      men            = (DATA_S3.men_by_judet || {})[code] || [];
+      women          = (DATA_S3.women_by_judet || {})[code] || [];
+      foreigners     = (DATA_S3.foreigners_by_judet || {})[code] || [];
+      themeData      = (DATA_S5.theme_by_judet || {})[code] || null;
+      genderData     = (DATA_S3.gender_by_judet || {})[code] || null;
+      pvRows         = (DATA_S4.top_pageviews_by_judet || {})[code] || [];
+      natRows        = (DATA_S5.nature_by_judet || {})[code] || [];
+      ideoRows       = (DATA_S5.ideo_by_judet || {})[code] || [];
+      profRows       = (DATA_S3.profession_by_judet || {})[code] || [];
+      eraRows        = (DATA_S3.era_by_judet || {})[code] || [];
+      foreignersFull = (DATA_S3.foreigners_by_judet || {})[code] || [];
       footerText = `județul ${label}`;
     }
 
@@ -1574,22 +1702,36 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
     setSubCount('s3p-foreigners-count', foreigners.length);
     document.getElementById('s2-footer').textContent = footerText;
 
-    // Update all other panels
+    // Theme donut
     if (themeData) {
       updateTheme(themeData);
-    } else if (code === 'all') {
-      // Restore national theme from baked-in page data
+    } else if (isNat) {
       const natTotal = DATA_S5.theme_dist.reduce((s, t) => s + t.count, 0);
       const natMap = Object.fromEntries(DATA_S5.theme_dist.map(t => [t.category, t.count]));
       natMap.total = natTotal;
       updateTheme(natMap);
     }
 
-    const gm = genderData ? genderData.m : (code === 'all' ? DATA_S3.total_m : 0);
-    const gf = genderData ? genderData.f : (code === 'all' ? DATA_S3.total_f : 0);
+    // Gender grid
+    const gm = genderData ? genderData.m : (isNat ? DATA_S3.total_m : 0);
+    const gf = genderData ? genderData.f : (isNat ? DATA_S3.total_f : 0);
     updateGenderGrid(gm, gf);
 
+    // Pageviews list
     if (pvRows !== null) updatePageviews(pvRows);
+
+    // Nature subtypes, ideo tokens, professions, eras
+    updateNatureSubtypes(natRows);
+    updateIdeoTokens(ideoRows);
+    updateProfessions(profRows);
+    updateEras(eraRows);
+
+    // Foreigners full panel
+    updateForeigners(foreignersFull);
+
+    // Contests panel: national only
+    const contestsPanel = document.getElementById('s8-contests-panel');
+    if (contestsPanel) contestsPanel.style.display = isNat ? '' : 'none';
   }
 
   select.addEventListener('change', e => {
