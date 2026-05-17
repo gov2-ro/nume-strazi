@@ -179,8 +179,8 @@ def query_meta(conn: sqlite3.Connection) -> dict:
 
 
 def query_filter(conn: sqlite3.Connection, params: dict) -> dict:
-    limit = min(int((params.get('limit') or ['200'])[0]), 1000)
-    offset = int((params.get('offset') or ['0'])[0])
+    limit = max(1, min(int((params.get('limit') or ['200'])[0]), 1000))
+    offset = max(0, int((params.get('offset') or ['0'])[0]))
 
     where, values = build_filter_query(params)
 

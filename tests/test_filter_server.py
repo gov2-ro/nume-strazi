@@ -177,12 +177,14 @@ class TestServerIntegration:
         url = f"{base_url}/api/filter?classification=person&limit=10"
         with urllib.request.urlopen(url) as r:
             data = json.loads(r.read())
+        assert len(data['rows']) > 0
         assert all(row['classification'] == 'person' for row in data['rows'])
 
     def test_filter_profession_poet_in_HR(self, base_url):
         url = f"{base_url}/api/filter?judet=HR&profession=poet&limit=50"
         with urllib.request.urlopen(url) as r:
             data = json.loads(r.read())
+        assert data['total'] > 0
         assert all(row['judet'] == 'HR' for row in data['rows'])
         assert all(row['profession'] == 'poet' for row in data['rows'])
 
@@ -191,8 +193,8 @@ class TestServerIntegration:
             p1 = json.loads(r.read())
         with urllib.request.urlopen(f"{base_url}/api/filter?limit=10&offset=10") as r:
             p2 = json.loads(r.read())
-        keys1 = {(r['name'], r['uat']) for r in p1['rows']}
-        keys2 = {(r['name'], r['uat']) for r in p2['rows']}
+        keys1 = {(r['name'], r['uat'], r['judet']) for r in p1['rows']}
+        keys2 = {(r['name'], r['uat'], r['judet']) for r in p2['rows']}
         assert len(keys1 & keys2) == 0
 
     def test_filter_rows_have_street_slug(self, base_url):
