@@ -1192,8 +1192,19 @@ def person_detail(conn: sqlite3.Connection, core_name_norm: str) -> dict:
     }
 
 
-def uat_detail(conn: sqlite3.Connection, siruta: str) -> dict:
-    """All streets in one UAT, themed and ranked, with national-average deltas."""
+def uat_detail(
+    conn: sqlite3.Connection,
+    siruta: str,
+    *,
+    global_rarity: dict | None = None,
+    nat: dict | None = None,
+) -> dict:
+    """All streets in one UAT, themed and ranked, with national-average deltas.
+
+    Pass precomputed `global_rarity` (name_normalized → uat_count) and `nat`
+    (saint_pct, numeric_pct) to avoid per-call full-table scans when building
+    all 672 UAT pages in a loop.
+    """
     head = _one(conn, """
         SELECT judet, uat, siruta, COUNT(*) AS total,
                SUM(is_saint)   AS saints,
@@ -1257,33 +1268,53 @@ def uat_detail(conn: sqlite3.Connection, siruta: str) -> dict:
     for r in top_persons:
         r["slug"] = (r["wikidata_qid"] or "").lower() or slugify(r["full_name"])
 
-    # Names rare nationally but present here
-    distinctive = _rows(conn, """
-        WITH global_rarity AS (
-          SELECT name_normalized, COUNT(DISTINCT siruta) AS uat_n
-          FROM streets_dedup
-          WHERE is_numeric = 0 AND core_name IS NOT NULL
-          GROUP BY name_normalized
-        )
-        SELECT sd.name_normalized, MIN(sd.core_name) AS display, gr.uat_n
-        FROM streets_dedup sd
-        JOIN global_rarity gr ON gr.name_normalized = sd.name_normalized
-        WHERE sd.siruta = ? AND sd.is_numeric = 0 AND sd.core_name IS NOT NULL
-          AND gr.uat_n <= 3
-        GROUP BY sd.name_normalized, gr.uat_n
-        ORDER BY gr.uat_n, display
-        LIMIT 12
-    """, (siruta,))
-    for r in distinctive:
-        r["slug"] = slugify(r["display"] or r["name_normalized"])
+    # Names rare nationally but present here.
+    # When global_rarity is precomputed (batch build), fetch only this UAT's
+    # names and filter in Python — avoids a full-scan CTE on every call.
+    if global_rarity is not None:
+        uat_names = _rows(conn, """
+            SELECT sd.name_normalized, MIN(sd.core_name) AS display
+            FROM streets_dedup sd
+            WHERE sd.siruta = ? AND sd.is_numeric = 0 AND sd.core_name IS NOT NULL
+            GROUP BY sd.name_normalized
+        """, (siruta,))
+        distinctive = sorted(
+            [{"name_normalized": r["name_normalized"],
+              "display": r["display"],
+              "uat_n": global_rarity[r["name_normalized"]],
+              "slug": slugify(r["display"] or r["name_normalized"])}
+             for r in uat_names
+             if global_rarity.get(r["name_normalized"], 99) <= 3],
+            key=lambda x: (x["uat_n"], x["display"] or ""),
+        )[:12]
+    else:
+        distinctive = _rows(conn, """
+            WITH global_rarity AS (
+              SELECT name_normalized, COUNT(DISTINCT siruta) AS uat_n
+              FROM streets_dedup
+              WHERE is_numeric = 0 AND core_name IS NOT NULL
+              GROUP BY name_normalized
+            )
+            SELECT sd.name_normalized, MIN(sd.core_name) AS display, gr.uat_n
+            FROM streets_dedup sd
+            JOIN global_rarity gr ON gr.name_normalized = sd.name_normalized
+            WHERE sd.siruta = ? AND sd.is_numeric = 0 AND sd.core_name IS NOT NULL
+              AND gr.uat_n <= 3
+            GROUP BY sd.name_normalized, gr.uat_n
+            ORDER BY gr.uat_n, display
+            LIMIT 12
+        """, (siruta,))
+        for r in distinctive:
+            r["slug"] = slugify(r["display"] or r["name_normalized"])
 
-    # National averages (single row, joined in Python for clarity)
-    nat = _one(conn, """
-        SELECT
-          ROUND(100.0 * SUM(is_saint)   / COUNT(*), 2) AS saint_pct,
-          ROUND(100.0 * SUM(is_numeric) / COUNT(*), 2) AS numeric_pct
-        FROM streets_dedup
-    """)
+    # National averages — precomputed by caller in batch mode.
+    if nat is None:
+        nat = _one(conn, """
+            SELECT
+              ROUND(100.0 * SUM(is_saint)   / COUNT(*), 2) AS saint_pct,
+              ROUND(100.0 * SUM(is_numeric) / COUNT(*), 2) AS numeric_pct
+            FROM streets_dedup
+        """)
     saint_pct   = round(100.0 * (head["saints"]   or 0) / head["total"], 2) if head["total"] else 0
     numeric_pct = round(100.0 * (head["numerics"] or 0) / head["total"], 2) if head["total"] else 0
 

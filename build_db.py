@@ -207,14 +207,18 @@ CREATE INDEX ix_streets_namenorm  ON streets(name_normalized);
 CREATE INDEX ix_streets_corenorm  ON streets(core_name_norm);
 CREATE INDEX ix_streets_type      ON streets(street_type);
 CREATE INDEX ix_streets_flags     ON streets(is_saint, is_date, is_numeric);
+-- Composite index allows the optimizer to push WHERE siruta=? into streets_dedup.
+CREATE INDEX ix_streets_siruta_name ON streets(siruta, name_normalized);
 CREATE INDEX ix_aliases_norm      ON street_aliases(alias_normalized);
 
+-- GROUP BY siruta (not uat) is intentional: 48 UAT names are shared across
+-- multiple județe and would be incorrectly merged if grouped by name alone.
 CREATE VIEW streets_dedup AS
 SELECT MIN(id) AS id, judet, uat, siruta, street_type, name, name_normalized,
        title, rank, is_saint, is_date, is_numeric, core_name, core_name_norm
 FROM streets
 WHERE name_normalized != ''
-GROUP BY uat, name_normalized;
+GROUP BY siruta, name_normalized;
 
 CREATE VIEW streets_classified_pct AS
 -- One row per distinct core_name_norm (non-null).

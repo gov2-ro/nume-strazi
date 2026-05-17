@@ -1,5 +1,27 @@
 # Activity History
 
+## 2026-05-17 — Fix --detail-only hang + streets_dedup correctness
+
+### Root cause
+`uat_detail()` ran two global full-table scans on every one of the 672 UAT calls:
+a full-scan CTE for "distinctive" names (counting all streets globally) and a separate full-scan for national saint/numeric averages. Total wall time: ~740s — effectively a hang.
+
+### Fixes applied
+
+**`build_db.py`**
+- Changed `streets_dedup` GROUP BY from `(uat, name_normalized)` to `(siruta, name_normalized)`. This is a correctness fix: 48 Romanian UAT names appear in multiple județe (e.g. ALBEȘTI in Argeș and Mureș); the old grouping merged them. UAT count 672→676.
+- Added `ix_streets_siruta_name` composite index on `streets(siruta, name_normalized)` — enables the optimizer to push `WHERE siruta = ?` into the view, cutting per-UAT query time from ~250ms to ~2ms.
+
+**`site_queries.py` — `uat_detail`**
+- Added optional keyword args `global_rarity: dict | None` and `nat: dict | None`.
+- When provided, the distinctive-names section fetches only the current UAT's names (fast, indexed) and filters against the precomputed dict in Python. Falls back to the full-scan CTE if called standalone.
+
+**`build_site.py` — `build_detail_pages`**
+- Precomputes `global_rarity` and `nat` once before the 676-UAT loop, passes them in.
+
+### Result
+`--detail-only` runs complete in ~100s (3427 pages). The bug is closed.
+
 ## 2026-05-17 — Detail-page browsing (Phase 1)
 
 Implemented navigable detail pages for all four entity types: streets, persons, UATs (towns), and themes. Pages have real URLs and are statically generated at build time.
