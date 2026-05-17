@@ -34,6 +34,8 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 ## P2
 
+- [ ] **Scope UAT detail page generation to județe capitals + county seats only** — Currently `build_detail_pages()` renders pages for all 676 UATs with ≥50 streets. Restrict to: (a) all 41 county-seat municipalities (municipiu reședință per județ, hardcoded siruta lookup), (b) Bucharest sectors, (c) all other UATs with ≥50 streets that are *municipiu* rank. Rationale: long-tail comune pages see near-zero traffic; build time and storage are substantial. When implemented, add a `is_capital` flag to the `uats` list passed to templates so breadcrumbs and the judete-index page can link correctly.
+
 - [ ] **Reconsider static export strategy for all entities** — Phase 1 pre-renders ~3,400 detail pages (2,464 streets + 211 persons + 672 UATs + 72 themes) at build time. This is a significant storage and build-time overhead for long-tail entities that may receive very few visits. Consider: (a) reduce static thresholds (render only top-N per category), (b) render on-demand (Datasette or dynamic handler for missing slugs), or (c) hybrid (static for top-100 streets, dynamic for long tail). Measure traffic patterns first to justify the export cost.
 
 - [x] **Fix `build_site.py --detail-only` hanging on re-runs** — Root cause: `uat_detail()` ran two global full-table scans (distinctive CTE + national averages) on every one of 672 UAT calls = ~740s wall time. Fixes: (1) changed `streets_dedup` GROUP BY from `(uat, name_normalized)` to `(siruta, name_normalized)` — this is also a correctness fix since 48 UAT names appear in multiple județe and were being merged; (2) added `ix_streets_siruta_name` composite index so per-UAT queries can use the index; (3) precompute `global_rarity` dict and `nat` once before the UAT loop in `build_detail_pages` and pass as kwargs to `uat_detail`. Full `--detail-only` now completes in ~100s (3427 pages). UAT count 672→676 due to correctness fix.
@@ -85,7 +87,9 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [ ] OG image description
 
-- [ ] Harta · statistici pe județ – select random județ on load
+- [ ] create spider chart for judete, based on choice of street names
+
+- [x] Harta din front page · statistici pe județ – select random județ on load
 
 - [ ] add orașe / towns - top by population. SIRUTA?
 
@@ -97,7 +101,7 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [ ] Go wild, nerdy, quirky. The people, how old, what are the occupations? Reason of death?
 
-- [ ] Norm to population, street length, lanes, centrality 
+- [ ] Norm to population, street length, lanes, centrality. Order by number (absolute), relative to population, relative to population x street relevance
 
 - [ ] **Replace placeholder emojis with proper monoline SVG icons.** Current dashboard uses emojis (🔝 🧭 🌿 🚩 🎓 ⏳ 👥 🌍 📈 🗺️ 🧬 📜 🔎 🏟️ 📝, + per-row category emojis in nature subtypes / professions / eras / contests) as category cues. They render inconsistently across OSes (Apple Color Emoji vs Noto vs Segoe) and clash with the otherwise refined typography. Plan: inline SVG sprite of ~30 Lucide/Phosphor icons, swap each `<span class="emo">…</span>` to `<svg class="icon">…</svg>`. The `.icon` CSS class already exists in the stylesheet for this. Wait until icon set is curated — don't dribble in one-off SVGs.
 

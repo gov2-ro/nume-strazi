@@ -41,6 +41,7 @@ def build(db_path: str = DB_PATH, variant: str = "default") -> None:
             "section5": site_queries.section5(conn),
             "section6": site_queries.section6(conn),
             "section8": site_queries.section8(conn),
+            "municipii": site_queries.municipii_index(conn),
         }
         conn.close()
 

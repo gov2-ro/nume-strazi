@@ -320,6 +320,17 @@ def section3(conn: sqlite3.Connection) -> dict:
     for rows in foreigners_by_judet.values():
         _add_person_slugs(rows)
 
+    gender_count_rows = _rows(conn, """
+        SELECT CASE WHEN sd.judet LIKE 'BUCURESTI%%' OR sd.judet = 'B' THEN 'B'
+                    ELSE sd.judet END AS judet,
+               SUM(CASE WHEN p.gender = 'M' THEN 1 ELSE 0 END) AS m,
+               SUM(CASE WHEN p.gender = 'F' THEN 1 ELSE 0 END) AS f
+        FROM streets_dedup sd
+        JOIN persons p ON p.core_name_norm = sd.core_name_norm
+        GROUP BY 1
+    """)
+    gender_by_judet = {r["judet"]: {"m": r["m"], "f": r["f"]} for r in gender_count_rows}
+
     # Top-20 persons per județ — drives the shared județ filter in the clusters variant.
     persons_by_judet_rows = _rows(conn, """
         WITH per_judet AS (
@@ -360,6 +371,7 @@ def section3(conn: sqlite3.Connection) -> dict:
         "men_by_judet": men_by_judet,
         "women_by_judet": women_by_judet,
         "foreigners_by_judet": foreigners_by_judet,
+        "gender_by_judet": gender_by_judet,
         "total_m": counts.get("m", 0) or 0,
         "total_f": counts.get("f", 0) or 0,
         "profession_dist": profession_dist,
@@ -392,8 +404,39 @@ def section4(conn: sqlite3.Connection) -> dict:
         WHERE wikidata_qid IS NOT NULL
     """)
 
+    pv_judet_rows = _rows(conn, """
+        WITH per_judet AS (
+          SELECT CASE WHEN sd.judet LIKE 'BUCURESTI%%' OR sd.judet = 'B' THEN 'B'
+                      ELSE sd.judet END AS judet,
+                 p.core_name_norm,
+                 MAX(p.full_name)      AS full_name,
+                 MAX(p.wikidata_qid)   AS wikidata_qid,
+                 MAX(p.wiki_ro_views)  AS wiki_ro_views,
+                 MAX(p.wiki_scope)     AS wiki_scope,
+                 COUNT(*)              AS street_count
+          FROM streets_dedup sd
+          JOIN persons p ON p.core_name_norm = sd.core_name_norm
+          WHERE p.wiki_ro_views IS NOT NULL AND p.wiki_ro_views > 0
+          GROUP BY 1, 2
+        ),
+        ranked AS (
+          SELECT judet, full_name, wikidata_qid, wiki_ro_views, wiki_scope, street_count,
+                 ROW_NUMBER() OVER (PARTITION BY judet ORDER BY wiki_ro_views DESC) AS rn
+          FROM per_judet
+        )
+        SELECT judet, full_name, wikidata_qid, wiki_ro_views, wiki_scope, street_count
+        FROM ranked WHERE rn <= 5
+        ORDER BY judet, wiki_ro_views DESC
+    """)
+    top_pageviews_by_judet: dict[str, list[dict]] = {}
+    for r in pv_judet_rows:
+        entry = {k: r[k] for k in ("full_name", "wikidata_qid", "wiki_ro_views", "wiki_scope", "street_count")}
+        entry["slug"] = (r.get("wikidata_qid") or "").lower() or slugify(r.get("full_name") or "")
+        top_pageviews_by_judet.setdefault(r["judet"], []).append(entry)
+
     return {
         "top_pageviews": top_pageviews,
+        "top_pageviews_by_judet": top_pageviews_by_judet,
         "tier_counts": {
             "universal": tier_counts.get("universal", 0) or 0,
             "national": tier_counts.get("national", 0) or 0,
@@ -468,8 +511,36 @@ def section5(conn: sqlite3.Connection) -> dict:
     for r in ideo_tokens:
         r["slug"] = f"ideologic-{slugify(r['token'])}" if r.get("token") else ""
 
+    theme_judet_rows = _rows(conn, """
+        SELECT CASE WHEN sd.judet LIKE 'BUCURESTI%%' OR sd.judet = 'B' THEN 'B'
+                    ELSE sd.judet END AS judet,
+               SUM(CASE WHEN p.core_name_norm  IS NOT NULL THEN 1 ELSE 0 END) AS persoana,
+               SUM(CASE WHEN nt.core_name_norm IS NOT NULL THEN 1 ELSE 0 END) AS natura,
+               SUM(CASE WHEN sd.is_saint = 1   THEN 1 ELSE 0 END) AS religios,
+               SUM(CASE WHEN sd.is_date  = 1   THEN 1 ELSE 0 END) AS data_sab,
+               SUM(CASE WHEN nc.category = 'ideological' THEN 1 ELSE 0 END) AS ideologic,
+               SUM(CASE WHEN nc.category IN ('abstract','commemorative','institutional') THEN 1 ELSE 0 END) AS abstract,
+               COUNT(*) AS total
+        FROM streets_dedup sd
+        LEFT JOIN persons p      ON p.core_name_norm  = sd.core_name_norm
+        LEFT JOIN nature_terms nt ON nt.core_name_norm = sd.core_name_norm
+        LEFT JOIN name_categories nc ON nc.core_name_norm = sd.core_name_norm
+        WHERE sd.is_numeric = 0
+        GROUP BY 1
+    """)
+    theme_by_judet = {
+        r["judet"]: {
+            "persoană": r["persoana"], "natură": r["natura"],
+            "religios": r["religios"], "dată / sărbătoare": r["data_sab"],
+            "ideologic": r["ideologic"], "concept / abstract": r["abstract"],
+            "total": r["total"],
+        }
+        for r in theme_judet_rows
+    }
+
     return {
         "theme_dist": theme_dist,
+        "theme_by_judet": theme_by_judet,
         "nature_subtypes": nature_subtypes,
         "ideo_tokens": ideo_tokens,
     }
@@ -1459,3 +1530,146 @@ def explorer_indexes(conn: sqlite3.Connection) -> dict:
         })
 
     return {"streets": street_idx, "uats": uat_idx}
+
+
+def municipii_index(conn: sqlite3.Connection) -> dict:
+    """Per-municipiu data for the landing-page UAT filter dropdown.
+
+    Only covers UATs whose name starts with 'MUNICIPIUL' (~102 UATs).
+    Returns compact dicts to keep JSON payload manageable.
+    """
+    # List of municipii per județ
+    list_rows = _rows(conn, """
+        SELECT CASE WHEN judet LIKE 'BUCURESTI%%' OR judet = 'B' THEN 'B'
+                    ELSE judet END AS judet,
+               siruta, uat, COUNT(*) AS total
+        FROM streets_dedup
+        WHERE uat LIKE 'MUNICIPIUL%%' AND is_numeric = 0
+        GROUP BY siruta, uat, judet
+        ORDER BY judet, total DESC
+    """)
+    by_judet: dict[str, list[dict]] = {}
+    for r in list_rows:
+        slug = slugify(r["uat"])
+        by_judet.setdefault(r["judet"], []).append({
+            "s": str(r["siruta"]), "n": r["uat"].title(), "sl": slug, "t": r["total"],
+        })
+
+    # Top-25 streets per municipiu, ordered by national occurrence count so the
+    # most recognisable names appear first (each name appears exactly once per UAT
+    # in streets_dedup, so national frequency is the meaningful ranking signal).
+    streets_rows = _rows(conn, """
+        WITH nat AS (
+          SELECT name_normalized, COUNT(DISTINCT siruta) AS nat_count
+          FROM streets_dedup
+          WHERE is_numeric = 0 AND core_name IS NOT NULL
+          GROUP BY name_normalized
+        ),
+        uat_streets AS (
+          SELECT sd.siruta, sd.name_normalized, MIN(sd.core_name) AS core_name,
+                 MAX(p.wikidata_qid) AS wikidata_qid,
+                 CASE WHEN MAX(p.core_name_norm) IS NOT NULL THEN 'persoana'
+                      WHEN MAX(nt.core_name_norm) IS NOT NULL THEN 'natura'
+                      WHEN MAX(sd.is_saint) = 1 THEN 'religios'
+                      ELSE 'altele' END AS category
+          FROM streets_dedup sd
+          LEFT JOIN persons p ON p.core_name_norm = sd.core_name_norm
+          LEFT JOIN nature_terms nt ON nt.core_name_norm = sd.core_name_norm
+          WHERE sd.is_numeric = 0 AND sd.core_name IS NOT NULL
+            AND sd.uat LIKE 'MUNICIPIUL%%'
+          GROUP BY sd.siruta, sd.name_normalized
+        ),
+        ranked AS (
+          SELECT u.siruta, u.name_normalized, u.core_name, u.wikidata_qid, u.category,
+                 COALESCE(n.nat_count, 1) AS street_count,
+                 ROW_NUMBER() OVER (
+                   PARTITION BY u.siruta ORDER BY COALESCE(n.nat_count, 1) DESC
+                 ) AS rn
+          FROM uat_streets u
+          LEFT JOIN nat n ON n.name_normalized = u.name_normalized
+        )
+        SELECT siruta, name_normalized, core_name, wikidata_qid, category, street_count
+        FROM ranked WHERE rn <= 25
+        ORDER BY siruta, street_count DESC
+    """)
+    streets_by_siruta: dict[str, list[dict]] = {}
+    for r in streets_rows:
+        slug = slugify(r["core_name"] or r["name_normalized"])
+        streets_by_siruta.setdefault(str(r["siruta"]), []).append({
+            "n": r["core_name"], "nn": r["name_normalized"],
+            "c": r["street_count"], "cat": r["category"], "sl": slug,
+        })
+
+    # Top-10 persons (M) per municipiu
+    def _persons_by_siruta(gender: str) -> dict[str, list[dict]]:
+        rows = _rows(conn, f"""
+            WITH ranked AS (
+              SELECT sd.siruta, p.core_name_norm,
+                     MAX(p.full_name) AS full_name, MAX(p.gender) AS gender,
+                     MAX(p.wikidata_qid) AS wikidata_qid, COUNT(*) AS street_count,
+                     ROW_NUMBER() OVER (PARTITION BY sd.siruta ORDER BY COUNT(*) DESC) AS rn
+              FROM streets_dedup sd
+              JOIN persons p ON p.core_name_norm = sd.core_name_norm
+              WHERE sd.uat LIKE 'MUNICIPIUL%%' AND p.gender = '{gender}'
+              GROUP BY sd.siruta, p.core_name_norm
+            )
+            SELECT siruta, full_name, gender, wikidata_qid, street_count
+            FROM ranked WHERE rn <= 10
+            ORDER BY siruta, street_count DESC
+        """)
+        out: dict[str, list[dict]] = {}
+        for r in rows:
+            slug = (r.get("wikidata_qid") or "").lower() or slugify(r.get("full_name") or "")
+            out.setdefault(str(r["siruta"]), []).append({
+                "n": r["full_name"], "qid": r["wikidata_qid"],
+                "c": r["street_count"], "sl": slug,
+            })
+        return out
+
+    # Gender counts per municipiu for the grid
+    gender_rows = _rows(conn, """
+        SELECT sd.siruta,
+               SUM(CASE WHEN p.gender = 'M' THEN 1 ELSE 0 END) AS m,
+               SUM(CASE WHEN p.gender = 'F' THEN 1 ELSE 0 END) AS f
+        FROM streets_dedup sd
+        JOIN persons p ON p.core_name_norm = sd.core_name_norm
+        WHERE sd.uat LIKE 'MUNICIPIUL%%'
+        GROUP BY sd.siruta
+    """)
+    gender_by_siruta = {str(r["siruta"]): {"m": r["m"], "f": r["f"]} for r in gender_rows}
+
+    # Theme counts per municipiu
+    theme_rows = _rows(conn, """
+        SELECT sd.siruta,
+               SUM(CASE WHEN p.core_name_norm  IS NOT NULL THEN 1 ELSE 0 END) AS persoana,
+               SUM(CASE WHEN nt.core_name_norm IS NOT NULL THEN 1 ELSE 0 END) AS natura,
+               SUM(CASE WHEN sd.is_saint = 1   THEN 1 ELSE 0 END) AS religios,
+               SUM(CASE WHEN sd.is_date  = 1   THEN 1 ELSE 0 END) AS data_sab,
+               SUM(CASE WHEN nc.category = 'ideological' THEN 1 ELSE 0 END) AS ideologic,
+               SUM(CASE WHEN nc.category IN ('abstract','commemorative','institutional') THEN 1 ELSE 0 END) AS abstract,
+               COUNT(*) AS total
+        FROM streets_dedup sd
+        LEFT JOIN persons p       ON p.core_name_norm  = sd.core_name_norm
+        LEFT JOIN nature_terms nt  ON nt.core_name_norm = sd.core_name_norm
+        LEFT JOIN name_categories nc ON nc.core_name_norm = sd.core_name_norm
+        WHERE sd.uat LIKE 'MUNICIPIUL%%' AND sd.is_numeric = 0
+        GROUP BY sd.siruta
+    """)
+    theme_by_siruta = {
+        str(r["siruta"]): {
+            "persoană": r["persoana"], "natură": r["natura"],
+            "religios": r["religios"], "dată / sărbătoare": r["data_sab"],
+            "ideologic": r["ideologic"], "concept / abstract": r["abstract"],
+            "total": r["total"],
+        }
+        for r in theme_rows
+    }
+
+    return {
+        "by_judet": by_judet,
+        "streets": streets_by_siruta,
+        "men": _persons_by_siruta("M"),
+        "women": _persons_by_siruta("F"),
+        "gender": gender_by_siruta,
+        "themes": theme_by_siruta,
+    }
