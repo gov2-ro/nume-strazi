@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Filtru avansat — Cum ne numim străzile</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&family=Barlow+Semi+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #FFFFFF;
+  --surface-1: #F7F9FC;
+  --surface-2: #ECF1F8;
+  --surface-blue: #DEE8F4;
+  --warn-1: #FFF7CC;
+  --warn-2: #FBE486;
+  --ink: #0B1118;
+  --ink-2: #2A313B;
+  --muted: #5A6573;
+  --muted-2: #8B95A2;
+  --rule: #E2E6EC;
+  --rule-strong: #BFC7D2;
+  --hairline: #EEF1F5;
+  --plaque: #0E4D92;
+  --plaque-deep: #08366D;
+  --accent: #C04F35;
+  --sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --mono: 'IBM Plex Mono', monospace;
+  --street: 'Barlow Semi Condensed', 'IBM Plex Sans', sans-serif;
+  --panel-w: 270px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--plaque); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.topbar {
+  background: var(--plaque);
+  color: #fff;
+  padding: 10px 20px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.topbar a { color: rgba(255,255,255,.75); }
+.topbar a:hover { color: #fff; text-decoration: none; }
+.topbar .sep { color: rgba(255,255,255,.4); }
+.topbar .title { font-family: var(--street); font-weight: 700; font-size: 14px; color: #fff; }
+
+.layout {
+  display: flex;
+  min-height: calc(100vh - 40px);
+}
+
+.panel {
+  width: var(--panel-w);
+  flex-shrink: 0;
+  border-right: 1px solid var(--rule);
+  background: var(--surface-1);
+  padding: 16px 14px;
+  overflow-y: auto;
+  position: sticky;
+  top: 0;
+  height: calc(100vh - 40px);
+}
+.panel-title {
+  font-size: 10px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+.filter-section { margin-bottom: 18px; }
+.filter-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  margin-bottom: 6px;
+}
+.filter-search {
+  width: 100%;
+  font-family: var(--sans);
+  font-size: 12px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  padding: 5px 8px;
+  background: var(--bg);
+  color: var(--ink);
+  margin-bottom: 6px;
+  outline: none;
+}
+.filter-search:focus { border-color: var(--plaque); }
+.check-list {
+  max-height: 160px;
+  overflow-y: auto;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--bg);
+}
+.check-list label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  border-bottom: 1px solid var(--hairline);
+}
+.check-list label:last-child { border-bottom: none; }
+.check-list label:hover { background: var(--surface-1); }
+.check-list input[type=checkbox] { accent-color: var(--plaque); flex-shrink: 0; }
+.check-list label.hidden { display: none; }
+
+.text-filter {
+  width: 100%;
+  font-family: var(--sans);
+  font-size: 12px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  padding: 6px 8px;
+  background: var(--bg);
+  color: var(--ink);
+  outline: none;
+}
+.text-filter:focus { border-color: var(--plaque); }
+
+.radio-list label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 0;
+  cursor: pointer;
+  font-size: 12px;
+}
+.radio-list input[type=radio] { accent-color: var(--plaque); }
+
+.subpanel {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+}
+.subpanel.hidden { display: none; }
+
+.btn-clear {
+  width: 100%;
+  margin-top: 14px;
+  padding: 7px;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  background: transparent;
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.btn-clear:hover { background: var(--surface-2); color: var(--ink); }
+
+.results {
+  flex: 1;
+  padding: 20px 24px;
+  overflow-x: auto;
+}
+.results-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.results-count {
+  font-family: var(--street);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.results-sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+.empty-state {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 32px 0;
+}
+
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.tbl th {
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 2px solid var(--rule-strong);
+  padding: 6px 10px 8px;
+  white-space: nowrap;
+}
+.tbl td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--hairline);
+  vertical-align: middle;
+}
+.tbl tr:hover td { background: var(--surface-1); }
+.tbl .cell-name { font-weight: 600; font-family: var(--street); font-size: 13px; }
+.tbl .cell-type { color: var(--muted-2); white-space: nowrap; }
+.tbl .cell-uat  { max-width: 220px; }
+.tbl .cell-jud  { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.tbl .cell-detail { color: var(--muted); max-width: 160px; }
+.cls-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 2px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  background: var(--surface-2);
+  color: var(--muted);
+}
+.cls-person   { background: #E8F0FB; color: #2A4A8C; }
+.cls-nature   { background: #E8F5EC; color: #2E6040; }
+.cls-place    { background: #FFF3E0; color: #7A4A00; }
+.cls-category { background: #F3E8F8; color: #5A2080; }
+.cls-saint    { background: #FFF8E1; color: #7A5800; }
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.btn-page {
+  padding: 5px 14px;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--plaque);
+  cursor: pointer;
+}
+.btn-page:hover { background: var(--surface-blue); }
+.btn-page:disabled { color: var(--muted-2); cursor: default; background: var(--surface-1); }
+
+.loading {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 24px 0;
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="/" class="title">Cum ne numim străzile</a>
+  <span class="sep">›</span>
+  <span>Filtru avansat</span>
+</div>
+
+<div class="layout">
+
+  <aside class="panel" id="panel">
+    <div class="panel-title">Filtre</div>
+
+    <div class="filter-section">
+      <div class="filter-label">Județ</div>
+      <input class="filter-search" id="judet-search" placeholder="Caută județ…" autocomplete="off">
+      <div class="check-list" id="judet-list"></div>
+    </div>
+
+    <div class="filter-section">
+      <div class="filter-label">Localitate</div>
+      <input class="text-filter" id="uat-input" placeholder="ex. Miercurea Ciuc" autocomplete="off">
+    </div>
+
+    <div class="filter-section">
+      <div class="filter-label">Tip arteră</div>
+      <div class="check-list" id="street-type-list"></div>
+    </div>
+
+    <div class="filter-section">
+      <div class="filter-label">Clasificare</div>
+      <div class="radio-list" id="classification-list"></div>
+    </div>
+
+    <div class="subpanel hidden" id="subpanel-person">
+      <div class="filter-label">Persoană</div>
+      <div class="filter-section">
+        <div class="filter-label">Profesie</div>
+        <div class="check-list" id="profession-list"></div>
+      </div>
+      <div class="filter-section">
+        <div class="filter-label">Naționalitate</div>
+        <div class="check-list" id="nationality-list"></div>
+      </div>
+      <div class="filter-section">
+        <div class="filter-label">Gen</div>
+        <div class="check-list" id="gender-list"></div>
+      </div>
+      <div class="filter-section">
+        <div class="filter-label">Epocă</div>
+        <div class="check-list" id="era-list"></div>
+      </div>
+      <div class="filter-section">
+        <div class="filter-label">Notorietate Wikipedia</div>
+        <div class="check-list" id="wiki-scope-list"></div>
+      </div>
+    </div>
+
+    <div class="subpanel hidden" id="subpanel-nature">
+      <div class="filter-label">Natură</div>
+      <div class="filter-section">
+        <div class="filter-label">Tip</div>
+        <div class="check-list" id="nature-type-list"></div>
+      </div>
+    </div>
+
+    <div class="subpanel hidden" id="subpanel-place">
+      <div class="filter-label">Loc</div>
+      <div class="filter-section">
+        <div class="filter-label">Tip</div>
+        <div class="check-list" id="place-type-list"></div>
+      </div>
+      <div class="filter-section">
+        <div class="filter-label">Țară</div>
+        <div class="check-list" id="place-country-list"></div>
+      </div>
+    </div>
+
+    <div class="subpanel hidden" id="subpanel-category">
+      <div class="filter-label">Categorie</div>
+      <div class="filter-section">
+        <div class="filter-label">Categorie</div>
+        <div class="check-list" id="category-list"></div>
+      </div>
+      <div class="filter-section">
+        <div class="filter-label">Subcategorie</div>
+        <div class="check-list" id="subcategory-list"></div>
+      </div>
+    </div>
+
+    <button class="btn-clear" id="btn-clear">Șterge toate filtrele</button>
+  </aside>
+
+  <main class="results">
+    <div class="results-header">
+      <div class="results-count" id="results-count">—</div>
+      <div class="results-sub" id="results-sub"></div>
+    </div>
+    <div id="results-body"><div class="loading">Se încarcă…</div></div>
+    <div class="pagination" id="pagination" style="display:none">
+      <button class="btn-page" id="btn-prev">← Anterior</button>
+      <span id="page-info"></span>
+      <button class="btn-page" id="btn-next">Următor →</button>
+    </div>
+  </main>
+
+</div>
+
+<script>
+'use strict';
+
+const state = {
+  meta: null,
+  offset: 0,
+  limit: 200,
+  debounceTimer: null,
+};
+
+function esc(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function getChecked(listId) {
+  return Array.from(
+    document.querySelectorAll(`#${listId} input[type=checkbox]:checked`)
+  ).map(el => el.value);
+}
+
+function getRadio(listId) {
+  const el = document.querySelector(`#${listId} input[type=radio]:checked`);
+  return el ? el.value : '';
+}
+
+function buildParams() {
+  const p = new URLSearchParams();
+
+  getChecked('judet-list').forEach(v => p.append('judet', v));
+
+  const uat = document.getElementById('uat-input').value.trim();
+  if (uat) p.set('uat', uat);
+
+  getChecked('street-type-list').forEach(v => p.append('street_type', v));
+
+  const cls = getRadio('classification-list');
+  if (cls) p.set('classification', cls);
+
+  if (cls === 'person' || !cls) {
+    getChecked('profession-list').forEach(v => p.append('profession', v));
+    getChecked('nationality-list').forEach(v => p.append('nationality', v));
+    getChecked('gender-list').forEach(v => p.append('gender', v));
+    getChecked('era-list').forEach(v => p.append('era', v));
+    getChecked('wiki-scope-list').forEach(v => p.append('wiki_scope', v));
+  }
+  if (cls === 'nature' || !cls) {
+    getChecked('nature-type-list').forEach(v => p.append('nature_type', v));
+  }
+  if (cls === 'place' || !cls) {
+    getChecked('place-type-list').forEach(v => p.append('place_type', v));
+    getChecked('place-country-list').forEach(v => p.append('place_country', v));
+  }
+  if (cls === 'category' || !cls) {
+    getChecked('category-list').forEach(v => p.append('category', v));
+    getChecked('subcategory-list').forEach(v => p.append('subcategory', v));
+  }
+
+  if (state.offset) p.set('offset', state.offset);
+  return p;
+}
+
+function pushUrl(params) {
+  const qs = params.toString();
+  history.replaceState(null, '', qs ? `?${qs}` : location.pathname);
+}
+
+function readUrl() {
+  return new URLSearchParams(location.search);
+}
+
+function makeCheckList(listId, values, selectedSet) {
+  const el = document.getElementById(listId);
+  el.innerHTML = values.map(v => `
+    <label>
+      <input type="checkbox" value="${esc(v)}"${selectedSet.has(v) ? ' checked' : ''}>
+      ${esc(v)}
+    </label>`).join('');
+  el.querySelectorAll('input').forEach(cb => cb.addEventListener('change', onFilterChange));
+}
+
+function makeRadioList(listId, values, selected) {
+  const el = document.getElementById(listId);
+  const opts = [['', 'Toate'], ...values.map(v => [v, v])];
+  el.innerHTML = opts.map(([v, label]) => `
+    <label>
+      <input type="radio" name="classification" value="${esc(v)}"${v === selected ? ' checked' : ''}>
+      ${esc(label)}
+    </label>`).join('');
+  el.querySelectorAll('input').forEach(r => r.addEventListener('change', () => {
+    updateSubpanels();
+    onFilterChange();
+  }));
+}
+
+function updateSubpanels() {
+  const cls = getRadio('classification-list');
+  ['person', 'nature', 'place', 'category'].forEach(c => {
+    document.getElementById(`subpanel-${c}`).classList.toggle('hidden', cls !== c);
+  });
+}
+
+function populatePanel(meta, urlParams) {
+  const sel = (key) => new Set(urlParams.getAll(key));
+
+  makeCheckList('judet-list', meta.judete, sel('judet'));
+  makeCheckList('street-type-list', meta.street_types, sel('street_type'));
+  makeRadioList('classification-list', meta.classifications, urlParams.get('classification') || '');
+
+  makeCheckList('profession-list',    meta.professions,    sel('profession'));
+  makeCheckList('nationality-list',   meta.nationalities,  sel('nationality'));
+  makeCheckList('gender-list',        meta.genders,        sel('gender'));
+  makeCheckList('era-list',           meta.eras,           sel('era'));
+  makeCheckList('wiki-scope-list',    meta.wiki_scopes,    sel('wiki_scope'));
+  makeCheckList('nature-type-list',   meta.nature_types,   sel('nature_type'));
+  makeCheckList('place-type-list',    meta.place_types,    sel('place_type'));
+  makeCheckList('place-country-list', meta.place_countries, sel('place_country'));
+  makeCheckList('category-list',      meta.categories,     sel('category'));
+  makeCheckList('subcategory-list',   meta.subcategories,  sel('subcategory'));
+
+  document.getElementById('uat-input').value = urlParams.get('uat') || '';
+
+  updateSubpanels();
+
+  document.getElementById('judet-search').addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    document.querySelectorAll('#judet-list label').forEach(lbl => {
+      lbl.classList.toggle('hidden', !lbl.textContent.toLowerCase().includes(q));
+    });
+  });
+}
+
+async function fetchResults(params) {
+  const apiParams = new URLSearchParams(params);
+  apiParams.set('limit', state.limit);
+  apiParams.set('offset', state.offset);
+  const res = await fetch(`/api/filter?${apiParams}`);
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
+}
+
+function clsBadge(row) {
+  const cls = row.classification || '';
+  const detail = row.person_full_name || row.nature_type || row.place_type || row.category || cls;
+  return `<span class="cls-badge cls-${esc(cls)}">${esc(cls)}</span> ${esc(detail)}`;
+}
+
+function renderResults(data) {
+  const { total, limit, offset, rows } = data;
+  const from = offset + 1;
+  const to = Math.min(offset + rows.length, total);
+
+  document.getElementById('results-count').textContent =
+    total === 0 ? 'Nicio potrivire' : `${total.toLocaleString('ro')} rezultate`;
+  document.getElementById('results-sub').textContent =
+    total > 0 ? `(${from}–${to} din ${total.toLocaleString('ro')})` : '';
+
+  const body = document.getElementById('results-body');
+  if (rows.length === 0) {
+    body.innerHTML = '<div class="empty-state">Nicio potrivire găsită pentru filtrele selectate.</div>';
+    document.getElementById('pagination').style.display = 'none';
+    return;
+  }
+
+  body.innerHTML = `
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>Nume stradă</th>
+          <th>Tip</th>
+          <th>Localitate</th>
+          <th>Județ</th>
+          <th>Detaliu</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(r => `
+        <tr>
+          <td class="cell-name">
+            ${r.street_slug
+              ? `<a href="/strada/${esc(r.street_slug)}/">${esc(r.name)}</a>`
+              : esc(r.name)}
+          </td>
+          <td class="cell-type">${esc(r.street_type || '')}</td>
+          <td class="cell-uat">
+            ${r.uat_slug
+              ? `<a href="/oras/${esc((r.judet||'').toLowerCase())}/${esc(r.uat_slug)}/">${esc(r.uat)}</a>`
+              : esc(r.uat)}
+          </td>
+          <td class="cell-jud">${esc(r.judet)}</td>
+          <td class="cell-detail">${clsBadge(r)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+
+  const pag = document.getElementById('pagination');
+  pag.style.display = total > limit ? 'flex' : 'none';
+  document.getElementById('page-info').textContent = `${from}–${to} din ${total.toLocaleString('ro')}`;
+  document.getElementById('btn-prev').disabled = offset === 0;
+  document.getElementById('btn-next').disabled = to >= total;
+}
+
+function onFilterChange() {
+  state.offset = 0;
+  clearTimeout(state.debounceTimer);
+  state.debounceTimer = setTimeout(runQuery, 120);
+}
+
+async function runQuery() {
+  const params = buildParams();
+  pushUrl(params);
+  document.getElementById('results-body').innerHTML = '<div class="loading">Se caută…</div>';
+  try {
+    const data = await fetchResults(params);
+    renderResults(data);
+  } catch (e) {
+    document.getElementById('results-body').innerHTML =
+      `<div class="empty-state">Eroare: ${esc(e.message)}</div>`;
+  }
+}
+
+document.getElementById('uat-input').addEventListener('input', onFilterChange);
+
+document.getElementById('btn-prev').addEventListener('click', () => {
+  state.offset = Math.max(0, state.offset - state.limit);
+  runQuery();
+});
+document.getElementById('btn-next').addEventListener('click', () => {
+  state.offset += state.limit;
+  runQuery();
+});
+
+document.getElementById('btn-clear').addEventListener('click', () => {
+  document.querySelectorAll('.check-list input[type=checkbox]').forEach(cb => cb.checked = false);
+  const allRadio = document.querySelector('#classification-list input[type=radio][value=""]');
+  if (allRadio) allRadio.checked = true;
+  document.getElementById('uat-input').value = '';
+  document.getElementById('judet-search').value = '';
+  document.querySelectorAll('#judet-list label').forEach(l => l.classList.remove('hidden'));
+  state.offset = 0;
+  updateSubpanels();
+  runQuery();
+});
+
+(async () => {
+  try {
+    const metaRes = await fetch('/api/meta');
+    state.meta = await metaRes.json();
+
+    const urlParams = readUrl();
+    state.offset = parseInt(urlParams.get('offset') || '0', 10);
+    if (isNaN(state.offset)) state.offset = 0;
+
+    populatePanel(state.meta, urlParams);
+    await runQuery();
+  } catch (e) {
+    document.getElementById('results-body').innerHTML =
+      `<div class="empty-state">Nu s-a putut conecta la server (${esc(e.message)}). Rulați: <code>python3 filter_server.py</code></div>`;
+  }
+})();
+</script>
+</body>
+</html>
