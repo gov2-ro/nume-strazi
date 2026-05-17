@@ -149,9 +149,9 @@ def query_meta(conn: sqlite3.Connection) -> dict:
 
     return {
         'judete': distinct(
-            "SELECT DISTINCT judet FROM streets WHERE judet IS NOT NULL ORDER BY judet"),
+            "SELECT DISTINCT judet FROM streets_dedup WHERE judet IS NOT NULL ORDER BY judet"),
         'street_types': distinct(
-            "SELECT DISTINCT street_type FROM streets WHERE street_type IS NOT NULL ORDER BY street_type"),
+            "SELECT DISTINCT street_type FROM streets_dedup WHERE street_type IS NOT NULL ORDER BY street_type"),
         'classifications': [
             'person', 'nature', 'place', 'category', 'saint', 'date', 'numeric'
         ],

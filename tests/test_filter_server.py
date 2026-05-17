@@ -1,9 +1,11 @@
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+import json
+import threading
+import urllib.error
+import urllib.request
 import pytest
 from http.server import HTTPServer
-import json
-import urllib.error
 
 import filter_server
 
@@ -106,31 +108,29 @@ class TestBuildFilterQuery:
         assert " AND " in where
 
 
-import threading
-import urllib.request
-
 DB_PATH = "data/streets.db"
 DB_EXISTS = os.path.exists(DB_PATH)
 
 
 def _start_test_server(db_path: str) -> tuple:
-    """Start server on a random port, return (base_url, server)."""
+    """Start server on a random port, return (base_url, server, conn)."""
     conn = filter_server.get_db(db_path)
     handler = filter_server.make_handler(conn)
     server = HTTPServer(('localhost', 0), handler)
     port = server.server_address[1]
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    return f"http://localhost:{port}", server
+    return f"http://localhost:{port}", server, conn
 
 
 @pytest.mark.skipif(not DB_EXISTS, reason="streets.db not present")
 class TestServerIntegration:
     @pytest.fixture(scope="class")
     def base_url(self):
-        url, server = _start_test_server(DB_PATH)
+        url, server, conn = _start_test_server(DB_PATH)
         yield url
         server.shutdown()
+        conn.close()
 
     def test_meta_returns_200(self, base_url):
         with urllib.request.urlopen(f"{base_url}/api/meta") as r:
