@@ -8,7 +8,7 @@ Two backlog items.
 
 **P2: scope UAT detail pages.** `site_queries.enumerate_uats()` rewrote to return pages only for (a) the 41 county-seat municipalities, (b) the 6 Bucharest sectors, (c) any other UAT named `MUNICIPIUL ...` with ≥50 streets. Added `COUNTY_SEAT_SIRUTAS` dict — hardcoded because the DB carries no rank/seat metadata, the seat is not always the largest municipiu (HR: Miercurea-Ciuc < Odorheiu Secuiesc by street count), and Ilfov's seat Buftea is `ORAŞ`, not `MUNICIPIUL`, so a pure-rank filter would drop it. Returned dicts now include `is_capital`. UAT page count: 676 → 108 (41 seats + 6 sectors + 61 other municipii). Bucharest sectors are detected by `judet == "B"`. Added prune step in `build_detail_pages` that removes any `dist/oras/<judet>/<slug>/` not in the rendered set — first prune deleted 568 stale comune directories.
 
-Open follow-up: the search index (`dist/cauta/uats.json`) still contains all 1207 UATs, so search results for excluded comune now 404. Tracked separately.
+Closed the search-index follow-up in the same session: `explorer_indexes` now sources its UAT list from `enumerate_uats` instead of a separate query, so `dist/cauta/uats.json` shrank 1207 → 108 and stays in sync with whatever has a rendered page. A future DB-backed endpoint for long-tail UATs can be wired in later without re-introducing the 404s.
 
 ## 2026-05-18 — Permanent URLs for Landing-Page Filter
 

@@ -1630,21 +1630,15 @@ def explorer_indexes(conn: sqlite3.Connection) -> dict:
             "u": r["uat_count"],
         })
 
-    uats = _rows(conn, """
-        SELECT siruta, judet, uat, COUNT(*) AS total
-        FROM streets_dedup
-        GROUP BY siruta
-        ORDER BY uat
-    """)
-    uat_idx = []
-    for r in uats:
-        uat_display = fix_diacritics(r["uat"])
-        slug = slugify(uat_display)
-        if not slug:
-            continue
-        uat_idx.append({
-            "s": slug, "j": r["judet"], "n": uat_display, "t": r["total"],
-        })
+    # Only index UATs that have a rendered detail page — otherwise search
+    # results 404 on the long-tail comune we no longer build. Rural UATs
+    # could come back via a future DB-backed endpoint; for now they're
+    # simply hidden from the autocomplete.
+    uat_idx = [
+        {"s": u["slug"], "j": u["judet"], "n": u["uat"], "t": u["total"]}
+        for u in enumerate_uats(conn)
+    ]
+    uat_idx.sort(key=lambda x: x["n"])
 
     return {"streets": street_idx, "uats": uat_idx}
 
