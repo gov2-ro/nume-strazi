@@ -1,5 +1,15 @@
 # Activity History
 
+## 2026-05-18 — Root-Relative Links + Scoped UAT Detail Pages
+
+Two backlog items.
+
+**P0: root-relative links.** Audited every `href` and `src` in the templates that weren't already `/`-prefixed. Changed `href="metodologie.html"` → `href="/metodologie.html"` across `index.html.j2`, `index-v1.html.j2`, `index-v2.html.j2`. In `metodologie.html.j2`, the nav's `href="index.html"` and `href="index.html#…"` became `href="/"` and `href="/#…"`, and the self-link to `metodologie.html` became absolute. Four JS template-literal portrait `src="portraits/${qid}.jpg"` occurrences (foreigners panel renderer, two branches of `renderFlat`, plus one server-rendered Jinja path) became `/portraits/${qid}.jpg`. Detail templates (`_detail-shell`, `street-detail`, `person-detail`, `uat-detail`, `persons-index`) were already root-relative. Rebuilt all variants — `dist/index.html`, `dist/index-v1.html`, `dist/index-v2.html`, `dist/metodologie.html` now contain zero relative `metodologie.html` or `portraits/` references.
+
+**P2: scope UAT detail pages.** `site_queries.enumerate_uats()` rewrote to return pages only for (a) the 41 county-seat municipalities, (b) the 6 Bucharest sectors, (c) any other UAT named `MUNICIPIUL ...` with ≥50 streets. Added `COUNTY_SEAT_SIRUTAS` dict — hardcoded because the DB carries no rank/seat metadata, the seat is not always the largest municipiu (HR: Miercurea-Ciuc < Odorheiu Secuiesc by street count), and Ilfov's seat Buftea is `ORAŞ`, not `MUNICIPIUL`, so a pure-rank filter would drop it. Returned dicts now include `is_capital`. UAT page count: 676 → 108 (41 seats + 6 sectors + 61 other municipii). Bucharest sectors are detected by `judet == "B"`. Added prune step in `build_detail_pages` that removes any `dist/oras/<judet>/<slug>/` not in the rendered set — first prune deleted 568 stale comune directories.
+
+Open follow-up: the search index (`dist/cauta/uats.json`) still contains all 1207 UATs, so search results for excluded comune now 404. Tracked separately.
+
 ## 2026-05-18 — Permanent URLs for Landing-Page Filter
 
 Added query-string state persistence to the two-level județ/municipiu filter on the landing page. Selecting a județ updates the URL to `/?judet=CJ`; selecting a municipiu appends `&siruta=54984`. On page load, `URLSearchParams` is read and the filter is restored before the first `render()` call — with `updateUrl()` called after each branch to clean any stale params. `history.replaceState` (not `pushState`) is used — Back button is intentionally not wired to filter navigation. All changes in `templates/index.html.j2`.

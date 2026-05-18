@@ -805,7 +805,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
     <a href="#tematica">Tematică</a>
     <a href="#pe-cine-onoram">Pe cine onorăm</a>
     <a href="/judete/">Județe</a>
-    <a href="metodologie.html">Metodologie</a>
+    <a href="/metodologie.html">Metodologie</a>
     <span class="nav-sep"></span>
     <select id="s2-judet-select">
       <option value="all">Toate județele</option>
@@ -1187,7 +1187,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       <span class="rank-name person" style="display:flex;align-items:center;gap:7px;">
         {% if p.wikidata_qid and p.wikidata_qid in portraits %}
         <span class="portrait" style="width:22px;height:22px;border-radius:50%;overflow:hidden;flex-shrink:0;display:inline-flex;">
-          <img src="portraits/{{ p.wikidata_qid }}.jpg" alt="" style="width:100%;height:100%;object-fit:cover;" loading="lazy">
+          <img src="/portraits/{{ p.wikidata_qid }}.jpg" alt="" style="width:100%;height:100%;object-fit:cover;" loading="lazy">
         </span>
         {% endif %}
         {% if p.slug %}<a href="/persoana/{{ p.slug }}/" style="color:inherit;text-decoration:none;">{{ p.full_name }}</a>{% else %}{{ p.full_name }}{% endif %}
@@ -1322,12 +1322,12 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       </p>
     </div>
     <div>
-      <a href="metodologie.html" style="text-decoration:none;color:inherit;display:inline-flex;align-items:center;gap:7px;font-family:var(--sans);font-size:10px;letter-spacing:.22em;text-transform:uppercase;font-weight:700;color:var(--gold);margin-bottom:8px;"><span class="emo md">⚗️</span> Metodologie</a>
+      <a href="/metodologie.html" style="text-decoration:none;color:inherit;display:inline-flex;align-items:center;gap:7px;font-family:var(--sans);font-size:10px;letter-spacing:.22em;text-transform:uppercase;font-weight:700;color:var(--gold);margin-bottom:8px;"><span class="emo md">⚗️</span> Metodologie</a>
       <p style="font-family:var(--sans);font-size:12.5px;line-height:1.6;color:rgba(255,255,255,.72);">
         Clasificare: curation manual + LLM batch (Claude Haiku + Gemini).
         Recunoaștere: Wikidata + Wikipedia pageviews.
         Harta: GeoJSON județe, surse publice.
-        <a href="metodologie.html" style="color:#F7D777;text-decoration:underline;text-underline-offset:2px;">Citește metodologia completă →</a>
+        <a href="/metodologie.html" style="color:#F7D777;text-decoration:underline;text-underline-offset:2px;">Citește metodologia completă →</a>
       </p>
     </div>
     <div>
@@ -1501,7 +1501,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       const pct  = Math.round(p.street_count / maxF * 100);
       const href = p.slug ? `/persoana/${p.slug}/` : null;
       const portrait = (p.wikidata_qid && PORTRAITS.has(p.wikidata_qid))
-        ? `<span class="portrait" style="width:22px;height:22px;border-radius:50%;overflow:hidden;flex-shrink:0;display:inline-flex;"><img src="portraits/${p.wikidata_qid}.jpg" alt="" style="width:100%;height:100%;object-fit:cover;" loading="lazy"></span>`
+        ? `<span class="portrait" style="width:22px;height:22px;border-radius:50%;overflow:hidden;flex-shrink:0;display:inline-flex;"><img src="/portraits/${p.wikidata_qid}.jpg" alt="" style="width:100%;height:100%;object-fit:cover;" loading="lazy"></span>`
         : '';
       const nameInner = portrait + escapeHtml(p.full_name);
       const nameEl = href
@@ -1608,7 +1608,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
         const qid = r.wikidata_qid;
         const hasPortrait = (qid && PORTRAITS.has(qid));
         const portrait = hasPortrait
-          ? `<span class="portrait"><img src="portraits/${qid}.jpg" alt="" loading="lazy"></span>`
+          ? `<span class="portrait"><img src="/portraits/${qid}.jpg" alt="" loading="lazy"></span>`
           : '';
         const personSlug = r.slug || (qid ? qid.toLowerCase() : '');
         const personHref = personSlug ? `/persoana/${personSlug}/` : null;
@@ -1618,7 +1618,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       }
       const sqid = r.wikidata_qid;
       const sPortrait = (sqid && PORTRAITS.has(sqid))
-        ? `<span class="portrait"><img src="portraits/${sqid}.jpg" alt="" loading="lazy"></span>`
+        ? `<span class="portrait"><img src="/portraits/${sqid}.jpg" alt="" loading="lazy"></span>`
         : '';
       const streetSlug = r.slug || '';
       const streetHref = streetSlug ? `/strada/${streetSlug}/` : null;

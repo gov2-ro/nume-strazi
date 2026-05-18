@@ -149,7 +149,23 @@ def build_detail_pages(db_path: str = DB_PATH) -> None:
         _render(env, "uat-detail.html.j2",
                 DIST / "oras" / u["judet"].lower() / u["slug"] / "index.html",
                 portraits=portraits, **detail)
-    print(f"    → dist/oras/ ({len(uats)} pages)")
+    # Prune stale UAT directories left over from earlier, less-scoped builds.
+    # The set of rendered UATs shrank when comune were excluded; without this
+    # sweep, /oras/<judet>/<old-slug>/ would keep serving outdated pages.
+    valid = {(u["judet"].lower(), u["slug"]) for u in uats}
+    oras_dir = DIST / "oras"
+    pruned = 0
+    if oras_dir.exists():
+        for jud_dir in oras_dir.iterdir():
+            if not jud_dir.is_dir():
+                continue
+            for uat_dir in jud_dir.iterdir():
+                if uat_dir.is_dir() and (jud_dir.name, uat_dir.name) not in valid:
+                    shutil.rmtree(uat_dir)
+                    pruned += 1
+            if not any(jud_dir.iterdir()):
+                jud_dir.rmdir()
+    print(f"    → dist/oras/ ({len(uats)} pages, pruned {pruned} stale)")
 
     # ── Themes ───────────────────────────────────────────────────────────────
     themes = site_queries.enumerate_themes(conn)

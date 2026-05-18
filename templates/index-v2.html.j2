@@ -667,7 +667,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
     <a href="#harta">Harta</a>
     <a href="#renumiri">Renumiri</a>
     <a href="#curiozitati">Curiozități</a>
-    <a href="metodologie.html">Metodologie</a>
+    <a href="/metodologie.html">Metodologie</a>
   </nav>
 </nav>
 
@@ -984,7 +984,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
     {% for p in section3.top_persons %}
     <div class="rank-row">
       <span class="rank-name person">
-        <span class="portrait lg" aria-hidden="true">{% if p.wikidata_qid and p.wikidata_qid in portraits %}<img src="portraits/{{ p.wikidata_qid }}.jpg" alt="" loading="lazy">{% else %}{{ (p.full_name.split()[0][0] if p.full_name else '·') }}{{ (p.full_name.split()[-1][0] if p.full_name and (p.full_name.split() | length) > 1 else '') }}{% endif %}</span>
+        <span class="portrait lg" aria-hidden="true">{% if p.wikidata_qid and p.wikidata_qid in portraits %}<img src="/portraits/{{ p.wikidata_qid }}.jpg" alt="" loading="lazy">{% else %}{{ (p.full_name.split()[0][0] if p.full_name else '·') }}{{ (p.full_name.split()[-1][0] if p.full_name and (p.full_name.split() | length) > 1 else '') }}{% endif %}</span>
         {{ p.full_name }}{% if p.gender == 'F' %} <span style="display:inline-block;width:7px;height:7px;background:var(--accent);border-radius:50%;margin-left:4px;vertical-align:middle;"></span>{% endif %}
       </span>
       <div class="bar-wrap">
@@ -1230,12 +1230,12 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       </p>
     </div>
     <div>
-      <a href="metodologie.html" style="text-decoration:none;color:inherit;display:inline-flex;align-items:center;gap:7px;font-family:var(--sans);font-size:10px;letter-spacing:.22em;text-transform:uppercase;font-weight:700;color:var(--gold);margin-bottom:8px;"><span class="emo md">⚗️</span> Metodologie</a>
+      <a href="/metodologie.html" style="text-decoration:none;color:inherit;display:inline-flex;align-items:center;gap:7px;font-family:var(--sans);font-size:10px;letter-spacing:.22em;text-transform:uppercase;font-weight:700;color:var(--gold);margin-bottom:8px;"><span class="emo md">⚗️</span> Metodologie</a>
       <p style="font-family:var(--sans);font-size:12.5px;line-height:1.6;color:rgba(255,255,255,.72);">
         Clasificare: curation manual + LLM batch (Claude Haiku + Gemini).
         Recunoaștere: Wikidata + Wikipedia pageviews.
         Harta: GeoJSON județe, surse publice.
-        <a href="metodologie.html" style="color:#F7D777;text-decoration:underline;text-underline-offset:2px;">Citește metodologia completă →</a>
+        <a href="/metodologie.html" style="color:#F7D777;text-decoration:underline;text-underline-offset:2px;">Citește metodologia completă →</a>
       </p>
     </div>
     <div>

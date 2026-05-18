@@ -1057,27 +1057,65 @@ def enumerate_persons(conn: sqlite3.Connection) -> list[dict]:
     return out
 
 
+# SIRUTA codes for the 41 county-seat municipalities (municipiu reședință de
+# județ). Hardcoded because the DB carries no rank/seat metadata and the seat
+# is not always the largest municipiu in the județ (e.g. HR: Miercurea-Ciuc
+# has fewer streets than Odorheiu Secuiesc). Ilfov's seat Buftea is an ORAŞ,
+# not MUNICIPIUL, so it would otherwise fail the rank filter.
+COUNTY_SEAT_SIRUTAS: dict[str, int] = {
+    "AB":  1017,  "AG":  13169, "AR":   9262, "BC": 20297,
+    "BH": 26564,  "BN":  32394, "BR":  42682, "BT": 35731,
+    "BV": 40198,  "BZ":  44818, "CJ":  54975, "CL": 92569,
+    "CS": 50790,  "CT":  60419, "CV":  63394, "DB": 65342,
+    "DJ": 69900,  "GJ":  77812, "GL":  75098, "GR": 100521,
+    "HD": 86687,  "HR":  83320, "IF": 100576, "IL": 92658,
+    "IS": 95060,  "MH": 109773, "MM": 106318, "MS": 114319,
+    "NT": 120726, "OT": 125347, "PH": 130534, "SB": 143450,
+    "SJ": 139704, "SM": 136483, "SV": 146263, "TL": 159614,
+    "TM": 155243, "TR": 151790, "VL": 167473, "VN": 174744,
+    "VS": 161945,
+}
+
+
 def enumerate_uats(conn: sqlite3.Connection, min_streets: int = 50) -> list[dict]:
-    """UATs with their own page: >= min_streets total streets."""
+    """UATs with their own detail page.
+
+    Renders pages for:
+      (a) the 41 county-seat municipalities, regardless of size or rank
+      (b) the 6 Bucharest sectors
+      (c) any other UAT named 'MUNICIPIUL ...' with >= min_streets streets
+
+    Rural comune are deliberately excluded — long-tail pages saw near-zero
+    traffic and the full set added meaningful build time and storage.
+    Each returned dict carries an `is_capital` flag (True only for case a).
+    """
+    seat_set = set(COUNTY_SEAT_SIRUTAS.values())
     rows = _rows(conn, """
         SELECT sd.judet, sd.uat, sd.siruta, COUNT(*) AS total
         FROM streets_dedup sd
         GROUP BY sd.siruta
-        HAVING total >= ?
         ORDER BY total DESC
-    """, (min_streets,))
+    """)
     out = []
     for r in rows:
-        uat_display = fix_diacritics(r["uat"])
+        siruta       = r["siruta"]
+        uat_raw      = r["uat"]
+        is_seat      = siruta in seat_set
+        is_sector    = r["judet"] == "B"
+        is_municipiu = uat_raw.startswith("MUNICIPIUL ")
+        if not (is_seat or is_sector or (is_municipiu and r["total"] >= min_streets)):
+            continue
+        uat_display = fix_diacritics(uat_raw)
         slug = slugify(uat_display)
         if not slug:
             continue
         out.append({
-            "slug":    slug,
-            "judet":   r["judet"],
-            "siruta":  r["siruta"],
-            "uat":     uat_display,
-            "total":   r["total"],
+            "slug":       slug,
+            "judet":      r["judet"],
+            "siruta":     siruta,
+            "uat":        uat_display,
+            "total":      r["total"],
+            "is_capital": is_seat,
         })
     return out
 
