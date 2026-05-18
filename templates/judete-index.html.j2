@@ -182,7 +182,9 @@ function escapeHtml(s) {
     <div style="display:flex;flex-wrap:wrap;gap:8px;padding-top:4px;">
       {% for u in top_uats[:20] %}
       <a href="/oras/{{ u.judet | lower }}/{{ u.slug }}/"
-         style="display:inline-flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--rule);border-radius:4px;padding:6px 12px;text-decoration:none;color:var(--ink);">
+         {% if u.is_capital %}title="Reședință de județ"{% endif %}
+         style="display:inline-flex;align-items:center;gap:8px;background:var(--bg);{% if u.is_capital %}border:1px solid var(--gold);box-shadow:inset 3px 0 0 var(--gold);padding-left:14px;{% else %}border:1px solid var(--rule);{% endif %}border-radius:4px;padding:6px 12px;text-decoration:none;color:var(--ink);">
+        {% if u.is_capital %}<span style="color:var(--gold);font-size:10px;line-height:1;" aria-hidden="true">◆</span>{% endif %}
         <span style="font-family:var(--sans);font-weight:600;font-size:12px;">{{ u.uat | title }}</span>
         <span style="font-family:var(--sans);font-size:10px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;">{{ u.judet }}</span>
         <span style="font-family:var(--mono);font-size:11px;color:var(--gold);font-weight:700;">{{ u.total }}</span>

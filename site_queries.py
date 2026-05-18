@@ -401,6 +401,18 @@ def section3(conn: sqlite3.Connection) -> dict:
             "street_count": r["street_count"],
         })
 
+    # Nationality summary for the s8 foreigners panel: list of
+    # (nationality, count) tuples sorted by count desc. Template uses this
+    # to render flag chips without re-grouping in Jinja.
+    foreign_nat_counts: dict[str, int] = {}
+    for p in top_foreigners:
+        nat = p["nationality"]
+        if nat:
+            foreign_nat_counts[nat] = foreign_nat_counts.get(nat, 0) + 1
+    foreign_nat_summary = sorted(
+        foreign_nat_counts.items(), key=lambda kv: -kv[1]
+    )
+
     return {
         "top_persons": top_persons,
         "persons_by_judet": persons_by_judet,
@@ -417,6 +429,7 @@ def section3(conn: sqlite3.Connection) -> dict:
         "profession_dist": profession_dist,
         "era_dist": era_dist,
         "top_foreigners": top_foreigners,
+        "foreign_nat_summary": foreign_nat_summary,
     }
 
 

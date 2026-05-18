@@ -799,11 +799,15 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 <body>
 
 <nav class="site-nav">
-  <a href="#cele-mai-intalnite" class="brand">Cum ne numim străzile</a>
+  <a href="/" class="brand">Cum ne numim străzile</a>
   <nav>
     <a href="#cele-mai-intalnite">Cele mai întâlnite</a>
     <a href="#tematica">Tematică</a>
     <a href="#pe-cine-onoram">Pe cine onorăm</a>
+    <span class="nav-sep"></span>
+    <a href="/cauta/">Caută</a>
+    <a href="/persoane/">Persoane</a>
+    <a href="/teme/">Teme</a>
     <a href="/judete/">Județe</a>
     <a href="/metodologie.html">Metodologie</a>
     <span class="nav-sep"></span>
@@ -1173,6 +1177,8 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
   'royalty':'rege / voievod','politician':'politician',
   'military':'militar','revolutionary':'revoluționar',
   'scientist':'om de știință','painter':'pictor','philosopher':'filozof',
+  'architect':'arhitect','linguist':'lingvist','biologist/chemist':'om de știință',
+  'biologist':'biolog','chemist':'chimist','physicist':'fizician',
 } %}
 <div id="s3-foreigners-panel" class="panel s8">
   <div class="panel-header">
@@ -1200,7 +1206,17 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
     </div>
     {% endfor %}
   </div>
-  <div class="panel-caption" style="margin-top:10px;">Concentrate predominant în județele cu comunități maghiare istorice (Harghita, Covasna, Mureș, Bihor).</div>
+  <div class="panel-caption" style="margin-top:10px;display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;">
+    <span style="display:inline-flex;flex-wrap:wrap;gap:8px 14px;align-items:baseline;">
+      {% for nat, n in section3.foreign_nat_summary %}
+        <span style="display:inline-flex;align-items:baseline;gap:4px;">
+          <span style="font-size:14px;line-height:1;vertical-align:-1px;">{{ nat_flag.get(nat, '🏳️') }}</span>
+          <span style="font-family:var(--mono);font-size:11px;font-weight:600;color:var(--ink);">{{ n }}</span>
+        </span>
+      {% endfor %}
+    </span>
+    <span style="font-style:italic;">Concentrate în județele cu comunități maghiare istorice (HR, CV, MS, BH).</span>
+  </div>
 </div>
 {% endif %}
 

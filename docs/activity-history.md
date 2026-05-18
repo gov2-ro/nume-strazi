@@ -1,5 +1,15 @@
 # Activity History
 
+## 2026-05-18 — UI Polish: Seats, Foreigners Panel, Nav Consistency
+
+Three polish passes on the static site.
+
+**Mark county seats in /judete/.** Used the `is_capital` flag from yesterday's UAT-scoping work. Added `.uat-pill.is-capital` style in `_detail-shell.html.j2` — gold border + inset accent + ◆ glyph. `judete-lista.html.j2` now sorts capitals first within each județ and applies the class; `judete-index.html.j2` does the same inline for the top-20 cities block. The 41 seats now read at a glance.
+
+**Foreigners panel.** With 125 more persons in the table (after this morning's Gemini batch import), the s8 panel grew richer entries. Added missing profession translations (architect, linguist, biologist/chemist, biologist, chemist, physicist) so labels render in Romanian. Precomputed a `foreign_nat_summary` list of `(nationality, count)` sorted by count in `site_queries.section3()` — Jinja's `groupby` can't sort by group length cleanly. The panel caption now shows a flag-chip strip (`🇭🇺 16 · 🇫🇷 2 · 🇲🇩 1 · 🇷🇺 1 …`) before the Hungarian-community footnote.
+
+**Nav consistency.** The landing page nav had section-anchor links plus only `/judete/` and `/metodologie.html` for site navigation; the detail-shell nav had the full set (Caută, Persoane, Teme, Județe) but no anchors. Unified the landing nav by adding `/cauta/`, `/persoane/`, `/teme/` between separator chips, alongside the existing anchors. Brand link changed from `#cele-mai-intalnite` to `/` so it behaves like the detail-shell brand. Footers stay distinct on purpose — landing has the wide 3-column data/methodology/source band; detail-shell has the compact one-line strip.
+
 ## 2026-05-18 — Gender Curation: Import LLM Batch, Refresh Notebook
 
 Closed the "Gender story needs curation" P2 item. Discovered that `data/curation/llm_gemini-3.1-flash-lite.csv` (700 rows from a Gemini classification run, dated 2026-05-15) had never been imported. Ran it through `tools/import_csv.py`: 125 persons + 208 nature_terms + 191 name_categories + 173 place_refs upserted.

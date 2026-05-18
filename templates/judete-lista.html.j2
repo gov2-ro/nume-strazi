@@ -21,13 +21,15 @@
   </div>
 
   {% for j in judete %}
-  {% set j_uats = uats | selectattr('judet', 'equalto', j) | sort(attribute='total', reverse=true) | list %}
+  {# Capital first (◆), then by street count descending. #}
+  {% set j_uats = uats | selectattr('judet', 'equalto', j) | sort(attribute='total', reverse=true) | sort(attribute='is_capital', reverse=true) | list %}
   {% if j_uats %}
   <div class="detail-section">
     <div class="detail-section-header">{{ j }} — {{ j_uats | length }} localități</div>
     <div class="uat-cluster">
       {% for u in j_uats %}
-        <a class="uat-pill" href="/oras/{{ j | lower }}/{{ u.slug }}/">
+        <a class="uat-pill{% if u.is_capital %} is-capital{% endif %}" href="/oras/{{ j | lower }}/{{ u.slug }}/"
+           {% if u.is_capital %}title="Reședință de județ"{% endif %}>
           {{ u.uat | title }}
           <span style="font-size:10px; color:var(--muted); font-weight:500; margin-left:4px;">{{ u.total }}</span>
         </a>
