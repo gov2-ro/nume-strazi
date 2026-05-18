@@ -44,7 +44,28 @@
 .result-row .name { font-weight: 600; font-size: 13px; }
 .result-row .sub  { font-size: 11px; color: var(--muted); margin-top: 2px; }
 .result-row .cnt  { font-size: 12px; font-weight: 700; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.result-row.disabled {
+  cursor: default; color: var(--muted-2);
+  background: var(--surface-1);
+}
+.result-row.disabled:hover { background: var(--surface-1); }
+.result-row.disabled .name { color: var(--muted-2); font-weight: 500; }
+.result-row.disabled .tag-nopage {
+  display: inline-block;
+  font-size: 9px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--muted); background: var(--bg);
+  border: 1px solid var(--rule); border-radius: 2px;
+  padding: 1px 5px; margin-left: 6px; vertical-align: 1px;
+}
 .no-results { font-size: 13px; color: var(--muted); padding: 20px 0; }
+.search-note {
+  font-size: 11px; color: var(--muted); margin: -16px 0 24px;
+  display: flex; align-items: center; gap: 8px;
+}
+.search-note .dot {
+  width: 8px; height: 8px; background: var(--surface-2);
+  border: 1px solid var(--rule); border-radius: 1px; flex-shrink: 0;
+}
 </style>
 {% endblock %}
 
@@ -65,6 +86,8 @@
   <div class="search-wrap">
     <input class="search-input" id="q" type="search" placeholder="ex. Eminescu, Timișoara, Florilor…" autocomplete="off" spellcheck="false">
   </div>
+
+  <div class="search-note"><span class="dot"></span> Rezultatele estompate sunt în baza de date dar nu au încă pagină proprie generată.</div>
 
   <div id="streets-section" class="results-section" style="display:none;">
     <div class="results-label">Străzi</div>
@@ -113,7 +136,12 @@ function doSearch(q) {
     return;
   }
   const nq = norm(q);
-  const matchStreets = STREETS.filter(s => norm(s.n || '').includes(nq)).slice(0, 20);
+  // Sort streets with a page first, so the 20-row cap doesn't bury
+  // clickable matches behind disabled long-tail rows.
+  const matchStreets = STREETS
+    .filter(s => norm(s.n || '').includes(nq))
+    .sort((a, b) => (b.p|0) - (a.p|0))
+    .slice(0, 20);
   const matchUats    = UATS.filter(u    => norm(u.n || '').includes(nq) || (u.j || '').toLowerCase().includes(q.toLowerCase())).slice(0, 20);
 
   renderStreets(matchStreets);
@@ -128,14 +156,17 @@ function renderStreets(items) {
   const div = document.getElementById('streets-results');
   if (!items.length) { sec.style.display = 'none'; return; }
   sec.style.display = 'block';
-  div.innerHTML = items.map(s => `
-    <a class="result-row" href="/strada/${s.s}/">
+  div.innerHTML = items.map(s => {
+    const inner = `
       <div>
-        <div class="name">${esc(s.n)}</div>
+        <div class="name">${esc(s.n)}${s.p ? '' : ' <span class="tag-nopage">fără pagină</span>'}</div>
         <div class="sub">${s.u} localități</div>
       </div>
-      <div class="cnt">${s.t}</div>
-    </a>`).join('');
+      <div class="cnt">${s.t}</div>`;
+    return s.p
+      ? `<a class="result-row" href="/strada/${s.s}/">${inner}</a>`
+      : `<div class="result-row disabled" title="Există în baza de date — fără pagină proprie încă">${inner}</div>`;
+  }).join('');
 }
 
 function renderUats(items) {

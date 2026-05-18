@@ -1,5 +1,11 @@
 # Activity History
 
+## 2026-05-18 — Search: Disable Rows for Streets Without Pages
+
+The `/cauta/` autocomplete was finding 29,735 streets but only 2,464 have rendered detail pages — clicks on the long-tail 27k were silent 404s. Added a `p` flag to the street index (`1` if a rendered page exists, `0` otherwise). The page renders `p=0` rows as dimmed, non-clickable rows with a "fără pagină" tag and an explanatory note line ("Rezultatele estompate sunt în baza de date dar nu au încă pagină proprie generată."). Search results are sorted so renderable hits come first within the 20-row cap.
+
+Subtle correctness fix in `site_queries.explorer_indexes`: matching on bare slug was wrong on both ends — (a) two `name_normalized` values that happen to slugify to the same string would both be marked `p=1` even though only one renders, and (b) `enumerate_streets` suffixes colliding slugs (`-2`, `-3`), so the rendered page's slug differs from the bare slugify output. Switched to a `{name_normalized → rendered_slug}` map: `p=1` only when name_normalized is in the rendered set, and the row's slug is taken from the map so the link goes to the actual rendered URL.
+
 ## 2026-05-18 — UI Polish: Seats, Foreigners Panel, Nav Consistency
 
 Three polish passes on the static site.

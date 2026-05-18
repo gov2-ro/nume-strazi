@@ -1622,7 +1622,22 @@ def theme_detail(conn: sqlite3.Connection, theme_type: str, theme_key: str) -> d
 
 
 def explorer_indexes(conn: sqlite3.Connection) -> dict:
-    """Compact JSON indexes for the /cauta/ autocomplete page."""
+    """Compact JSON indexes for the /cauta/ autocomplete page.
+
+    Each street row carries a `p` flag — 1 if a detail page exists for the
+    slug, 0 if the entity is only in the DB. The autocomplete renders the
+    latter as disabled rows with a "fără pagină proprie" label rather than
+    a 404-bound link.
+    """
+    # Map name_normalized → (slug, has_page) using the exact slugs assigned
+    # during page rendering. Matching on name_normalized (not bare slug)
+    # avoids two failure modes: (a) streets with uat_count < 5 that don't
+    # render but coincidentally share a slug with a rendered one, (b)
+    # rendered streets whose slug was suffixed (-2, -3) due to collision.
+    rendered_by_namenorm = {
+        s["name_normalized"]: s["slug"] for s in enumerate_streets(conn)
+    }
+
     streets = _rows(conn, """
         SELECT sd.name_normalized, MIN(sd.core_name) AS display,
                COUNT(*) AS total, COUNT(DISTINCT sd.siruta) AS uat_count
@@ -1633,7 +1648,10 @@ def explorer_indexes(conn: sqlite3.Connection) -> dict:
     """)
     street_idx = []
     for r in streets:
-        slug = slugify(r["display"] or r["name_normalized"])
+        rendered_slug = rendered_by_namenorm.get(r["name_normalized"])
+        # Use the rendered slug when available (preserves -2 suffix);
+        # otherwise fall back to the bare slug for the no-page label.
+        slug = rendered_slug or slugify(r["display"] or r["name_normalized"])
         if not slug:
             continue
         street_idx.append({
@@ -1641,6 +1659,7 @@ def explorer_indexes(conn: sqlite3.Connection) -> dict:
             "n": r["display"],
             "t": r["total"],
             "u": r["uat_count"],
+            "p": 1 if rendered_slug else 0,
         })
 
     # Only index UATs that have a rendered detail page — otherwise search

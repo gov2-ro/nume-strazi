@@ -44,6 +44,8 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [x] **Search index includes UATs without detail pages** — Done 2026-05-18. `explorer_indexes` now sources its UAT list from `enumerate_uats`, so search is automatically in sync with whatever has a rendered page (108 UATs). Rural comune are no longer surfaced in `/cauta/`. When/if we add a DB-backed endpoint for long-tail UATs, route it through `enumerate_uats` (or a sibling) so the search index stays the single source of truth.
 
+- [x] **Search index includes streets without detail pages** — Done 2026-05-18. The 29,735-row street index was clickable on all rows but only 2,464 streets have rendered pages — clicks on the rest were silent 404s. Added a `p` flag (0/1) to each index entry, and rendered `p=0` rows as disabled greyed-out rows with a "fără pagină" tag plus a note ("Rezultatele estompate sunt în baza de date dar nu au încă pagină proprie generată."). Renderable hits sort first within the 20-row cap. Fix is name_normalized-based (not bare-slug), so it survives slug collisions on both sides (`enumerate_streets` suffixes `-2` on collisions; explorer index would otherwise mark a non-rendered duplicate as `p=1`).
+
 - [ ] **Reconsider static export strategy for all entities** — Phase 1 pre-renders ~3,400 detail pages (2,464 streets + 211 persons + 672 UATs + 72 themes) at build time. This is a significant storage and build-time overhead for long-tail entities that may receive very few visits. Consider: (a) reduce static thresholds (render only top-N per category), (b) render on-demand (Datasette or dynamic handler for missing slugs), or (c) hybrid (static for top-100 streets, dynamic for long tail). Measure traffic patterns first to justify the export cost.
 
 - [x] **Fix `build_site.py --detail-only` hanging on re-runs** — Root cause: `uat_detail()` ran two global full-table scans (distinctive CTE + national averages) on every one of 672 UAT calls = ~740s wall time. Fixes: (1) changed `streets_dedup` GROUP BY from `(uat, name_normalized)` to `(siruta, name_normalized)` — this is also a correctness fix since 48 UAT names appear in multiple județe and were being merged; (2) added `ix_streets_siruta_name` composite index so per-UAT queries can use the index; (3) precompute `global_rarity` dict and `nat` once before the UAT loop in `build_detail_pages` and pass as kwargs to `uat_detail`. Full `--detail-only` now completes in ~100s (3427 pages). UAT count 672→676 due to correctness fix.
@@ -93,7 +95,17 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [x] UI make emojis larger/icons, slightly larger than the text
 
-- [ ] OG image description
+- [ ] UI: Landing, balance the 2 sections below stats. Personalități non-române (universale) is in 2 sections. Remove the first. Keep the second. Remove 'Notorietate Wikipedia' section.
+
+- [ ] UI: search from anywhere, with `/` or `Ctrl/Command + k` ?
+
+- [ ] UI: try compact version. Instead of showing multiple lists show one that's highly filterable. Start with stats, then a single filterable list of streets.
+
+- [ ] UI: try a super dorpdown navigator, where it can reach all options via taxonomies, attributes, witih contextual keyboard shortcuts. or just search by visible terms. but how can we select more or exclude, to make it crazy good? With streer count in brackets?
+
+- [ ] street names profiles, convert it to map. shows towns that match the name.
+
+- [ ] map mode. a choropleth map colored by different variables (genders, flowers, independence, universal, etc)
 
 - [ ] create spider chart for judete, based on choice of street names
 
@@ -120,6 +132,8 @@ Items detected during sessions. Each entry has enough context to act on cold.
 - [ ] **Validate dark-statbar direction with stakeholders.** The bold-restyle pass moved the stats band from a light cream to dark ink (Bloomberg-feel). User brief said "white background" — interpreted as the main panels, with the statbar as a structural masthead. If user pushes back, flip `.statbar` to `background: var(--bg)` + `color: var(--ink)` and the rest of the design holds (panels, leader highlights, type scale all read fine on white-on-white as well).
 
 ## Later
+
+- [ ] side by side comparison. Judete or UATs - can be mixed. Pick max 6? toponyms to compare. Attempt (later) an automated commentary based on stats.
 
 - [ ] brainstorm on naming
 
