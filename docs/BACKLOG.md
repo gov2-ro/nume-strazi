@@ -95,9 +95,9 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [x] UI make emojis larger/icons, slightly larger than the text
 
-- [ ] UI: Landing, balance the 2 sections below stats. Personalități non-române (universale) is in 2 sections. Remove the first. Keep the second. Remove 'Notorietate Wikipedia' section.
+- [x] UI: Landing, balance the 2 sections below stats. Personalități non-române (universale) is in 2 sections. Remove the first. Keep the second. Remove 'Notorietate Wikipedia' section. — Done 2026-05-18. The duplicate sub-section inside Persoane removed; the "Notorietate Wikipedia · vizualizări" panel removed. JS handlers for the now-missing IDs cleaned up.
 
-- [ ] UI: search from anywhere, with `/` or `Ctrl/Command + k` ?
+- [x] UI: search from anywhere, with `/` or `Ctrl/Command + k` ? — Done 2026-05-18. `templates/_search_overlay.html.j2` partial included from `_detail-shell.html.j2` and all top-level templates. `/` (when not in a text input) or `Cmd/Ctrl+K` opens; Esc closes; arrows + Enter navigate. Reuses `/cauta/*.json` indexes and the `p` flag for "fără pagină" rows.
 
 - [ ] UI: try compact version. Instead of showing multiple lists show one that's highly filterable. Start with stats, then a single filterable list of streets.
 
@@ -105,7 +105,9 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [ ] street names profiles, convert it to map. shows towns that match the name.
 
-- [ ] map mode. a choropleth map colored by different variables (genders, flowers, independence, universal, etc)
+- [x] map mode. a choropleth map colored by different variables (genders, flowers, independence, universal, etc) — Done 2026-05-18. The existing `/judete/` map gained 8 new metrics: `person_pct`, `male_pct`, `foreign_pct`, `universal_pct`, `date_pct`, `flora_pct` (flori/copaci), `ideology_pct` next to the prior saint/numeric/female/nature. Scale auto-switches to min..max when the spread is tight so person/nature metrics show actual variation; 0..max stays for rare-event metrics. 11 chips total; default is now `person_pct`. Chip CSS was missing from the detail-shell — added local style block in `judete-index.html.j2`.
+
+- [ ] choropleth: option to render per-uat (not just per-județ). Currently the map is județ-level only; same chip metrics applied to UAT polygons would surface much finer signal (the urban/rural split, neighbourhood patterns). Blocked on UAT polygon source — admin_level=8 in OSM, parsed via osmium area assembler. Roughly: extract 3,200 UAT polygons → simplify (Mapshaper or `topojson-simplify`) → publish as `uats.topojson`. Plug into the same updateMetric() flow, swap geometry only.
 
 - [ ] create spider chart for judete, based on choice of street names
 
@@ -113,13 +115,13 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [ ] add orașe / towns - top by population. SIRUTA?
 
-- [ ] og image, og description, metadata
+- [x] og image, og description, metadata — Done 2026-05-18. `_meta.html.j2` partial emits og + twitter cards + meta description. Detail renders pass per-page `og_title`/`og_description`/`og_url_path` from `build_site.py`. Single static OG image at `dist/og.png` (1200×630, brand + live counts) regenerated with `python3 tools/gen_og_image.py`.
 
 - [ ] top of foreigners foreign street names
 
 - [x] lading page, permanent urls for selected judet / municipiu
 
-- [ ] percent of nationalities of personalities. Universal. Local.
+- [x] percent of nationalities of personalities. Universal. Local. — Done 2026-05-18. New "Naționalitatea personalităților onorate" panel on the landing page: side-by-side bars `după persoane` vs `după străzi (ponderate)`. Surfaced the asymmetry: non-Romanian personalities are 7.4% of persons but only 4.49% of streets — onorate proporțional pe mai puține străzi decât cota lor numerică. Source data via `section3.nationality_breakdown` in `site_queries.py`. Note: `wiki_scope` is too sparse (3 universal only) for a "Universal vs Local" sub-split to be informative; deferred until scope coverage improves.
 
 - [ ] Go wild, nerdy, quirky. The people, how old, what are the occupations? Reason of death?
 

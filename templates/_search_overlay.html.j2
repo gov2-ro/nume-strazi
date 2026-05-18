@@ -1,0 +1,236 @@
+{# Global search overlay. Triggered by `/` or Cmd/Ctrl+K from anywhere.
+   Lazily fetches /cauta/streets.json + /cauta/uats.json on first open. #}
+<style>
+.gso-backdrop {
+  position: fixed; inset: 0; background: rgba(20, 20, 24, .55);
+  display: none; z-index: 9999; align-items: flex-start; justify-content: center;
+  padding: 12vh 16px 16px;
+}
+.gso-backdrop.open { display: flex; }
+.gso-modal {
+  width: 100%; max-width: 640px; background: #FFFFFF;
+  border: 1px solid #D8D5CB; border-radius: 6px;
+  box-shadow: 0 24px 60px rgba(0,0,0,.32);
+  font-family: 'IBM Plex Sans','Inter',system-ui,sans-serif;
+  display: flex; flex-direction: column; max-height: 76vh; overflow: hidden;
+}
+.gso-search-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; border-bottom: 1px solid #E6E2D6;
+}
+.gso-search-row .icon {
+  font-size: 14px; color: #7A766C; line-height: 1;
+}
+.gso-search-row input {
+  flex: 1; border: 0; outline: 0; background: transparent;
+  font: 500 16px/1.2 inherit; color: #1A1815;
+}
+.gso-search-row .hint {
+  font: 600 10px/1 ui-monospace,Menlo,monospace;
+  color: #9A968B; padding: 4px 6px; border: 1px solid #D8D5CB; border-radius: 3px;
+  letter-spacing: .05em;
+}
+.gso-results { overflow-y: auto; flex: 1; padding: 6px 0; }
+.gso-empty, .gso-loading {
+  padding: 16px; color: #7A766C; font-size: 13px; text-align: center;
+}
+.gso-group-eyebrow {
+  font: 600 10px/1 inherit; letter-spacing: .18em; text-transform: uppercase;
+  color: #9A968B; padding: 10px 16px 6px;
+}
+.gso-row {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px; padding: 8px 16px; text-decoration: none; color: inherit;
+  font-size: 13.5px; line-height: 1.3;
+  border-left: 2px solid transparent;
+}
+.gso-row.active { background: #F4F1E8; border-left-color: #C8A85A; }
+.gso-row .name { font-weight: 500; color: #1A1815; }
+.gso-row .sub { color: #7A766C; font-size: 11.5px; margin-left: 6px; }
+.gso-row .cnt {
+  font: 600 12px/1 ui-monospace,Menlo,monospace; color: #5A5650;
+  white-space: nowrap;
+}
+.gso-row.disabled { opacity: .55; cursor: default; }
+.gso-row .nopage {
+  display: inline-block; font-size: 9.5px; padding: 1px 5px;
+  border: 1px solid #D8D5CB; border-radius: 2px; color: #9A968B;
+  margin-left: 6px; vertical-align: 2px; text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.gso-footer {
+  display: flex; gap: 16px; padding: 8px 16px;
+  border-top: 1px solid #E6E2D6; background: #FAF8F2;
+  font: 500 11px/1 inherit; color: #7A766C;
+}
+.gso-footer kbd {
+  font: 600 10px/1 ui-monospace,Menlo,monospace; padding: 2px 5px;
+  border: 1px solid #D8D5CB; border-radius: 2px; margin-right: 4px;
+  color: #5A5650;
+}
+@media (max-width: 480px) {
+  .gso-backdrop { padding: 4vh 8px 8px; }
+}
+</style>
+
+<div class="gso-backdrop" id="gso-backdrop" role="dialog" aria-modal="true" aria-label="Căutare globală">
+  <div class="gso-modal">
+    <div class="gso-search-row">
+      <span class="icon">⌕</span>
+      <input id="gso-input" type="text" placeholder="Caută stradă sau localitate…" autocomplete="off" spellcheck="false">
+      <span class="hint">esc</span>
+    </div>
+    <div class="gso-results" id="gso-results">
+      <div class="gso-empty">Tastează pentru a căuta.</div>
+    </div>
+    <div class="gso-footer">
+      <span><kbd>↑↓</kbd>navighează</span>
+      <span><kbd>⏎</kbd>deschide</span>
+      <span><kbd>esc</kbd>închide</span>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  if (window.__gsoInit) return; window.__gsoInit = true;
+
+  const backdrop = document.getElementById('gso-backdrop');
+  const input    = document.getElementById('gso-input');
+  const results  = document.getElementById('gso-results');
+  let STREETS = null, UATS = null, loaded = false, items = [], active = 0;
+
+  function norm(s) {
+    return (s || '').toLowerCase()
+      .replace(/[ăâ]/g, 'a').replace(/[îí]/g, 'i')
+      .replace(/[șş]/g, 's').replace(/[țţ]/g, 't')
+      .replace(/[éèê]/g, 'e').replace(/[óòô]/g, 'o')
+      .replace(/[úùû]/g, 'u').replace(/[^a-z0-9 ]/g, '');
+  }
+  function esc(s) {
+    return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  async function loadIndexes() {
+    if (loaded) return;
+    results.innerHTML = '<div class="gso-loading">Se încarcă indexul…</div>';
+    try {
+      const [s, u] = await Promise.all([
+        fetch('/cauta/streets.json').then(r => r.json()),
+        fetch('/cauta/uats.json').then(r => r.json()),
+      ]);
+      STREETS = s; UATS = u; loaded = true;
+      doSearch(input.value);
+    } catch (e) {
+      results.innerHTML = '<div class="gso-empty">Nu am putut încărca indexul.</div>';
+    }
+  }
+
+  function open() {
+    backdrop.classList.add('open');
+    setTimeout(() => input.focus(), 0);
+    if (!loaded) loadIndexes();
+    else doSearch(input.value);
+  }
+  function close() {
+    backdrop.classList.remove('open');
+  }
+
+  function doSearch(q) {
+    q = (q || '').trim();
+    if (!q || !STREETS) {
+      items = [];
+      results.innerHTML = q
+        ? '<div class="gso-empty">Nicio potrivire găsită.</div>'
+        : '<div class="gso-empty">Tastează pentru a căuta.</div>';
+      return;
+    }
+    const nq = norm(q);
+    const ql = q.toLowerCase();
+    const streets = STREETS
+      .filter(s => norm(s.n || '').includes(nq))
+      .sort((a, b) => (b.p|0) - (a.p|0))
+      .slice(0, 12);
+    const uats = UATS
+      .filter(u => norm(u.n || '').includes(nq) || (u.j || '').toLowerCase().includes(ql))
+      .slice(0, 8);
+
+    items = [];
+    let html = '';
+    if (streets.length) {
+      html += '<div class="gso-group-eyebrow">Străzi</div>';
+      streets.forEach(s => {
+        const href = s.p ? `/strada/${s.s}/` : null;
+        items.push({ href });
+        const tag = s.p ? '' : ' <span class="nopage">fără pagină</span>';
+        html += s.p
+          ? `<a class="gso-row" href="${href}" data-href="${href}"><span><span class="name">${esc(s.n)}</span><span class="sub">${s.u} localități</span></span><span class="cnt">${s.t}</span></a>`
+          : `<div class="gso-row disabled"><span><span class="name">${esc(s.n)}${tag}</span><span class="sub">${s.u} localități</span></span><span class="cnt">${s.t}</span></div>`;
+      });
+    }
+    if (uats.length) {
+      html += '<div class="gso-group-eyebrow">Orașe</div>';
+      uats.forEach(u => {
+        const href = `/oras/${(u.j || '').toLowerCase()}/${u.s}/`;
+        items.push({ href });
+        html += `<a class="gso-row" href="${href}" data-href="${href}"><span><span class="name">${esc(u.n)}</span><span class="sub">${esc(u.j || '')}</span></span><span class="cnt">${u.t}</span></a>`;
+      });
+    }
+    if (!html) html = '<div class="gso-empty">Nicio potrivire găsită.</div>';
+    results.innerHTML = html;
+    active = 0;
+    highlightActive();
+  }
+
+  function rowEls() {
+    return results.querySelectorAll('.gso-row');
+  }
+  function highlightActive() {
+    const els = rowEls();
+    els.forEach((el, i) => el.classList.toggle('active', i === active));
+    const el = els[active];
+    if (el) el.scrollIntoView({ block: 'nearest' });
+  }
+
+  function isTypingTarget(t) {
+    if (!t) return false;
+    const tag = (t.tagName || '').toLowerCase();
+    return tag === 'input' || tag === 'textarea' || tag === 'select' || t.isContentEditable;
+  }
+
+  document.addEventListener('keydown', (e) => {
+    const isOpen = backdrop.classList.contains('open');
+    if (!isOpen) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault(); open();
+      } else if (e.key === '/' && !isTypingTarget(e.target)) {
+        e.preventDefault(); open();
+      }
+      return;
+    }
+    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const els = rowEls();
+      if (els.length) { active = (active + 1) % els.length; highlightActive(); }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const els = rowEls();
+      if (els.length) { active = (active - 1 + els.length) % els.length; highlightActive(); }
+    } else if (e.key === 'Enter') {
+      const els = rowEls();
+      const el = els[active];
+      if (el && el.dataset.href) {
+        e.preventDefault();
+        window.location.href = el.dataset.href;
+      }
+    }
+  });
+
+  backdrop.addEventListener('click', (e) => {
+    if (e.target === backdrop) close();
+  });
+  input.addEventListener('input', (e) => doSearch(e.target.value));
+})();
+</script>

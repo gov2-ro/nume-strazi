@@ -1,5 +1,19 @@
 # Activity History
 
+## 2026-05-18 — Backlog Sweep: Trim, Search, OG, Choropleth, Nationalities
+
+One sitting, five backlog items.
+
+**Landing trim** (`templates/index.html.j2`). Removed the duplicate "Non-române" sub-section inside the Persoane panel (kept the richer standalone s8 foreigners panel). Also removed the "Notorietate Wikipedia · vizualizări lunare" panel — it was a duplicate signal next to the Wikidata scope panel and never drove story. JS `renderFlat` for `s3p-foreigners` removed; pageviews updater is harmless when the panel is missing (`if (!container) return`).
+
+**Global search shortcut** (`templates/_search_overlay.html.j2`). New partial: `/` or `Cmd/Ctrl+K` opens a modal with input + lazy-loaded indexes (`/cauta/streets.json` + `/cauta/uats.json`). Arrow keys to navigate, Enter to open, Esc to close. Reuses the same `p` flag so streets without rendered pages show as dimmed `fără pagină` rows. Included from `_detail-shell.html.j2` (covers all 3,042 detail pages) and from `index.html.j2`, `index-v1.html.j2`, `index-v2.html.j2`, `metodologie.html.j2`. Module guards against double-init via `window.__gsoInit`.
+
+**OG metadata + image** (`templates/_meta.html.j2`, `tools/gen_og_image.py`). New `_meta.html.j2` partial emits og:title / og:description / og:url / og:image plus the twitter:card pair and a meta description. Each detail render in `build_site.py` now passes per-page `og_title` / `og_description` / `og_url_path` overrides; landings and methodology set them inline. Static OG image at `dist/og.png` (1200×630): gold rule, brand mark, two-line serif headline, dark stats band with live counts (104,483 streets · 1,207 localități · 42 județe), Georgia + Menlo only — no extra font dependencies. Regenerate with `python3 tools/gen_og_image.py`.
+
+**Choropleth · 11 metrics on the judete map** (`site_queries.section6`, `templates/judete-index.html.j2`). Extended the per-județ stats with `male_pct`, `person_pct`, `foreign_pct`, `universal_pct`, `date_pct`, `flora_pct`, `ideology_pct` next to the existing saint/numeric/female/nature columns. Chip row at the top of the existing `/judete/` map now exposes all 11. Scale logic now uses `min..max` when the metric is tightly clustered (spread < 50% of max) so e.g. `person_pct` (range 8–13%) shows visible county-to-county differentiation instead of a flat wash; rare-event metrics (`female_pct`, `ideology_pct`) still use 0..max so the absolute zero is grounded. Default chip changed from `saint_pct` to `person_pct`. The `.chip` / `.chip-row` styles weren't present in `_detail-shell.html.j2`, so the chips rendered as plain text — re-added the same rules locally via `{% block head_scripts %}`.
+
+**Nationalities breakdown panel** (`site_queries.section3.nationality_breakdown`, `templates/index.html.j2`). New compact `s8` panel "Naționalitatea personalităților onorate". Side-by-side bars: "după persoane" vs "după străzi (ponderate)". Reveals the asymmetry — non-Romanian honorees are 7.4% of persons but only 4.49% of streets, i.e. foreign personalities get fewer streets per person than their numeric share. Flag chips + Romanian-language full country labels. RO bars use plaque blue; non-RO use olive to visually separate. Placed between the rich foreigners panel and the (hidden) global-recognition panel.
+
 ## 2026-05-18 — Search: Disable Rows for Streets Without Pages
 
 The `/cauta/` autocomplete was finding 29,735 streets but only 2,464 have rendered detail pages — clicks on the long-tail 27k were silent 404s. Added a `p` flag to the street index (`1` if a rendered page exists, `0` otherwise). The page renders `p=0` rows as dimmed, non-clickable rows with a "fără pagină" tag and an explanatory note line ("Rezultatele estompate sunt în baza de date dar nu au încă pagină proprie generată."). Search results are sorted so renderable hits come first within the 20-row cap.

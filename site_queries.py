@@ -413,6 +413,22 @@ def section3(conn: sqlite3.Connection) -> dict:
         foreign_nat_counts.items(), key=lambda kv: -kv[1]
     )
 
+    # Full nationality breakdown (persons + street-weighted) for a side-by-side
+    # "by person" / "by street" panel. Includes RO so the chart can show shares.
+    nat_rows = _rows(conn, """
+        SELECT COALESCE(p.nationality, 'XX') AS nationality,
+               COUNT(DISTINCT p.core_name_norm) AS persons,
+               COUNT(sd.id) AS streets
+        FROM persons p
+        LEFT JOIN streets_dedup sd ON sd.core_name_norm = p.core_name_norm
+        GROUP BY nationality
+        ORDER BY streets DESC
+    """)
+    nationality_breakdown = [
+        {"nat": r["nationality"], "persons": r["persons"], "streets": r["streets"]}
+        for r in nat_rows
+    ]
+
     return {
         "top_persons": top_persons,
         "persons_by_judet": persons_by_judet,
@@ -430,6 +446,7 @@ def section3(conn: sqlite3.Connection) -> dict:
         "era_dist": era_dist,
         "top_foreigners": top_foreigners,
         "foreign_nat_summary": foreign_nat_summary,
+        "nationality_breakdown": nationality_breakdown,
     }
 
 
@@ -644,11 +661,19 @@ def section6(conn: sqlite3.Connection) -> dict:
                COUNT(*) AS total_streets,
                ROUND(100.0 * SUM(is_saint) / COUNT(*), 1) AS saint_pct,
                ROUND(100.0 * SUM(is_numeric) / COUNT(*), 1) AS numeric_pct,
+               ROUND(100.0 * SUM(is_date) / COUNT(*), 2) AS date_pct,
                ROUND(100.0 * SUM(CASE WHEN p.gender = 'F' THEN 1 ELSE 0 END) / COUNT(*), 2) AS female_pct,
-               ROUND(100.0 * SUM(CASE WHEN nt.core_name_norm IS NOT NULL THEN 1 ELSE 0 END) / COUNT(*), 1) AS nature_pct
+               ROUND(100.0 * SUM(CASE WHEN p.gender = 'M' THEN 1 ELSE 0 END) / COUNT(*), 1) AS male_pct,
+               ROUND(100.0 * SUM(CASE WHEN p.core_name_norm IS NOT NULL THEN 1 ELSE 0 END) / COUNT(*), 1) AS person_pct,
+               ROUND(100.0 * SUM(CASE WHEN p.nationality IS NOT NULL AND p.nationality != 'RO' THEN 1 ELSE 0 END) / COUNT(*), 2) AS foreign_pct,
+               ROUND(100.0 * SUM(CASE WHEN p.wiki_scope = 'universal' THEN 1 ELSE 0 END) / COUNT(*), 2) AS universal_pct,
+               ROUND(100.0 * SUM(CASE WHEN nt.core_name_norm IS NOT NULL THEN 1 ELSE 0 END) / COUNT(*), 1) AS nature_pct,
+               ROUND(100.0 * SUM(CASE WHEN nt.nature_type IN ('flower','tree','plant','fruit','forest','orchard') THEN 1 ELSE 0 END) / COUNT(*), 2) AS flora_pct,
+               ROUND(100.0 * SUM(CASE WHEN nc.category = 'ideological' THEN 1 ELSE 0 END) / COUNT(*), 2) AS ideology_pct
         FROM streets_dedup sd
         LEFT JOIN persons p ON p.core_name_norm = sd.core_name_norm
         LEFT JOIN nature_terms nt ON nt.core_name_norm = sd.core_name_norm
+        LEFT JOIN name_categories nc ON nc.core_name_norm = sd.core_name_norm
         GROUP BY judet
         ORDER BY total_streets DESC
     """)

@@ -1,0 +1,25 @@
+{# Open Graph + Twitter card meta. Pass:
+   - og_title (defaults to "Cum ne numim străzile")
+   - og_description (1–2 sentence summary)
+   - og_url_path (path under the site, e.g. "/strada/eminescu/")
+   - og_image_path (defaults to "/og.png")
+#}
+{% set _t  = og_title       | default("Cum ne numim străzile") %}
+{% set _d  = og_description | default("Cine se ascunde în spatele numelor de străzi din România? Personalități, natură, ideologie, locuri — analiză pe baza registrului Autorității Electorale Permanente.") %}
+{% set _p  = og_url_path    | default("/") %}
+{% set _im = og_image_path  | default("/og.png") %}
+{% set _site = "https://strazi.gov2.ro" %}
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Cum ne numim străzile">
+<meta property="og:title" content="{{ _t }}">
+<meta property="og:description" content="{{ _d }}">
+<meta property="og:url" content="{{ _site }}{{ _p }}">
+<meta property="og:image" content="{{ _site }}{{ _im }}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ro_RO">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ _t }}">
+<meta name="twitter:description" content="{{ _d }}">
+<meta name="twitter:image" content="{{ _site }}{{ _im }}">
+<meta name="description" content="{{ _d }}">

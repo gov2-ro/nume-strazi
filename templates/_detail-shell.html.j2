@@ -5,6 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Cum ne numim străzile{% endblock %}</title>
+  {% include "_meta.html.j2" %}
   {% block meta %}{% endblock %}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -286,6 +287,8 @@ a:hover { text-decoration: underline; }
 </header>
 
 {% block body %}{% endblock %}
+
+{% include "_search_overlay.html.j2" %}
 
 <footer class="site-footer">
   <span>Date: Autoritatea Electorală Permanentă · <a href="/metodologie.html">Metodologie</a></span>

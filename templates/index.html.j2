@@ -5,6 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Cum ne numim străzile</title>
+  {% include "_meta.html.j2" %}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&family=Barlow+Semi+Condensed:wght@600;700&display=swap" rel="stylesheet">
@@ -939,10 +940,6 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
     <div class="sub-eyebrow"><span class="dot" style="background:var(--accent);"></span>Femei<span class="meta" id="s3p-women-count"></span></div>
     <div id="s3p-women">{# Populated by JS #}</div>
   </div>
-  <div class="sub-section">
-    <div class="sub-eyebrow"><span class="dot" style="background:#6B8E23;"></span>Non-române<span class="meta" id="s3p-foreigners-count"></span></div>
-    <div id="s3p-foreigners">{# Populated by JS #}</div>
-  </div>
 </div>
 
 {# PANEL: REPARTIȚIE TEMATICĂ (s4) #}
@@ -1220,27 +1217,67 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 </div>
 {% endif %}
 
-{# PANEL: NOTORIETATE WIKIPEDIA (s12, 2-col internal) #}
-<div class="panel s12">
+{# PANEL: NAȚIONALITĂȚI · breakdown agregat #}
+{% if section3.nationality_breakdown %}
+{% set nat_full_label = {
+  'RO':'România','HU':'Ungaria','FR':'Franța','DE':'Germania','IT':'Italia',
+  'RU':'Rusia','MD':'R. Moldova','PL':'Polonia','TR':'Turcia','US':'SUA',
+  'GR':'Grecia','RS':'Serbia','UA':'Ucraina','CZ':'Cehia','SK':'Slovacia',
+  'BG':'Bulgaria','HR':'Croația','GB':'Marea Britanie','AT':'Austria',
+  'CH':'Elveția','ES':'Spania','NL':'Olanda','BE':'Belgia',
+  'XX':'fără naționalitate',
+} %}
+{% set nb = section3.nationality_breakdown %}
+{% set total_p = nb | sum(attribute='persons') %}
+{% set total_s = nb | sum(attribute='streets') %}
+<div class="panel s8" id="nationalities-panel">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo xl">📈</span> Notorietate Wikipedia · vizualizări lunare medii · ro.wikipedia.org · 12 luni</span>
+    <span class="panel-label"><span class="emo xl">🌐</span> Naționalitatea personalităților onorate</span>
+    <span class="panel-meta">{{ total_p }} persoane · {{ "{:,.0f}".format(total_s).replace(",",".") }} străzi</span>
   </div>
-  <div id="s4-pv-list" class="rank-list rank-2col s4-list">
-    {% set max_pv = section4.top_pageviews[0].wiki_ro_views if section4.top_pageviews else 1 %}
-    {% for p in section4.top_pageviews %}
-    <div class="rank-row">
-      {% if p.slug %}<a href="/persoana/{{ p.slug }}/" style="color:inherit;text-decoration:none;"><span class="rank-name person">{{ p.full_name }}</span></a>
-      {% else %}<span class="rank-name person">{{ p.full_name }}</span>{% endif %}
-      <div class="bar-wrap">
-        <div class="{{ 'bar accent' if p.wiki_scope == 'universal' else 'bar' }}"
-             style="width:{{ (p.wiki_ro_views / max_pv * 100)|int }}%"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;padding-top:6px;">
+    <div>
+      <div class="sub-eyebrow" style="margin-bottom:8px;">
+        <span class="dot" style="background:var(--plaque);"></span>După persoane
+        <span class="meta">{{ total_p }}</span>
       </div>
-      <span class="rank-count">{{ "{:,.0f}".format(p.wiki_ro_views).replace(",", ".") }}</span>
-      <span class="tag{{ ' person' if p.wiki_scope == 'universal' else '' }}">{{ p.wiki_scope or '—' }}</span>
+      {% for r in nb %}
+        {% if r.persons > 0 %}
+        {% set pct = (r.persons * 100.0 / total_p) | round(1) %}
+        <div style="display:grid;grid-template-columns:24px minmax(0,1fr) 1fr 48px;gap:8px;align-items:center;padding:3px 0;border-bottom:1px solid var(--rule);">
+          <span style="font-size:16px;line-height:1;text-align:center;">{{ nat_flag.get(r.nat, '🏳️') }}</span>
+          <span style="font-family:var(--sans);font-size:12px;color:var(--ink);font-weight:500;">{{ nat_full_label.get(r.nat, r.nat) }}</span>
+          <div class="bar-wrap"><div class="bar" style="width:{{ (r.persons * 100 / total_p)|int }}%;{% if r.nat != 'RO' %}background:#6B8E23;{% endif %}"></div></div>
+          <span style="font-family:var(--mono);font-size:11px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums;">{{ pct }}%</span>
+        </div>
+        {% endif %}
+      {% endfor %}
     </div>
-    {% endfor %}
+    <div>
+      <div class="sub-eyebrow" style="margin-bottom:8px;">
+        <span class="dot" style="background:var(--accent);"></span>După străzi (ponderate)
+        <span class="meta">{{ "{:,.0f}".format(total_s).replace(",",".") }}</span>
+      </div>
+      {% for r in nb %}
+        {% if r.streets > 0 %}
+        {% set pct = (r.streets * 100.0 / total_s) | round(1) %}
+        <div style="display:grid;grid-template-columns:24px minmax(0,1fr) 1fr 48px;gap:8px;align-items:center;padding:3px 0;border-bottom:1px solid var(--rule);">
+          <span style="font-size:16px;line-height:1;text-align:center;">{{ nat_flag.get(r.nat, '🏳️') }}</span>
+          <span style="font-family:var(--sans);font-size:12px;color:var(--ink);font-weight:500;">{{ nat_full_label.get(r.nat, r.nat) }}</span>
+          <div class="bar-wrap"><div class="bar accent" style="width:{{ (r.streets * 100 / total_s)|int }}%;"></div></div>
+          <span style="font-family:var(--mono);font-size:11px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums;">{{ pct }}%</span>
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+  <div class="panel-caption" style="margin-top:10px;font-style:italic;">
+    {% set non_ro_p = nb | rejectattr('nat','equalto','RO') | sum(attribute='persons') %}
+    {% set non_ro_s = nb | rejectattr('nat','equalto','RO') | sum(attribute='streets') %}
+    Personalități non-române: {{ non_ro_p }} persoane ({{ (non_ro_p * 100.0 / total_p) | round(1) }}%) → {{ non_ro_s }} străzi ({{ (non_ro_s * 100.0 / total_s) | round(2) }}%). Onorate proporțional pe mai puține străzi decât cota lor numerică.
   </div>
 </div>
+{% endif %}
 
 {# PANEL: RECUNOAȘTERE GLOBALĂ (s6) #}
 <div class="panel s6" id="recunoastere" style="display:none;">
@@ -1712,10 +1749,8 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
     renderFlat(streets, 's2-clusters', false);
     renderFlat(men,    's3p-men',    true);
     renderFlat(women,  's3p-women',  true);
-    renderFlat(foreigners, 's3p-foreigners', true);
     setSubCount('s3p-men-count', men.length);
     setSubCount('s3p-women-count', women.length);
-    setSubCount('s3p-foreigners-count', foreigners.length);
     document.getElementById('s2-footer').textContent = footerText;
 
     // Theme donut
@@ -1792,6 +1827,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 })();
 </script>
 
+{% include "_search_overlay.html.j2" %}
 
 </body>
 </html>

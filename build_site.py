@@ -98,9 +98,17 @@ def build_detail_pages(db_path: str = DB_PATH) -> None:
         detail = site_queries.street_detail(conn, s["name_normalized"])
         if not detail:
             continue
+        og = {
+            "og_title": f"{detail['display_name']} — Cum ne numim străzile",
+            "og_description": (
+                f"„{detail['display_name']}” — {detail['total_count']} străzi "
+                f"în {detail['uat_count']} localități din România."
+            ),
+            "og_url_path": f"/strada/{slug}/",
+        }
         _render(env, "street-detail.html.j2",
                 DIST / "strada" / slug / "index.html",
-                portraits=portraits, **detail)
+                portraits=portraits, **og, **detail)
     print(f"    → dist/strada/ ({len(streets)} pages)")
 
     # ── Persons ──────────────────────────────────────────────────────────────
@@ -116,9 +124,19 @@ def build_detail_pages(db_path: str = DB_PATH) -> None:
         detail = site_queries.person_detail(conn, p["core_name_norm"])
         if not detail:
             continue
+        full_name = detail.get("full_name") or p["full_name"]
+        sc = detail.get("street_count") or p.get("street_count") or 0
+        og = {
+            "og_title": f"{full_name} — Cum ne numim străzile",
+            "og_description": (
+                f"{full_name} — onorat(ă) pe {sc} străzi din România. "
+                f"Profil, biografie scurtă, distribuție pe județe."
+            ),
+            "og_url_path": f"/persoana/{slug}/",
+        }
         _render(env, "person-detail.html.j2",
                 DIST / "persoana" / slug / "index.html",
-                portraits=portraits, slug=slug, **detail)
+                portraits=portraits, slug=slug, **og, **detail)
         rendered_p += 1
     print(f"    → dist/persoana/ ({rendered_p} pages)")
 
@@ -146,9 +164,19 @@ def build_detail_pages(db_path: str = DB_PATH) -> None:
         )
         if not detail:
             continue
+        uat_label = detail.get("uat_name") or u.get("uat") or u["slug"]
+        total_streets = detail.get("total_streets") or u.get("total") or 0
+        og = {
+            "og_title": f"{uat_label} — Cum ne numim străzile",
+            "og_description": (
+                f"{uat_label} ({u['judet']}) — {total_streets} străzi inventariate. "
+                f"Top nume, raritate, comparație națională."
+            ),
+            "og_url_path": f"/oras/{u['judet'].lower()}/{u['slug']}/",
+        }
         _render(env, "uat-detail.html.j2",
                 DIST / "oras" / u["judet"].lower() / u["slug"] / "index.html",
-                portraits=portraits, **detail)
+                portraits=portraits, **og, **detail)
     # Prune stale UAT directories left over from earlier, less-scoped builds.
     # The set of rendered UATs shrank when comune were excluded; without this
     # sweep, /oras/<judet>/<old-slug>/ would keep serving outdated pages.
@@ -181,9 +209,17 @@ def build_detail_pages(db_path: str = DB_PATH) -> None:
         detail = site_queries.theme_detail(conn, t["type"], t["key"])
         if not detail:
             continue
+        theme_label = t.get("label") or t["key"]
+        og = {
+            "og_title": f"{theme_label} — Cum ne numim străzile",
+            "og_description": (
+                f"Străzi din România care poartă tema „{theme_label}”."
+            ),
+            "og_url_path": f"/tema/{slug}/",
+        }
         _render(env, "theme-detail.html.j2",
                 DIST / "tema" / slug / "index.html",
-                portraits=portraits, theme_meta=t, **detail)
+                portraits=portraits, theme_meta=t, **og, **detail)
     print(f"    → dist/tema/ ({len(themes)} pages)")
 
     # ── Index pages ──────────────────────────────────────────────────────────
