@@ -50,7 +50,7 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [ ] **Renaming data source for Section 7 (Renumiri)** — Section 7 of the static site needs before/after rename pairs with substitution type labels. Source candidates: (a) street name version comparison across two registry exports; (b) manual curation CSV; (c) external renamed-streets dataset. Currently the section renders with static illustrative data. When data is available, add `renamings` table to `build_db.py` and implement `site_queries.section7()`.
 
-- [ ] **Gender story needs curation before it can be told** — Current data has very few women classified. The gender gap is a headline finding for the publication but requires meaningful person-table coverage first. Priority curation target: female honorees in the top-500 unclassified names. Analysis notebook `notebooks/01_gender_gap.ipynb` is already written (4 sections: national ratio, top-M vs top-F bar chart, per-județ breakdown, era trend) — it runs correctly now but numbers are thin. Steps: (1) `python3 tools/export_unclassified.py --limit 500` and scan for female names; (2) set `gender=F` in the CSV and `python3 tools/import_csv.py`; (3) re-run notebook to verify charts fill out.
+- [x] **Gender story needs curation before it can be told** — Done 2026-05-18. The earlier-run Gemini batch CSV (`data/curation/llm_gemini-3.1-flash-lite.csv`, 700 rows) was imported via `tools/import_csv.py` — it had been sitting on disk but never applied. Net additions to `persons`: 3 women (Smaranda Brăescu, Domnița Bălașa, Iulia Hașdeu) on top of the existing 12, plus 122 men and 572 nature/place/category rows. Headline numbers: 15 female honorees covering 426 street-instances (3.42% of person-streets); top woman Ana Ipătescu at 91 streets vs. top man Mihai Eminescu at 300 (×3.3 ratio). Notebook re-executed and all four sections render cleanly. The persistent 3–5% female share is itself the story — adding more women didn't move the headline because the long tail is genuinely male-heavy. Future expansion would come from a fresh `llm_classify.py` pass on the remaining unclassified keys.
 
 - [ ] **`ORAŞ CERNAVODĂ` numeric streets named 1848 and 1933** — `anonymous_uats` shows CERNAVODĂ CT with 5 "numeric" streets, lowest=1848, highest=1933. These are likely historical date references rather than true street numbers. Consider a sub-query that separates true sequence numbering (contiguous run starting at 1) from isolated year-numbers.
 
@@ -120,6 +120,8 @@ Items detected during sessions. Each entry has enough context to act on cold.
 - [ ] **Validate dark-statbar direction with stakeholders.** The bold-restyle pass moved the stats band from a light cream to dark ink (Bloomberg-feel). User brief said "white background" — interpreted as the main panels, with the statbar as a structural masthead. If user pushes back, flip `.statbar` to `background: var(--bg)` + `color: var(--ink)` and the rest of the design holds (panels, leader highlights, type scale all read fine on white-on-white as well).
 
 ## Later
+
+- [ ] brainstorm on naming
 
 - [ ] translate, localisation - translate UI and street names, where possible
 

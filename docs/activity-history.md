@@ -1,5 +1,21 @@
 # Activity History
 
+## 2026-05-18 — Gender Curation: Import LLM Batch, Refresh Notebook
+
+Closed the "Gender story needs curation" P2 item. Discovered that `data/curation/llm_gemini-3.1-flash-lite.csv` (700 rows from a Gemini classification run, dated 2026-05-15) had never been imported. Ran it through `tools/import_csv.py`: 125 persons + 208 nature_terms + 191 name_categories + 173 place_refs upserted.
+
+Net additions to `persons`: 3 women on top of the existing 12 — Smaranda Brăescu (aviator, interwar), Domnița Bălașa (noble, medieval), Iulia Hașdeu (poet, premodern). Plus 122 men and one collective. Manual scan of the fresh top-500 unclassified turned up no additional confident female candidates the LLM had missed — the long tail is male-heavy and noisy with abstract / geographic / nature terms.
+
+Headline numbers after import:
+- 15 female honorees covering 426 street-instances
+- 318 male honorees covering 12,020 street-instances
+- 3.42% of person-named streets honor women
+- Top woman: Ana Ipătescu (91 streets); top man: Mihai Eminescu (300). Ratio ×3.3.
+
+Re-executed `notebooks/01_gender_gap.ipynb` end-to-end; all four sections (national ratio, top-M vs top-F, per-județ, era trend) render with the refreshed data.
+
+The persistent 3–5% female share is itself the editorial finding — adding more women didn't move the headline because that's genuinely what the data shows.
+
 ## 2026-05-18 — Root-Relative Links + Scoped UAT Detail Pages
 
 Two backlog items.
