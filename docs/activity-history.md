@@ -1,5 +1,23 @@
 # Activity History
 
+## 2026-05-19 — Browser page (`/browser/`)
+
+New explorer view at `/browser/` — filter bar on top + two layouts (Tabel / Compact), powered by `filter_server.py`.
+
+**filter_server.py changes.** Added `p.wikidata_qid` and a `name_count` correlated subquery to `_SELECT_COLS` (per-row national frequency). Added a name search param (`?name=…`) that uses `streets_lib.normalize_match` on the input and `LIKE %…%` on `sd.name_normalized`. Added `?sort=count|name|location` (default: `count` desc). Added `?aggregate=1` mode — one row per distinct name, grouped by `sd.name_normalized`, returned with portrait + person metadata via `MAX()` (the joins are per-`core_name_norm`, so all non-null values within a group are identical). New routes: `GET /browser` → `dist/browser/index.html`, and `GET /portraits/<file>` → static serving from `dist/portraits/`.
+
+**`dist/browser/index.html`** (new). Single-page UI, no Jinja — fetched live from the API. Filter bar on top: 130px search input + seven single-select dropdowns (Clasificare / Gen / Profesie / Eră / Naționalitate / Județ / Tip) + Tabel|Compact view toggle on the right. Each dropdown has a "Toate" item at top (italic when active = no filter selected) that resets just that criterion; clicking a value sets the filter and recolors the button accent. Result count bar with spinner. Two panes: a dense table (load-more pagination, 200 rows/page, sort=count default) and a Compact view that reuses the landing-page `.ctok.street .plaque` markup verbatim (46px circular portraits overflowing the sign, gold ring on top-3 leaders, Mono count badges). Info footer (sticky, 66px) updates on hover/click of any tag with portrait + person/gender/era/profession/nationality fields + national count. Default view is Compact, fetches `?aggregate=1&limit=500&sort=count`.
+
+**Fixed compact-view vertical alignment.** `.flat-tokens` used `align-items: baseline` (copy of the landing-page rule) — but in flex-wrap rows, tokens with portraits push the row taller, and baseline alignment then misaligns plaque text against plain plaques. Changed to `align-items: center`. The landing page doesn't show this because its `.cluster-tokens` lives in 2-column multicol where rows are independent.
+
+**`build_site.py --serve` proxy.** The dev static server (default 8000, the user runs on 9000) is `SimpleHTTPRequestHandler` — has no `/api/*` routes. Replaced with a `SiteHandler` that proxies `/api/*` and `/portraits/*` to `localhost:8765` (filter_server). Single entry point for browsing the site; `filter_server.py` must be running separately.
+
+**Top nav.** Added `/browser/` link to both `templates/index.html.j2` and `templates/_detail-shell.html.j2` (between Caută and Persoane). Rebuilt: landing variants + all 3,042 detail pages now carry the link.
+
+**Backlog.** Logged P2 items for keyboard navigation of the filter bar and a live-statistics bar for the current selection (gender split / top era / top profession / classification breakdown / total UATs, updates on each filter change).
+
+---
+
 ## 2026-05-18 — Backlog Sweep: Trim, Search, OG, Choropleth, Nationalities
 
 One sitting, five backlog items.

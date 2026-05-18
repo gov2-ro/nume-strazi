@@ -23,9 +23,10 @@ __pycache__/
 # macOS
 .DS_Store
 
-# Static site build output (dist/filter/ is excluded — it's source, not a build artifact)
+# Static site build output (dist/filter/ and dist/browser/ are excluded — they're source, not build artifacts)
 dist/*
 !dist/filter/
+!dist/browser/
 
 # Claude Code superpowers
 .superpowers/

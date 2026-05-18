@@ -3,9 +3,15 @@
 filter_server.py — Exploratory filter API for streets.db
 
 Routes:
-  GET /          → dist/filter/index.html
-  GET /api/meta  → enum values for every filter dimension
-  GET /api/filter → parameterized filter query, paginated JSON
+  GET /                  → dist/filter/index.html
+  GET /browser           → dist/browser/index.html
+  GET /portraits/<file>  → dist/portraits/<file>  (static)
+  GET /api/meta          → enum values for every filter dimension
+  GET /api/filter        → parameterized filter, paginated JSON
+                           ?aggregate=1 → grouped by name (one row per distinct name)
+                           ?sort=count  → order by national frequency desc (default)
+                           ?sort=name   → alphabetical
+                           ?sort=location → judet, uat, name
 
 Usage:
   python3 filter_server.py [--port 8765] [--db data/streets.db]
@@ -17,10 +23,12 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from streets_lib import fix_diacritics, slugify
+from streets_lib import fix_diacritics, normalize_match, slugify
 
-DB_PATH = "data/streets.db"
-UI_PATH = Path("dist/filter/index.html")
+DB_PATH      = "data/streets.db"
+UI_PATH      = Path("dist/filter/index.html")
+BROWSER_PATH = Path("dist/browser/index.html")
+PORTRAITS_DIR = Path("dist/portraits")
 
 _BASE_FROM = """
 FROM streets_dedup sd
@@ -38,6 +46,8 @@ _SELECT_COLS = """
     sd.siruta,
     sd.core_name,
     sd.name_normalized,
+    (SELECT COUNT(*) FROM streets_dedup x
+     WHERE x.name_normalized = sd.name_normalized) AS name_count,
     CASE
         WHEN sd.is_numeric = 1             THEN 'numeric'
         WHEN sd.is_date    = 1             THEN 'date'
@@ -48,6 +58,7 @@ _SELECT_COLS = """
         WHEN pr.core_name_norm IS NOT NULL THEN 'place'
         ELSE NULL
     END AS classification,
+    p.wikidata_qid,
     p.full_name   AS person_full_name,
     p.profession,
     p.nationality,
@@ -59,6 +70,36 @@ _SELECT_COLS = """
     n.nature_type,
     pr.place_type,
     pr.country    AS place_country
+"""
+
+# Aggregate select — one row per distinct name (group by name_normalized)
+_SELECT_AGG = """
+    MAX(sd.name)            AS name,
+    sd.name_normalized,
+    MAX(sd.core_name)       AS core_name,
+    COUNT(*)                AS name_count,
+    CASE
+        WHEN MAX(sd.is_numeric) = 1             THEN 'numeric'
+        WHEN MAX(sd.is_date)    = 1             THEN 'date'
+        WHEN MAX(sd.is_saint)   = 1             THEN 'saint'
+        WHEN MAX(p.core_name_norm)  IS NOT NULL THEN 'person'
+        WHEN MAX(n.core_name_norm)  IS NOT NULL THEN 'nature'
+        WHEN MAX(c.core_name_norm)  IS NOT NULL THEN 'category'
+        WHEN MAX(pr.core_name_norm) IS NOT NULL THEN 'place'
+        ELSE NULL
+    END AS classification,
+    MAX(p.wikidata_qid)     AS wikidata_qid,
+    MAX(p.full_name)        AS person_full_name,
+    MAX(p.profession)       AS profession,
+    MAX(p.nationality)      AS nationality,
+    MAX(p.gender)           AS gender,
+    MAX(p.era)              AS era,
+    MAX(p.wiki_scope)       AS wiki_scope,
+    MAX(c.category)         AS category,
+    MAX(c.subcategory)      AS subcategory,
+    MAX(n.nature_type)      AS nature_type,
+    MAX(pr.place_type)      AS place_type,
+    MAX(pr.country)         AS place_country
 """
 
 _CLS_MAP = {
@@ -77,12 +118,18 @@ _PERSON_COLS = ('profession', 'nationality', 'gender', 'era', 'wiki_scope')
 def build_filter_query(params: dict) -> tuple[str, list]:
     """
     Build (where_clause, bind_values) from parsed query params.
-    params: dict of str -> list[str] (multi-value already parsed).
-    Returns '' for where_clause when no filters are active.
     All values go through ? placeholders — no string interpolation.
     """
     conditions: list[str] = []
     values: list = []
+
+    # Street name search — normalized LIKE
+    if name_q := params.get('name'):
+        raw = (name_q[0] or '').strip()
+        if raw:
+            norm = normalize_match(raw)
+            conditions.append("sd.name_normalized LIKE ?")
+            values.append(f"%{norm}%")
 
     if judete := params.get('judet'):
         conditions.append(f"sd.judet IN ({', '.join('?' * len(judete))})")
@@ -138,6 +185,15 @@ def build_filter_query(params: dict) -> tuple[str, list]:
     return where, values
 
 
+def _order_clause(sort: str, aggregate: bool) -> str:
+    if sort == 'name':
+        return "ORDER BY name ASC"
+    if sort == 'location' and not aggregate:
+        return "ORDER BY sd.judet, sd.uat, sd.name"
+    # default: by frequency desc
+    return "ORDER BY name_count DESC, name ASC"
+
+
 def get_db(db_path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
@@ -180,63 +236,93 @@ def query_meta(conn: sqlite3.Connection) -> dict:
 
 
 def query_filter(conn: sqlite3.Connection, params: dict) -> dict:
-    limit = max(1, min(int((params.get('limit') or ['200'])[0]), 1000))
-    offset = max(0, int((params.get('offset') or ['0'])[0]))
+    limit     = max(1, min(int((params.get('limit')  or ['200'])[0]), 1000))
+    offset    = max(0,         int((params.get('offset') or ['0'])[0]))
+    aggregate = (params.get('aggregate') or ['0'])[0] == '1'
+    sort      = (params.get('sort') or ['count'])[0]
 
     where, values = build_filter_query(params)
 
-    count_sql = f"SELECT COUNT(*) {_BASE_FROM} {where}"
-    total = conn.execute(count_sql, values).fetchone()[0]
+    if aggregate:
+        count_sql  = f"SELECT COUNT(*) FROM (SELECT 1 {_BASE_FROM} {where} GROUP BY sd.name_normalized)"
+        select_sql = (
+            f"SELECT {_SELECT_AGG} {_BASE_FROM} {where} "
+            f"GROUP BY sd.name_normalized "
+            f"{_order_clause(sort, aggregate=True)} LIMIT ? OFFSET ?"
+        )
+    else:
+        count_sql  = f"SELECT COUNT(*) {_BASE_FROM} {where}"
+        select_sql = (
+            f"SELECT {_SELECT_COLS} {_BASE_FROM} {where} "
+            f"{_order_clause(sort, aggregate=False)} LIMIT ? OFFSET ?"
+        )
 
-    select_sql = (
-        f"SELECT {_SELECT_COLS} {_BASE_FROM} {where} "
-        f"ORDER BY sd.judet, sd.uat, sd.name LIMIT ? OFFSET ?"
-    )
-    rows = conn.execute(select_sql, [*values, limit, offset]).fetchall()
+    total = conn.execute(count_sql, values).fetchone()[0]
+    rows  = conn.execute(select_sql, [*values, limit, offset]).fetchall()
 
     def serialize(r: sqlite3.Row) -> dict:
         d = dict(r)
-        core = d.pop('core_name', None)
+        core      = d.pop('core_name', None)
         name_norm = d.pop('name_normalized', '')
         d['street_slug'] = slugify(core or name_norm)
-        d['uat_slug'] = slugify(fix_diacritics(d.get('uat') or ''))
+        if not aggregate:
+            d.pop('siruta', None)
         return d
 
     return {
-        'total': total,
-        'limit': limit,
-        'offset': offset,
-        'rows': [serialize(r) for r in rows],
+        'total':     total,
+        'limit':     limit,
+        'offset':    offset,
+        'aggregate': aggregate,
+        'rows':      [serialize(r) for r in rows],
     }
 
 
 def make_handler(conn: sqlite3.Connection):
     class FilterHandler(BaseHTTPRequestHandler):
         def log_message(self, fmt, *args):
-            pass  # silence per-request access log
+            pass
 
         def send_json(self, data, status: int = 200) -> None:
             body = json.dumps(data, ensure_ascii=False).encode()
             self.send_response(status)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.send_header('Content-Length', str(len(body)))
+            self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
             self.wfile.write(body)
 
+        def send_file(self, path: Path, content_type: str) -> None:
+            data = path.read_bytes()
+            self.send_response(200)
+            self.send_header('Content-Type', content_type)
+            self.send_header('Content-Length', str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
         def do_GET(self) -> None:
             parsed = urlparse(self.path)
-            path = parsed.path.rstrip('/')
+            path   = parsed.path.rstrip('/')
 
             if path in ('', '/filter'):
                 if not UI_PATH.exists():
-                    self.send_json({'error': f'{UI_PATH} not found — run build_site.py first'}, 503)
+                    self.send_json({'error': f'{UI_PATH} not found'}, 503)
                     return
-                html = UI_PATH.read_bytes()
-                self.send_response(200)
-                self.send_header('Content-Type', 'text/html; charset=utf-8')
-                self.send_header('Content-Length', str(len(html)))
-                self.end_headers()
-                self.wfile.write(html)
+                self.send_file(UI_PATH, 'text/html; charset=utf-8')
+
+            elif path == '/browser':
+                if not BROWSER_PATH.exists():
+                    self.send_json({'error': f'{BROWSER_PATH} not found'}, 503)
+                    return
+                self.send_file(BROWSER_PATH, 'text/html; charset=utf-8')
+
+            elif path.startswith('/portraits/'):
+                fname = Path(path).name
+                fpath = PORTRAITS_DIR / fname
+                if not fpath.exists() or not fpath.is_file():
+                    self.send_response(404); self.end_headers()
+                    return
+                self.send_file(fpath, 'image/jpeg')
 
             elif path == '/api/meta':
                 try:
@@ -263,10 +349,10 @@ def main() -> None:
     parser.add_argument('--db', default=DB_PATH)
     args = parser.parse_args()
 
-    conn = get_db(args.db)
+    conn    = get_db(args.db)
     handler = make_handler(conn)
-    server = HTTPServer(('localhost', args.port), handler)
-    print(f'Filter server → http://localhost:{args.port}/')
+    server  = HTTPServer(('localhost', args.port), handler)
+    print(f'Filter server → http://localhost:{args.port}/browser')
     try:
         server.serve_forever()
     except KeyboardInterrupt:

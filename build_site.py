@@ -291,9 +291,46 @@ def main() -> None:
     if args.serve:
         import http.server
         import os
+        import urllib.request
+        import urllib.error
+
+        FILTER_PORT = 8765  # filter_server.py default
+
+        class SiteHandler(http.server.SimpleHTTPRequestHandler):
+            """Static file server that proxies /api/* and /portraits/* to filter_server."""
+
+            def log_message(self, fmt, *args):
+                pass
+
+            def _proxy(self, upstream: str) -> None:
+                try:
+                    with urllib.request.urlopen(upstream, timeout=10) as resp:
+                        body = resp.read()
+                        self.send_response(resp.status)
+                        ct = resp.headers.get("Content-Type", "application/octet-stream")
+                        self.send_header("Content-Type", ct)
+                        self.send_header("Content-Length", str(len(body)))
+                        self.send_header("Access-Control-Allow-Origin", "*")
+                        self.end_headers()
+                        self.wfile.write(body)
+                except urllib.error.HTTPError as e:
+                    self.send_response(e.code)
+                    self.end_headers()
+                except Exception:
+                    self.send_response(502)
+                    self.end_headers()
+
+            def do_GET(self):
+                path = self.path.split("?")[0]
+                if path.startswith("/api/") or path.startswith("/portraits/"):
+                    upstream = f"http://localhost:{FILTER_PORT}{self.path}"
+                    self._proxy(upstream)
+                else:
+                    super().do_GET()
+
         os.chdir("dist")
-        print(f"Serving at http://localhost:{args.port} …")
-        http.server.test(HandlerClass=http.server.SimpleHTTPRequestHandler, port=args.port, bind="127.0.0.1")
+        print(f"Serving at http://localhost:{args.port}  (API proxied → :{FILTER_PORT}) …")
+        http.server.test(HandlerClass=SiteHandler, port=args.port, bind="127.0.0.1")
 
 
 if __name__ == "__main__":

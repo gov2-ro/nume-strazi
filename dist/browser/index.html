@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Browser — Cum ne numim străzile</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;700&family=Barlow+Semi+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #FFFFFF;
+  --surface-1: #F7F9FC;
+  --surface-2: #ECF1F8;
+  --surface-blue: #DEE8F4;
+  --ink: #0B1118;
+  --ink-2: #2A313B;
+  --ink-band: #0B1118;
+  --muted: #5A6573;
+  --muted-2: #8B95A2;
+  --rule: #E2E6EC;
+  --rule-strong: #BFC7D2;
+  --hairline: #EEF1F5;
+  --plaque: #0E4D92;
+  --plaque-deep: #08366D;
+  --accent: #C04F35;
+  --accent-dark: #8E3320;
+  --gold: #E8AE00;
+  --gold-soft: #F7D777;
+  --sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --mono: 'IBM Plex Mono', monospace;
+  --street: 'Barlow Semi Condensed', 'IBM Plex Sans', sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  display: flex; flex-direction: column;
+}
+
+/* ── NAV ── */
+.site-nav {
+  position: relative; z-index: 200;
+  background: var(--bg);
+  border-bottom: 1px solid var(--ink);
+  padding: 9px 20px;
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: var(--sans); font-size: 11.5px; letter-spacing: .06em;
+  flex-shrink: 0;
+}
+.site-nav a { color: var(--ink); text-decoration: none; }
+.site-nav a:hover { text-decoration: underline; }
+.brand { font-family: var(--street); font-weight: 700; font-size: 13px; letter-spacing: .04em; }
+.nav-links { display: flex; align-items: center; gap: 16px; }
+.nav-links a { color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
+.nav-links a:hover { color: var(--ink); text-decoration: none; }
+.nav-links .active { color: var(--plaque); }
+
+/* ── BROWSER WRAPPER ── */
+.browser-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── FILTER BAR ── */
+.filter-bar {
+  background: var(--ink);
+  padding: 8px 14px;
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 150;
+}
+.fsearch {
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 4px;
+  color: #fff;
+  font-family: var(--sans); font-size: 11px;
+  padding: 4px 9px;
+  width: 140px; flex-shrink: 0;
+  outline: none;
+  transition: background .1s;
+}
+.fsearch:focus { background: rgba(255,255,255,.18); }
+.fsearch::placeholder { color: rgba(255,255,255,.32); }
+.fsep { width: 1px; height: 16px; background: rgba(255,255,255,.13); flex-shrink: 0; margin: 0 2px; }
+
+/* ── DROPDOWN ── */
+.fdd { position: relative; flex-shrink: 0; }
+.fdd-btn {
+  background: rgba(255,255,255,.09);
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 4px;
+  color: rgba(255,255,255,.78);
+  font-family: var(--sans); font-size: 10.5px; font-weight: 600;
+  padding: 4px 8px 4px 9px;
+  cursor: pointer; white-space: nowrap; user-select: none;
+  display: inline-flex; align-items: center; gap: 4px;
+  transition: background .1s;
+}
+.fdd-btn:hover { background: rgba(255,255,255,.16); color: #fff; }
+.fdd-btn.has-val { background: var(--accent); border-color: var(--accent); color: #fff; }
+.fdd-btn .lbl { max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+.fdd-btn .arr { font-size: 7px; opacity: .55; transition: transform .15s; flex-shrink: 0; }
+.fdd.open .fdd-btn .arr { transform: rotate(180deg); opacity: 1; }
+
+.fdd-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 5px); left: 0;
+  background: var(--bg);
+  border: 1.5px solid var(--ink);
+  border-radius: 5px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.22);
+  min-width: 170px;
+  z-index: 300;
+  padding: 4px 0;
+}
+.fdd.open .fdd-menu { display: block; }
+
+.fdd-menu-title {
+  font-size: 9px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .1em; color: var(--muted-2);
+  padding: 6px 12px 3px;
+}
+.fdd-item {
+  padding: 5px 12px;
+  cursor: pointer; color: var(--ink-2);
+  display: flex; align-items: center; gap: 8px;
+  transition: background .07s; font-size: 11.5px;
+}
+.fdd-item:hover { background: var(--surface-1); }
+.fdd-item.sel { color: var(--plaque); font-weight: 600; background: var(--surface-blue); }
+.fdd-item .dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--plaque); flex-shrink: 0; opacity: 0;
+}
+.fdd-item.sel .dot { opacity: 1; }
+.fdd-item.toate { color: var(--muted); font-style: italic; }
+.fdd-item.toate.sel { color: var(--ink-2); font-style: normal; background: transparent; font-weight: 400; }
+.fdd-item.toate.sel .dot { opacity: 0; }
+.fdd-divider { height: 1px; background: var(--hairline); margin: 3px 0; }
+
+/* ── VIEW TOGGLE ── */
+.view-toggle {
+  margin-left: auto;
+  display: flex;
+  background: rgba(255,255,255,.10);
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 4px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.vt-btn {
+  padding: 3.5px 11px;
+  font-size: 10px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase;
+  color: rgba(255,255,255,.5);
+  cursor: pointer; user-select: none;
+  transition: all .1s; white-space: nowrap;
+}
+.vt-btn + .vt-btn { border-left: 1px solid rgba(255,255,255,.14); }
+.vt-btn:hover { color: rgba(255,255,255,.85); background: rgba(255,255,255,.08); }
+.vt-btn.on { background: rgba(255,255,255,.18); color: #fff; }
+
+/* ── RESULT BAR ── */
+.result-bar {
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--rule);
+  padding: 4px 14px;
+  font-size: 10.5px; color: var(--muted);
+  display: flex; align-items: center; gap: 10px;
+  flex-shrink: 0;
+  min-height: 26px;
+}
+.result-bar strong { color: var(--ink); }
+.result-bar .spinner {
+  width: 12px; height: 12px;
+  border: 1.5px solid var(--rule);
+  border-top-color: var(--plaque);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  display: none;
+}
+.result-bar.loading .spinner { display: inline-block; }
+.result-bar.loading .count-text { opacity: .4; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── PANES ── */
+.pane { display: none; flex: 1; min-height: 0; flex-direction: column; overflow: hidden; }
+.pane.active { display: flex; }
+
+/* ── TABLE VIEW ── */
+.table-scroll { flex: 1; overflow-y: auto; overflow-x: auto; }
+.dtable { width: 100%; border-collapse: collapse; }
+.dtable thead th {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--surface-1);
+  color: var(--muted); font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .07em;
+  padding: 5px 8px 4px;
+  border-bottom: 1.5px solid var(--rule-strong);
+  text-align: left; white-space: nowrap; cursor: pointer; user-select: none;
+}
+.dtable thead th:hover { color: var(--ink); }
+.dtable thead th.sorted { color: var(--plaque); }
+.dtable thead th .sarr { font-size: 9px; margin-left: 2px; }
+.dtable tbody tr { border-bottom: 1px solid var(--hairline); cursor: pointer; }
+.dtable tbody tr:hover td { background: var(--surface-1); }
+.dtable tbody tr.sel-row td { background: var(--surface-blue); }
+.dtable td { padding: 3px 8px; font-size: 11px; vertical-align: middle; color: var(--ink-2); white-space: nowrap; }
+.dtable td:first-child { padding-left: 14px; }
+.dtable td:last-child  { padding-right: 14px; }
+
+.tp {
+  font-family: var(--street); font-weight: 700; font-size: 11.5px;
+  letter-spacing: .04em; display: inline-block;
+  padding: 1.5px 6px; background: var(--plaque); color: #fff;
+  border-radius: 2px;
+  text-shadow: 0 -0.5px 0 rgba(0,0,0,.28), 0 1px 1.5px rgba(0,0,0,.45);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 1.5px 2px rgba(0,0,0,.2);
+}
+.tp a { color: inherit; text-decoration: none; }
+.tp a:hover { text-decoration: none; }
+
+.badge {
+  display: inline-block; font-size: 8.5px; font-weight: 700;
+  padding: 1.5px 4px; border-radius: 2px;
+  text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
+}
+.bm { background: #E8EEF8; color: #1A3C7A; }
+.bf { background: #FDE8E8; color: #9B2020; }
+.bn { background: #E1ECDA; color: #3D5A2A; }
+.bl { background: #F0E8D4; color: #7A5A1A; }
+.bc { background: #EEE8F8; color: #5A2A8E; }
+.bs { background: #FFF4E0; color: #8A6000; }
+
+.td-m  { color: var(--muted-2); }
+.td-n  { font-family: var(--mono); font-size: 10.5px; color: var(--ink); text-align: right; }
+.td-link { color: var(--plaque); font-size: 10px; }
+.port-xs { width: 18px; height: 18px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 4px; border: 1px solid var(--rule); background: var(--surface-2); display: inline-block; }
+
+.load-more-bar {
+  padding: 10px 14px;
+  border-top: 1px solid var(--rule);
+  background: var(--surface-1);
+  display: flex; align-items: center; gap: 10px;
+  flex-shrink: 0;
+}
+.load-more-btn {
+  font-family: var(--sans); font-size: 11px; font-weight: 600;
+  color: var(--plaque); border: 1px solid var(--plaque);
+  background: transparent; border-radius: 4px;
+  padding: 4px 12px; cursor: pointer;
+  transition: all .1s;
+}
+.load-more-btn:hover { background: var(--plaque); color: #fff; }
+.load-more-btn:disabled { opacity: .4; cursor: default; }
+.load-more-info { font-size: 10.5px; color: var(--muted); }
+
+/* ── COMPACT (PLĂCUȚE) VIEW ── */
+.placute-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 18px 10px;
+}
+.flat-tokens {
+  display: flex; flex-wrap: wrap;
+  align-items: center; gap: 11px 12px; line-height: 1.55;
+}
+.ctok { display: inline-block; position: relative; white-space: nowrap; cursor: pointer; }
+.ctok.street { display: inline-flex; align-items: center; vertical-align: middle; }
+.ctok .portrait {
+  width: 46px; height: 46px; border-radius: 50%;
+  background: var(--surface-2);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 14px; color: var(--muted-2); overflow: hidden;
+  border: 2px solid var(--bg); box-shadow: 0 0 0 3px var(--bg);
+  margin-right: -18px; z-index: 2; position: relative; flex-shrink: 0;
+}
+.ctok .portrait img { width: 100%; height: 100%; object-fit: cover; }
+.ctok.street .plaque {
+  display: inline-block; background: var(--plaque); color: #fff;
+  font-family: var(--street); font-weight: 600; letter-spacing: .01em;
+  padding: 4px 11px; border-radius: 3px;
+  text-shadow: 0 -0.5px 0 rgba(0,0,0,.30), 0 1px 1.5px rgba(0,0,0,.50);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 2px 3px rgba(0,0,0,.24);
+}
+.ctok.street.has-portrait .plaque { padding-left: 24px; }
+.ctok .cnt-badge {
+  position: absolute; top: -6px; right: -8px;
+  font-family: var(--mono); font-size: 9px; font-weight: 700;
+  background: var(--ink-band); color: var(--gold-soft);
+  padding: 1px 5px; border-radius: 7px; letter-spacing: .02em;
+  line-height: 1.4; pointer-events: none; z-index: 3;
+}
+.ctok.leader .plaque {
+  box-shadow: 0 0 0 2px var(--gold), inset 0 1px 0 rgba(255,255,255,.14), 0 2px 3px rgba(0,0,0,.24);
+}
+.ctok:hover .plaque  { background: var(--plaque-deep); }
+.ctok.sel .plaque    { box-shadow: 0 0 0 2.5px var(--gold), inset 0 1px 0 rgba(255,255,255,.14); }
+
+/* ── INFO FOOTER ── */
+.info-footer {
+  border-top: 2px solid var(--plaque);
+  background: var(--surface-1);
+  padding: 9px 16px;
+  display: flex; align-items: center; gap: 12px;
+  min-height: 66px; flex-shrink: 0;
+}
+.info-footer .hint { font-size: 11px; color: var(--muted-2); font-style: italic; margin: auto; }
+.info-port {
+  width: 46px; height: 46px; border-radius: 3px;
+  border: 1px solid var(--rule); background: var(--surface-2);
+  flex-shrink: 0; display: flex; align-items: center;
+  justify-content: center; font-size: 12px; color: var(--muted-2);
+  overflow: hidden;
+}
+.info-port img { width: 100%; height: 100%; object-fit: cover; }
+.info-name { font-family: var(--street); font-size: 16px; font-weight: 700; color: var(--plaque); margin-bottom: 3px; line-height: 1; }
+.info-fields { display: flex; flex-wrap: wrap; gap: 3px 14px; }
+.ifield { display: flex; flex-direction: column; }
+.ilabel { font-size: 8.5px; font-weight: 700; color: var(--muted-2); text-transform: uppercase; letter-spacing: .08em; }
+.ival   { font-size: 11px; color: var(--ink-2); }
+.info-cnt { margin-left: auto; text-align: right; flex-shrink: 0; }
+.info-cnt-n { font-family: var(--mono); font-size: 20px; font-weight: 700; color: var(--ink); line-height: 1; }
+.info-cnt-l { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-top: 1px; }
+.info-link { color: var(--plaque); font-size: 10.5px; text-decoration: none; }
+.info-link:hover { text-decoration: underline; }
+
+/* ── EMPTY STATE ── */
+.empty-state {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 8px; color: var(--muted-2);
+}
+.empty-state .big { font-size: 32px; }
+.empty-state p { font-size: 12px; }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <a href="/" class="brand">Cum ne numim străzile</a>
+  <div class="nav-links">
+    <a href="/">Acasă</a>
+    <a href="/cauta/">Caută</a>
+    <a href="/browser/" class="active">Browser</a>
+    <a href="/judete/">Județe</a>
+    <a href="/metodologie.html">Metodologie</a>
+  </div>
+</nav>
+
+<div class="browser-page">
+
+  <!-- ── FILTER BAR ── -->
+  <div class="filter-bar" id="filter-bar">
+    <input class="fsearch" id="search-input" placeholder="🔍 caută stradă…" autocomplete="off" spellcheck="false">
+    <div class="fsep"></div>
+
+    <div class="fdd" id="dd-classification">
+      <div class="fdd-btn" onclick="toggleDD('dd-classification')">
+        <span class="lbl" id="lbl-classification">Clasificare</span><span class="arr">▾</span>
+      </div>
+      <div class="fdd-menu" id="menu-classification">
+        <div class="fdd-menu-title">Clasificare</div>
+      </div>
+    </div>
+
+    <div class="fdd" id="dd-gender">
+      <div class="fdd-btn" onclick="toggleDD('dd-gender')">
+        <span class="lbl" id="lbl-gender">Gen</span><span class="arr">▾</span>
+      </div>
+      <div class="fdd-menu" id="menu-gender">
+        <div class="fdd-menu-title">Gen</div>
+      </div>
+    </div>
+
+    <div class="fdd" id="dd-profession">
+      <div class="fdd-btn" onclick="toggleDD('dd-profession')">
+        <span class="lbl" id="lbl-profession">Profesie</span><span class="arr">▾</span>
+      </div>
+      <div class="fdd-menu" id="menu-profession">
+        <div class="fdd-menu-title">Profesie</div>
+      </div>
+    </div>
+
+    <div class="fdd" id="dd-era">
+      <div class="fdd-btn" onclick="toggleDD('dd-era')">
+        <span class="lbl" id="lbl-era">Eră</span><span class="arr">▾</span>
+      </div>
+      <div class="fdd-menu" id="menu-era">
+        <div class="fdd-menu-title">Eră</div>
+      </div>
+    </div>
+
+    <div class="fdd" id="dd-nationality">
+      <div class="fdd-btn" onclick="toggleDD('dd-nationality')">
+        <span class="lbl" id="lbl-nationality">Naționalitate</span><span class="arr">▾</span>
+      </div>
+      <div class="fdd-menu" id="menu-nationality">
+        <div class="fdd-menu-title">Naționalitate</div>
+      </div>
+    </div>
+
+    <div class="fdd" id="dd-judet">
+      <div class="fdd-btn" onclick="toggleDD('dd-judet')">
+        <span class="lbl" id="lbl-judet">Județ</span><span class="arr">▾</span>
+      </div>
+      <div class="fdd-menu" id="menu-judet" style="max-height:240px;overflow-y:auto">
+        <div class="fdd-menu-title">Județ</div>
+      </div>
+    </div>
+
+    <div class="fdd" id="dd-street_type">
+      <div class="fdd-btn" onclick="toggleDD('dd-street_type')">
+        <span class="lbl" id="lbl-street_type">Tip</span><span class="arr">▾</span>
+      </div>
+      <div class="fdd-menu" id="menu-street_type">
+        <div class="fdd-menu-title">Tip arteră</div>
+      </div>
+    </div>
+
+    <div class="view-toggle">
+      <div class="vt-btn"    id="vt-tabel"   onclick="setView('tabel')">Tabel</div>
+      <div class="vt-btn on" id="vt-compact" onclick="setView('compact')">Compact</div>
+    </div>
+  </div>
+
+  <!-- result count -->
+  <div class="result-bar" id="result-bar">
+    <div class="spinner"></div>
+    <span class="count-text" id="count-text">Se încarcă…</span>
+  </div>
+
+  <!-- ── TABLE PANE ── -->
+  <div class="pane" id="pane-tabel">
+    <div class="table-scroll">
+      <table class="dtable">
+        <thead>
+          <tr>
+            <th style="padding-left:14px">Stradă</th>
+            <th>Tip</th>
+            <th>Localitate</th>
+            <th>Județ</th>
+            <th>Persoană</th>
+            <th>Gen</th>
+            <th>Profesie</th>
+            <th>Eră</th>
+            <th>Naționalitate</th>
+            <th class="sorted" style="text-align:right">Localități ↓</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+    <div class="load-more-bar" id="load-more-bar" style="display:none">
+      <button class="load-more-btn" id="load-more-btn" onclick="loadMore()">Încarcă mai multe</button>
+      <span class="load-more-info" id="load-more-info"></span>
+    </div>
+  </div>
+
+  <!-- ── COMPACT PANE ── -->
+  <div class="pane active" id="pane-compact">
+    <div class="placute-scroll">
+      <div class="flat-tokens" id="flat-tokens"></div>
+    </div>
+    <div class="info-footer" id="info-footer">
+      <span class="hint">Treci cu mouse-ul peste o plăcuță pentru detalii</span>
+    </div>
+  </div>
+
+</div><!-- /browser-page -->
+
+<script>
+'use strict';
+
+/* ── CONFIG ── */
+const API       = '';          // same origin
+const PAGE_SIZE = 200;
+const AGG_LIMIT = 500;
+
+/* ── STATE ── */
+let activeView    = 'compact';
+let filters       = {};        // { ddId: value }  e.g. { 'dd-gender': 'F' }
+let searchVal     = '';
+let tableOffset   = 0;
+let tableTotal    = 0;
+let tableRows     = [];
+let searchTimer   = null;
+
+/* ── LABEL MAPPING ── */
+const DD_PARAM = {
+  'dd-classification': 'classification',
+  'dd-gender':         'gender',
+  'dd-profession':     'profession',
+  'dd-era':            'era',
+  'dd-nationality':    'nationality',
+  'dd-judet':          'judet',
+  'dd-street_type':    'street_type',
+};
+const DD_PLACEHOLDER = {
+  'dd-classification': 'Clasificare',
+  'dd-gender':         'Gen',
+  'dd-profession':     'Profesie',
+  'dd-era':            'Eră',
+  'dd-nationality':    'Naționalitate',
+  'dd-judet':          'Județ',
+  'dd-street_type':    'Tip',
+};
+const CLS_LABEL = {
+  person: 'Persoană', nature: 'Natură', place: 'Loc',
+  category: 'Categorie', saint: 'Sfânt', date: 'Dată', numeric: 'Numeric',
+};
+const GEN_LABEL = { 'F': 'Feminin', 'M': 'Masculin' };
+
+/* ── NORMALIZE (mirror of Python normalize_match) ── */
+function norm(s) {
+  if (!s) return '';
+  return s
+    .replace(/[îÎ]/g, 'a')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+/* ── FETCH META & POPULATE DROPDOWNS ── */
+async function loadMeta() {
+  const meta = await fetch(`${API}/api/meta`).then(r => r.json());
+
+  buildMenu('dd-classification', meta.classifications,
+    v => CLS_LABEL[v] || v, 'classification');
+  buildMenu('dd-gender',      meta.genders,
+    v => GEN_LABEL[v] || v, 'gender');
+  buildMenu('dd-profession',  meta.professions, null, 'profession');
+  buildMenu('dd-era',         meta.eras,        null, 'era');
+  buildMenu('dd-nationality', meta.nationalities, null, 'nationality');
+  buildMenu('dd-judet',       meta.judete,      null, 'judet');
+  buildMenu('dd-street_type', meta.street_types, null, 'street_type');
+}
+
+function buildMenu(ddId, values, labelFn, param) {
+  const menu = document.getElementById(`menu-${param}`);
+
+  // "Toate" clear option — selected by default (no filter active)
+  const allItem = document.createElement('div');
+  allItem.className = 'fdd-item toate sel';
+  allItem.dataset.value = '';
+  allItem.innerHTML = `<div class="dot"></div>Toate`;
+  allItem.addEventListener('click', e => { e.stopPropagation(); clearFilter(ddId); });
+  menu.appendChild(allItem);
+
+  const div = document.createElement('div');
+  div.className = 'fdd-divider';
+  menu.appendChild(div);
+
+  values.forEach(v => {
+    const lbl = labelFn ? labelFn(v) : v;
+    const item = document.createElement('div');
+    item.className = 'fdd-item';
+    item.dataset.value = v;
+    item.innerHTML = `<div class="dot"></div>${esc(lbl)}`;
+    item.addEventListener('click', e => { e.stopPropagation(); pickItem(ddId, v, lbl); });
+    menu.appendChild(item);
+  });
+}
+
+/* ── DROPDOWN LOGIC ── */
+function toggleDD(id) {
+  const el = document.getElementById(id);
+  const wasOpen = el.classList.contains('open');
+  closeAllDD();
+  if (!wasOpen) el.classList.add('open');
+}
+function closeAllDD() {
+  document.querySelectorAll('.fdd.open').forEach(d => d.classList.remove('open'));
+}
+
+function clearFilter(ddId) {
+  const dd  = document.getElementById(ddId);
+  const lbl = document.getElementById(`lbl-${DD_PARAM[ddId]}`);
+  const btn = dd.querySelector('.fdd-btn');
+  dd.querySelectorAll('.fdd-item').forEach(i => i.classList.remove('sel'));
+  dd.querySelector('.fdd-item[data-value=""]').classList.add('sel');
+  delete filters[ddId];
+  lbl.textContent = DD_PLACEHOLDER[ddId];
+  btn.classList.remove('has-val');
+  closeAllDD();
+  triggerFetch();
+}
+
+function pickItem(ddId, value, label) {
+  const dd  = document.getElementById(ddId);
+  const lbl = document.getElementById(`lbl-${DD_PARAM[ddId]}`);
+  const btn = dd.querySelector('.fdd-btn');
+  const wasSelected = filters[ddId] === value;
+
+  dd.querySelectorAll('.fdd-item').forEach(i => i.classList.remove('sel'));
+
+  if (wasSelected) {
+    delete filters[ddId];
+    dd.querySelector('.fdd-item[data-value=""]').classList.add('sel');
+    lbl.textContent = DD_PLACEHOLDER[ddId];
+    btn.classList.remove('has-val');
+  } else {
+    filters[ddId] = value;
+    const item = dd.querySelector(`.fdd-item[data-value="${CSS.escape(value)}"]`);
+    if (item) item.classList.add('sel');
+    lbl.textContent = label;
+    btn.classList.add('has-val');
+  }
+
+  closeAllDD();
+  triggerFetch();
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.fdd')) closeAllDD();
+});
+
+/* ── TRIGGER FETCH (view-aware) ── */
+function triggerFetch() {
+  tableOffset = 0;
+  tableRows   = [];
+  if (activeView === 'compact') fetchCompact();
+  else fetchData();
+}
+
+/* ── SEARCH ── */
+document.getElementById('search-input').addEventListener('input', e => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    searchVal = norm(e.target.value.trim());
+    triggerFetch();
+  }, 280);
+});
+
+/* ── VIEW TOGGLE ── */
+function setView(v) {
+  activeView = v;
+  document.getElementById('pane-tabel').classList.toggle('active',   v === 'tabel');
+  document.getElementById('pane-compact').classList.toggle('active', v === 'compact');
+  document.getElementById('vt-tabel').classList.toggle('on',   v === 'tabel');
+  document.getElementById('vt-compact').classList.toggle('on', v === 'compact');
+  if (v === 'compact') fetchCompact();
+  if (v === 'tabel' && tableRows.length === 0) { tableOffset = 0; fetchData(); }
+}
+
+/* ── BUILD QUERY STRING ── */
+function buildParams(extra = {}) {
+  const p = new URLSearchParams();
+  if (searchVal) p.set('name', searchVal);
+  Object.entries(filters).forEach(([ddId, val]) => {
+    p.set(DD_PARAM[ddId], val);
+  });
+  Object.entries(extra).forEach(([k, v]) => p.set(k, v));
+  return p.toString();
+}
+
+/* ── FETCH TABLE DATA ── */
+async function fetchData() {
+  setLoading(true);
+  const qs  = buildParams({ limit: PAGE_SIZE, offset: tableOffset, sort: 'count' });
+  const res = await fetch(`${API}/api/filter?${qs}`).then(r => r.json());
+
+  tableTotal = res.total;
+  if (tableOffset === 0) tableRows = [];
+  tableRows = tableRows.concat(res.rows);
+
+  renderTable();
+  updateCountBar(tableTotal);
+  setLoading(false);
+}
+
+/* ── FETCH COMPACT DATA ── */
+async function fetchCompact() {
+  setLoading(true);
+  const qs  = buildParams({ aggregate: 1, limit: AGG_LIMIT, sort: 'count' });
+  const res = await fetch(`${API}/api/filter?${qs}`).then(r => r.json());
+  renderTokens(res.rows);
+  updateCountBar(res.total);
+  setLoading(false);
+}
+
+function loadMore() {
+  tableOffset += PAGE_SIZE;
+  fetchData();
+}
+
+/* ── RENDER TABLE ── */
+function renderTable() {
+  const tbody = document.getElementById('table-body');
+  if (tableOffset === 0) tbody.innerHTML = '';
+
+  if (tableRows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="11" style="padding:24px;text-align:center;color:var(--muted-2);font-style:italic">Nicio stradă găsită</td></tr>`;
+    document.getElementById('load-more-bar').style.display = 'none';
+    return;
+  }
+
+  tableRows.slice(tableOffset === 0 ? 0 : tableOffset).forEach(row => {
+    const tr = document.createElement('tr');
+    const slug = row.street_slug || '';
+    const link = slug ? `/strada/${slug}/` : null;
+    const nameTp = link
+      ? `<span class="tp"><a href="${link}">${esc(row.name)}</a></span>`
+      : `<span class="tp">${esc(row.name)}</span>`;
+
+    const cls = row.classification;
+    let clsBadge = '';
+    if (cls === 'nature')   clsBadge = `<span class="badge bn">Nat.</span> `;
+    if (cls === 'place')    clsBadge = `<span class="badge bl">Loc</span> `;
+    if (cls === 'saint')    clsBadge = `<span class="badge bs">Sf.</span> `;
+
+    const portrait = row.wikidata_qid
+      ? `<img class="port-xs" src="/portraits/${row.wikidata_qid}.jpg" onerror="this.style.display='none'" alt="">`
+      : '';
+    const personCell = row.person_full_name
+      ? `${portrait}${esc(row.person_full_name)}`
+      : `<span class="td-m">—</span>`;
+    const genBadge = row.gender
+      ? `<span class="badge ${row.gender === 'F' ? 'bf' : 'bm'}">${row.gender}</span>`
+      : `<span class="td-m">—</span>`;
+    const wikiLink = row.wiki_scope
+      ? `<a class="td-link" href="https://ro.wikipedia.org/wiki/${encodeURIComponent(row.person_full_name || row.name)}" target="_blank">↗</a>`
+      : '';
+
+    tr.innerHTML = `
+      <td>${nameTp}</td>
+      <td class="td-m">${esc(row.street_type || '')}</td>
+      <td>${esc(row.uat || '')}</td>
+      <td class="td-m">${esc(row.judet || '')}</td>
+      <td>${clsBadge}${personCell}</td>
+      <td>${genBadge}</td>
+      <td class="td-m">${esc(row.profession || '—')}</td>
+      <td class="td-m">${esc(row.era || '—')}</td>
+      <td class="td-m">${esc(row.nationality || '—')}</td>
+      <td class="td-n" style="padding-right:14px">${row.name_count ?? ''}</td>
+      <td>${wikiLink}</td>`;
+
+    tr.addEventListener('click', () => {
+      document.querySelectorAll('.sel-row').forEach(r => r.classList.remove('sel-row'));
+      tr.classList.add('sel-row');
+      if (link) window.location = link;
+    });
+    tbody.appendChild(tr);
+  });
+
+  const lmBar  = document.getElementById('load-more-bar');
+  const lmBtn  = document.getElementById('load-more-btn');
+  const lmInfo = document.getElementById('load-more-info');
+  const shown  = tableRows.length;
+  if (shown < tableTotal) {
+    lmBar.style.display = 'flex';
+    lmBtn.disabled = false;
+    lmInfo.textContent = `${shown.toLocaleString('ro')} din ${tableTotal.toLocaleString('ro')}`;
+  } else {
+    lmBar.style.display = shown > PAGE_SIZE ? 'flex' : 'none';
+    if (shown > PAGE_SIZE) {
+      lmBtn.disabled = true;
+      lmBtn.textContent = 'Toate încărcate';
+      lmInfo.textContent = `${shown.toLocaleString('ro')} rezultate`;
+    }
+  }
+}
+
+/* ── RENDER COMPACT TOKENS ── */
+function renderTokens(rows) {
+  const cont = document.getElementById('flat-tokens');
+  cont.innerHTML = '';
+
+  if (!rows.length) {
+    cont.innerHTML = `<span style="color:var(--muted-2);font-style:italic;font-size:12px">Nicio stradă găsită</span>`;
+    return;
+  }
+
+  const counts = rows.map(r => r.name_count);
+  const lo = Math.min(...counts), hi = Math.max(...counts);
+  const fontFor = c => +(12 + ((c - lo) / Math.max(hi - lo, 1)) * 14).toFixed(1);
+  const leaders = new Set(
+    rows.slice().sort((a, b) => b.name_count - a.name_count).slice(0, 3).map(r => r.name)
+  );
+
+  rows.forEach(row => {
+    const fs     = fontFor(row.name_count);
+    const isL    = leaders.has(row.name);
+    const hasP   = !!row.wikidata_qid;
+    const tok    = document.createElement('span');
+    tok.className = `ctok street${isL ? ' leader' : ''}${hasP ? ' has-portrait' : ''}`;
+
+    let h = '';
+    if (hasP) {
+      h += `<span class="portrait">
+              <img src="/portraits/${row.wikidata_qid}.jpg"
+                   onerror="this.parentElement.style.display='none'" alt="">
+            </span>`;
+    }
+    h += `<span class="plaque" style="font-size:${fs}px">${esc(row.name)}</span>`;
+    h += `<sup class="cnt-badge">${row.name_count}</sup>`;
+    tok.innerHTML = h;
+
+    tok.addEventListener('mouseenter', () => showFooterInfo(row));
+    tok.addEventListener('click', () => {
+      document.querySelectorAll('.ctok.sel').forEach(t => t.classList.remove('sel'));
+      tok.classList.add('sel');
+      showFooterInfo(row);
+    });
+    cont.appendChild(tok);
+  });
+
+  // reset footer
+  document.getElementById('info-footer').innerHTML =
+    '<span class="hint">Treci cu mouse-ul peste o plăcuță pentru detalii</span>';
+}
+
+/* ── INFO FOOTER ── */
+function showFooterInfo(row) {
+  const f = document.getElementById('info-footer');
+  let h = '';
+
+  const portSrc = row.wikidata_qid ? `/portraits/${row.wikidata_qid}.jpg` : null;
+  h += `<div class="info-port">${portSrc
+    ? `<img src="${portSrc}" onerror="this.style.display='none'" alt="">`
+    : '📍'}</div>`;
+
+  h += `<div style="flex:1;min-width:0">`;
+  h += `<div class="info-name">${esc(row.name)}</div>`;
+  h += `<div class="info-fields">`;
+  if (row.person_full_name) h += fld('Persoană', row.person_full_name);
+  if (row.gender)           h += fld('Gen', GEN_LABEL[row.gender] || row.gender);
+  if (row.profession)       h += fld('Profesie', row.profession);
+  if (row.era)              h += fld('Eră', row.era);
+  if (row.nationality)      h += fld('Naționalitate', row.nationality);
+  if (row.classification)   h += fld('Clasificare', CLS_LABEL[row.classification] || row.classification);
+  if (row.street_slug) {
+    h += `<div class="ifield"><span class="ilabel">Pagina</span>
+            <a class="info-link ival" href="/strada/${row.street_slug}/">↗ detalii</a></div>`;
+  }
+  h += `</div></div>`;
+  h += `<div class="info-cnt">
+          <div class="info-cnt-n">${row.name_count}</div>
+          <div class="info-cnt-l">localități</div>
+        </div>`;
+  f.innerHTML = h;
+}
+const fld = (l, v) =>
+  `<div class="ifield"><span class="ilabel">${l}</span><span class="ival">${esc(v)}</span></div>`;
+
+/* ── HELPERS ── */
+function esc(s) {
+  if (!s) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function setLoading(on) {
+  document.getElementById('result-bar').classList.toggle('loading', on);
+}
+
+function updateCountBar(total) {
+  document.getElementById('count-text').innerHTML =
+    `<strong>${total.toLocaleString('ro-RO')}</strong> rezultate`;
+}
+
+/* ── INIT ── */
+loadMeta().then(() => {
+  tableOffset = 0;
+  tableRows   = [];
+  fetchCompact();
+});
+</script>
+</body>
+</html>

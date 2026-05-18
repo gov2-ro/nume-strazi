@@ -40,6 +40,10 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 ## P2
 
+- [ ] **Live statistics bar for current Browser selection** — A bar (below the result count strip or as a collapsible panel) showing aggregated stats for whatever the current filter produces: gender split (% F / % M), top era, top profession, top nationality, classification breakdown (% person / % nature / % loc / etc.), total UATs covered. Should update live with each filter change — either as a second `/api/filter?aggregate=1` call with `limit=9999` for full stats, or a dedicated `/api/stats` endpoint that returns pre-aggregated counts for the current WHERE clause. Useful for quick data stories: "all streets named after women → 91% Romanian, 45% Sec. XIX".
+
+- [ ] **Keyboard navigation for Browser filter bar** — `/browser` filter bar should be navigable by keyboard: Tab/Shift-Tab moves between filter dropdowns, Enter/Space opens the focused dropdown, arrow keys move through options, Enter selects, Escape closes. Also: typing in the search box should jump focus to it (e.g. `/` shortcut). Selecting a street row by keyboard (arrow keys + Enter) would open the detail page. Design note: the filter state lives in `filters` (JS dict in `dist/browser/index.html`) and the dropdowns are `.fdd` elements — keyboard handlers slot in alongside the existing mouse handlers.
+
 - [x] **Scope UAT detail page generation to județe capitals + county seats only** — Done 2026-05-18. `site_queries.enumerate_uats()` now filters to (a) 41 county seats via hardcoded `COUNTY_SEAT_SIRUTAS`, (b) 6 Bucharest sectors (detected by `judet='B'`), (c) `MUNICIPIUL ...` UATs with ≥50 streets. Returned dicts carry `is_capital`. UAT page count: 676 → 108. `build_detail_pages` also prunes stale `dist/oras/<judet>/<slug>/` dirs so the output stays consistent with the filter. Templates don't yet visually distinguish seats — the flag is available but unused.
 
 - [x] **Search index includes UATs without detail pages** — Done 2026-05-18. `explorer_indexes` now sources its UAT list from `enumerate_uats`, so search is automatically in sync with whatever has a rendered page (108 UATs). Rural comune are no longer surfaced in `/cauta/`. When/if we add a DB-backed endpoint for long-tail UATs, route it through `enumerate_uats` (or a sibling) so the search index stays the single source of truth.
@@ -101,6 +105,8 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [ ] UI: try compact version. Instead of showing multiple lists show one that's highly filterable. Start with stats, then a single filterable list of streets.
 
+- [ ] Ui, break into stats and list of streets/names, with the above filter
+
 - [ ] UI: try a super dorpdown navigator, where it can reach all options via taxonomies, attributes, witih contextual keyboard shortcuts. or just search by visible terms. but how can we select more or exclude, to make it crazy good? With streer count in brackets?
 
 - [ ] street names profiles, convert it to map. shows towns that match the name.
@@ -117,7 +123,7 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [x] og image, og description, metadata — Done 2026-05-18. `_meta.html.j2` partial emits og + twitter cards + meta description. Detail renders pass per-page `og_title`/`og_description`/`og_url_path` from `build_site.py`. Single static OG image at `dist/og.png` (1200×630, brand + live counts) regenerated with `python3 tools/gen_og_image.py`.
 
-- [ ] top of foreigners foreign street names
+- [x] top of foreigners foreign street names
 
 - [x] lading page, permanent urls for selected judet / municipiu
 
