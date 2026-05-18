@@ -1230,52 +1230,31 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 {% set nb = section3.nationality_breakdown %}
 {% set total_p = nb | sum(attribute='persons') %}
 {% set total_s = nb | sum(attribute='streets') %}
+{% set ro_p  = nb | selectattr('nat','equalto','RO') | sum(attribute='persons') %}
+{% set ro_s  = nb | selectattr('nat','equalto','RO') | sum(attribute='streets') %}
+{% set non_ro = nb | rejectattr('nat','equalto','RO') | list %}
+{% set non_ro_p = non_ro | sum(attribute='persons') %}
+{% set non_ro_s = non_ro | sum(attribute='streets') %}
+{% set ro_p_pct  = (ro_p  * 100.0 / total_p) %}
+{% set ro_s_pct  = (ro_s  * 100.0 / total_s) %}
+{% set non_p_pct = (non_ro_p * 100.0 / total_p) %}
+{% set non_s_pct = (non_ro_s * 100.0 / total_s) %}
+{% set max_non_p = non_ro | map(attribute='persons') | max %}
+{% set max_non_s = non_ro | map(attribute='streets') | max %}
 <div class="panel s8" id="nationalities-panel">
   <div class="panel-header">
     <span class="panel-label"><span class="emo xl">🌐</span> Naționalitatea personalităților onorate</span>
-    <span class="panel-meta">{{ total_p }} persoane · {{ "{:,.0f}".format(total_s).replace(",",".") }} străzi</span>
+    <span class="panel-meta" id="s3nat-meta">{{ total_p }} persoane · {{ "{:,.0f}".format(total_s).replace(",",".") }} străzi</span>
   </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;padding-top:6px;">
-    <div>
-      <div class="sub-eyebrow" style="margin-bottom:8px;">
-        <span class="dot" style="background:var(--plaque);"></span>După persoane
-        <span class="meta">{{ total_p }}</span>
-      </div>
-      {% for r in nb %}
-        {% if r.persons > 0 %}
-        {% set pct = (r.persons * 100.0 / total_p) | round(1) %}
-        <div style="display:grid;grid-template-columns:24px minmax(0,1fr) 1fr 48px;gap:8px;align-items:center;padding:3px 0;border-bottom:1px solid var(--rule);">
-          <span style="font-size:16px;line-height:1;text-align:center;">{{ nat_flag.get(r.nat, '🏳️') }}</span>
-          <span style="font-family:var(--sans);font-size:12px;color:var(--ink);font-weight:500;">{{ nat_full_label.get(r.nat, r.nat) }}</span>
-          <div class="bar-wrap"><div class="bar" style="width:{{ (r.persons * 100 / total_p)|int }}%;{% if r.nat != 'RO' %}background:#6B8E23;{% endif %}"></div></div>
-          <span style="font-family:var(--mono);font-size:11px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums;">{{ pct }}%</span>
-        </div>
-        {% endif %}
-      {% endfor %}
-    </div>
-    <div>
-      <div class="sub-eyebrow" style="margin-bottom:8px;">
-        <span class="dot" style="background:var(--accent);"></span>După străzi (ponderate)
-        <span class="meta">{{ "{:,.0f}".format(total_s).replace(",",".") }}</span>
-      </div>
-      {% for r in nb %}
-        {% if r.streets > 0 %}
-        {% set pct = (r.streets * 100.0 / total_s) | round(1) %}
-        <div style="display:grid;grid-template-columns:24px minmax(0,1fr) 1fr 48px;gap:8px;align-items:center;padding:3px 0;border-bottom:1px solid var(--rule);">
-          <span style="font-size:16px;line-height:1;text-align:center;">{{ nat_flag.get(r.nat, '🏳️') }}</span>
-          <span style="font-family:var(--sans);font-size:12px;color:var(--ink);font-weight:500;">{{ nat_full_label.get(r.nat, r.nat) }}</span>
-          <div class="bar-wrap"><div class="bar accent" style="width:{{ (r.streets * 100 / total_s)|int }}%;"></div></div>
-          <span style="font-family:var(--mono);font-size:11px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums;">{{ pct }}%</span>
-        </div>
-        {% endif %}
-      {% endfor %}
-    </div>
-  </div>
-  <div class="panel-caption" style="margin-top:10px;font-style:italic;">
-    {% set non_ro_p = nb | rejectattr('nat','equalto','RO') | sum(attribute='persons') %}
-    {% set non_ro_s = nb | rejectattr('nat','equalto','RO') | sum(attribute='streets') %}
-    Personalități non-române: {{ non_ro_p }} persoane ({{ (non_ro_p * 100.0 / total_p) | round(1) }}%) → {{ non_ro_s }} străzi ({{ (non_ro_s * 100.0 / total_s) | round(2) }}%). Onorate proporțional pe mai puține străzi decât cota lor numerică.
-  </div>
+
+  {# Split bars: Români vs Străini (persoane + străzi). Body populated by JS so the
+     judet/municipiu filter can swap it; Jinja seeds the national view. #}
+  <div id="s3nat-split" style="display:grid;grid-template-columns:1fr 1fr;gap:18px;padding-top:6px;margin-bottom:14px;"></div>
+
+  <div class="sub-eyebrow" style="margin-bottom:6px;"><span class="dot" style="background:#6B8E23;"></span>Defalcare pe țări · non-români</div>
+  <div id="s3nat-detail" style="display:grid;grid-template-columns:1fr 1fr;gap:18px;"></div>
+
+  <div class="panel-caption" id="s3nat-caption" style="margin-top:10px;font-style:italic;"></div>
 </div>
 {% endif %}
 
@@ -1536,6 +1515,114 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
     }).join('');
   }
 
+  // ── Nationalities panel ──────────────────────────────────────────────────
+  const NAT_LABEL_RO = {
+    'RO':'România','HU':'Ungaria','FR':'Franța','DE':'Germania','IT':'Italia',
+    'RU':'Rusia','MD':'R. Moldova','PL':'Polonia','TR':'Turcia','US':'SUA',
+    'GR':'Grecia','RS':'Serbia','UA':'Ucraina','CZ':'Cehia','SK':'Slovacia',
+    'BG':'Bulgaria','HR':'Croația','GB':'Marea Britanie','AT':'Austria',
+    'CH':'Elveția','ES':'Spania','NL':'Olanda','BE':'Belgia',
+    'XX':'fără naționalitate',
+  };
+
+  function updateNationalities(rows) {
+    const panel = document.getElementById('nationalities-panel');
+    if (!panel) return;
+    const split  = document.getElementById('s3nat-split');
+    const detail = document.getElementById('s3nat-detail');
+    const cap    = document.getElementById('s3nat-caption');
+    const meta   = document.getElementById('s3nat-meta');
+
+    if (!rows || !rows.length) {
+      panel.style.display = 'none';
+      return;
+    }
+    panel.style.display = '';
+
+    const totalP = rows.reduce((s, r) => s + (r.persons || 0), 0);
+    const totalS = rows.reduce((s, r) => s + (r.streets || 0), 0);
+    const ro     = rows.find(r => r.nat === 'RO') || { persons: 0, streets: 0 };
+    const nonRo  = rows.filter(r => r.nat !== 'RO' && (r.persons || r.streets));
+
+    if (meta) {
+      const sFmt = totalS.toLocaleString('ro-RO');
+      meta.textContent = `${totalP} persoane · ${sFmt} străzi`;
+    }
+
+    const roP = ro.persons || 0, roS = ro.streets || 0;
+    const nonP = totalP - roP, nonS = totalS - roS;
+    const pct = (a, b) => b ? (a * 100 / b) : 0;
+    const fmtP = (v) => v.toFixed(1);
+    const fmtS = (v) => v.toFixed(2);
+
+    const splitCells = [
+      ['După persoane',           pct(roP, totalP), pct(nonP, totalP), roP, nonP, fmtP],
+      ['După străzi (ponderate)', pct(roS, totalS), pct(nonS, totalS), roS, nonS, fmtS],
+    ].map(([label, roPct, nonPct, roN, nonN, fmt]) => `
+      <div>
+        <div class="sub-eyebrow" style="margin-bottom:6px;">${label}</div>
+        <div style="display:flex;height:18px;border:1px solid var(--rule-strong);border-radius:2px;overflow:hidden;">
+          <div style="width:${roPct}%;background:var(--plaque);"></div>
+          <div style="width:${nonPct}%;background:#6B8E23;"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:6px;font-family:var(--sans);font-size:11.5px;">
+          <span><span style="color:var(--plaque);font-weight:700;">●</span> Români <strong style="font-variant-numeric:tabular-nums;">${fmt(roPct)}%</strong> <span style="color:var(--muted);">· ${roN}</span></span>
+          <span><span style="color:#6B8E23;font-weight:700;">●</span> Străini <strong style="font-variant-numeric:tabular-nums;">${fmt(nonPct)}%</strong> <span style="color:var(--muted);">· ${nonN}</span></span>
+        </div>
+      </div>`).join('');
+    if (split) split.innerHTML = splitCells;
+
+    if (detail) {
+      if (!nonRo.length) {
+        detail.innerHTML = '<div style="grid-column:1/-1;font-style:italic;color:var(--muted);font-size:12px;">Nicio personalitate non-română onorată aici.</div>';
+      } else {
+        const maxP = Math.max(...nonRo.map(r => r.persons || 0)) || 1;
+        const maxS = Math.max(...nonRo.map(r => r.streets || 0)) || 1;
+        const renderRow = (r, value, max, denom, isStreet) => {
+          const flag = NAT_FLAG[r.nat] || '🏳️';
+          const label = NAT_LABEL_RO[r.nat] || r.nat;
+          const pctTxt = denom ? (value * 100 / denom).toFixed(isStreet ? 2 : 1) : '0.0';
+          const barW = Math.max(2, Math.round(value * 100 / max));
+          const barCls = isStreet ? 'bar accent' : 'bar';
+          const barBg  = isStreet ? '' : 'background:#6B8E23;';
+          return `<div style="display:grid;grid-template-columns:24px minmax(0,1fr) 1fr 60px;gap:8px;align-items:center;padding:3px 0;border-bottom:1px solid var(--rule);">
+            <span style="font-size:16px;line-height:1;text-align:center;">${flag}</span>
+            <span style="font-family:var(--sans);font-size:12px;color:var(--ink);font-weight:500;">${label}</span>
+            <div class="bar-wrap"><div class="${barCls}" style="width:${barW}%;${barBg}"></div></div>
+            <span style="font-family:var(--mono);font-size:11px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums;">${value} · ${pctTxt}%</span>
+          </div>`;
+        };
+        const colP = nonRo
+          .slice().sort((a, b) => (b.persons || 0) - (a.persons || 0))
+          .filter(r => r.persons > 0)
+          .map(r => renderRow(r, r.persons, maxP, totalP, false)).join('');
+        const colS = nonRo
+          .slice().sort((a, b) => (b.streets || 0) - (a.streets || 0))
+          .filter(r => r.streets > 0)
+          .map(r => renderRow(r, r.streets, maxS, totalS, true)).join('');
+        detail.innerHTML = `
+          <div>
+            <div style="font-family:var(--sans);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">După persoane</div>
+            ${colP || '<span style="font-style:italic;color:var(--muted);font-size:12px;">—</span>'}
+          </div>
+          <div>
+            <div style="font-family:var(--sans);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">După străzi</div>
+            ${colS || '<span style="font-style:italic;color:var(--muted);font-size:12px;">—</span>'}
+          </div>`;
+      }
+    }
+
+    if (cap) {
+      if (nonP > 0 && nonS > 0) {
+        cap.textContent = `Personalitățile non-române ocupă o cotă vizibil mai mică din străzi decât din numărul de persoane: ${fmtP(pct(nonP, totalP))}% → ${fmtS(pct(nonS, totalS))}%.`;
+      } else if (totalP === 0) {
+        cap.textContent = 'Nicio personalitate cu date înregistrate aici.';
+      } else {
+        cap.textContent = `Toate cele ${totalP} personalități onorate sunt române.`;
+      }
+    }
+  }
+
   function updateForeigners(rows) {
     const panel = document.getElementById('s3-foreigners-panel');
     const list  = document.getElementById('s3-foreigners-list');
@@ -1689,7 +1776,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 
   function render(code, siruta) {
     let streets, men, women, foreigners, themeData, genderData, pvRows, footerText;
-    let natRows, ideoRows, profRows, eraRows, foreignersFull;
+    let natRows, ideoRows, profRows, eraRows, foreignersFull, natBreakdown;
     const isUat   = !!(siruta && siruta !== 'all');
     const isNat   = (code === 'all' && !isUat);
 
@@ -1712,6 +1799,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       pvRows        = null;
       natRows = ideoRows = profRows = eraRows = null;  // no UAT-level breakdown
       foreignersFull = [];
+      natBreakdown   = (DATA_S3.nationality_breakdown_by_siruta || {})[String(siruta)] || [];
       const uatName = uatSelect.options[uatSelect.selectedIndex]?.text?.split(' · ')[0] || siruta;
       footerText = `municipiul ${uatName}`;
     } else if (isNat) {
@@ -1727,6 +1815,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       profRows       = DATA_S3.profession_dist || [];
       eraRows        = DATA_S3.era_dist || [];
       foreignersFull = DATA_S3.top_foreigners || [];
+      natBreakdown   = DATA_S3.nationality_breakdown || [];
       footerText = `top ${streets.length} · la nivel național`;
     } else {
       // Județ level
@@ -1743,6 +1832,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       profRows       = (DATA_S3.profession_by_judet || {})[code] || [];
       eraRows        = (DATA_S3.era_by_judet || {})[code] || [];
       foreignersFull = (DATA_S3.foreigners_by_judet || {})[code] || [];
+      natBreakdown   = (DATA_S3.nationality_breakdown_by_judet || {})[code] || [];
       footerText = `județul ${label}`;
     }
 
@@ -1779,6 +1869,9 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 
     // Foreigners full panel
     updateForeigners(foreignersFull);
+
+    // Nationalities aggregate (Români vs Străini + per-country breakdown)
+    updateNationalities(natBreakdown);
 
     // Contests panel: national only
     const contestsPanel = document.getElementById('s8-contests-panel');

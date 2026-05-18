@@ -429,6 +429,48 @@ def section3(conn: sqlite3.Connection) -> dict:
         for r in nat_rows
     ]
 
+    # Per-județ nationality breakdown — persons = distinct honorees in the
+    # județ, streets = street-instances. Powers the landing's judet filter.
+    nat_judet_rows = _rows(conn, """
+        SELECT sd.judet,
+               COALESCE(p.nationality, 'XX') AS nationality,
+               COUNT(DISTINCT p.core_name_norm) AS persons,
+               COUNT(sd.id) AS streets
+        FROM streets_dedup sd
+        JOIN persons p ON p.core_name_norm = sd.core_name_norm
+        GROUP BY sd.judet, nationality
+        ORDER BY sd.judet, streets DESC
+    """)
+    nationality_breakdown_by_judet: dict[str, list[dict]] = {}
+    for r in nat_judet_rows:
+        nationality_breakdown_by_judet.setdefault(r["judet"], []).append({
+            "nat": r["nationality"],
+            "persons": r["persons"],
+            "streets": r["streets"],
+        })
+
+    # Per-municipiu (siruta) nationality breakdown — only MUNICIPIUL UATs to
+    # match the landing's UAT filter scope. Smaller payload than per-uat all.
+    nat_siruta_rows = _rows(conn, """
+        SELECT sd.siruta,
+               COALESCE(p.nationality, 'XX') AS nationality,
+               COUNT(DISTINCT p.core_name_norm) AS persons,
+               COUNT(sd.id) AS streets
+        FROM streets_dedup sd
+        JOIN persons p ON p.core_name_norm = sd.core_name_norm
+        WHERE sd.uat LIKE 'MUNICIPIUL%'
+        GROUP BY sd.siruta, nationality
+        ORDER BY sd.siruta, streets DESC
+    """)
+    nationality_breakdown_by_siruta: dict[str, list[dict]] = {}
+    for r in nat_siruta_rows:
+        key = str(r["siruta"])
+        nationality_breakdown_by_siruta.setdefault(key, []).append({
+            "nat": r["nationality"],
+            "persons": r["persons"],
+            "streets": r["streets"],
+        })
+
     return {
         "top_persons": top_persons,
         "persons_by_judet": persons_by_judet,
@@ -447,6 +489,8 @@ def section3(conn: sqlite3.Connection) -> dict:
         "top_foreigners": top_foreigners,
         "foreign_nat_summary": foreign_nat_summary,
         "nationality_breakdown": nationality_breakdown,
+        "nationality_breakdown_by_judet": nationality_breakdown_by_judet,
+        "nationality_breakdown_by_siruta": nationality_breakdown_by_siruta,
     }
 
 
