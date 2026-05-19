@@ -7,9 +7,9 @@
 <div class="detail-page">
 
   <div class="breadcrumb">
-    <a href="/">Acasă</a>
+    <a href="{{ base }}/">Acasă</a>
     <span class="sep">›</span>
-    <a href="/teme/">Teme</a>
+    <a href="{{ base }}/teme/">Teme</a>
     <span class="sep">›</span>
     <span>{{ theme_meta.label }}</span>
   </div>
@@ -32,7 +32,7 @@
         <div class="rank-row" style="grid-template-columns: 26px minmax(0,1fr) 50px 50px;">
           <div class="rank-num">{{ i + 1 }}</div>
           <div>
-            <a href="/strada/{{ s.slug }}/" class="street-tag sm">{{ s.display or s.name_normalized }}</a>
+            <a href="{{ base }}/strada/{{ s.slug }}/" class="street-tag sm">{{ s.display or s.name_normalized }}</a>
           </div>
           <div class="rank-count" title="{{ s.uat_count }} localități">{{ s.total }}</div>
           <div style="font-size:10.5px; color:var(--muted); text-align:right; font-variant-numeric:tabular-nums;">{{ s.uat_count }} loc.</div>

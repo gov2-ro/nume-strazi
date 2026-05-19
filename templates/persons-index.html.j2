@@ -7,7 +7,7 @@
 <div class="detail-page">
 
   <div class="breadcrumb">
-    <a href="/">Acasă</a>
+    <a href="{{ base }}/">Acasă</a>
     <span class="sep">›</span>
     <span>Persoane</span>
   </div>
@@ -24,14 +24,14 @@
       <div class="rank-num">{{ loop.index }}</div>
       <div class="portrait">
         {% if p.qid %}
-        <img src="/portraits/{{ p.qid }}.jpg" alt="{{ p.full_name }}"
+        <img src="{{ base }}/portraits/{{ p.qid }}.jpg" alt="{{ p.full_name }}"
              onerror="this.parentElement.textContent='{{ p.full_name[:2] | upper }}'">
         {% else %}
         {{ p.full_name[:2] | upper }}
         {% endif %}
       </div>
       <div>
-        <a href="/persoana/{{ p.slug }}/" style="font-weight:600; color:var(--ink);">{{ p.full_name }}</a>
+        <a href="{{ base }}/persoana/{{ p.slug }}/" style="font-weight:600; color:var(--ink);">{{ p.full_name }}</a>
       </div>
       <div style="font-size:11px; color:var(--muted);">{{ p.slug }}</div>
       <div class="rank-count">{{ p.street_count }}</div>

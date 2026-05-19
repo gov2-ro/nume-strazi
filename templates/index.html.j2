@@ -800,18 +800,18 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 <body>
 
 <nav class="site-nav">
-  <a href="/" class="brand">Cum ne numim străzile</a>
+  <a href="{{ base }}/" class="brand">Cum ne numim străzile</a>
   <nav>
     <a href="#cele-mai-intalnite">Cele mai întâlnite</a>
     <a href="#tematica">Tematică</a>
     <a href="#pe-cine-onoram">Pe cine onorăm</a>
     <span class="nav-sep"></span>
-    <a href="/cauta/">Caută</a>
-    <a href="/browser/">Browser</a>
-    <a href="/persoane/">Persoane</a>
-    <a href="/teme/">Teme</a>
-    <a href="/judete/">Județe</a>
-    <a href="/metodologie.html">Metodologie</a>
+    <a href="{{ base }}/cauta/">Caută</a>
+    <a href="{{ base }}/browser/">Browser</a>
+    <a href="{{ base }}/persoane/">Persoane</a>
+    <a href="{{ base }}/teme/">Teme</a>
+    <a href="{{ base }}/judete/">Județe</a>
+    <a href="{{ base }}/metodologie.html">Metodologie</a>
     <span class="nav-sep"></span>
     <select id="s2-judet-select">
       <option value="all">Toate județele</option>
@@ -977,7 +977,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
         <div style="width:10px;height:10px;border-radius:2px;background:{{ theme_colors[loop.index0 % theme_colors|length] }};flex-shrink:0;"></div>
         <span class="emo xxl">{{ theme_emoji.get(t.category, '·') }}</span>
         {% if t.slug %}
-        <a href="/tema/{{ t.slug }}/" style="font-family:var(--sans);font-size:22px;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);text-decoration:none;">{{ t.category }}</a>
+        <a href="{{ base }}/tema/{{ t.slug }}/" style="font-family:var(--sans);font-size:22px;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);text-decoration:none;">{{ t.category }}</a>
         {% else %}
         <span style="font-family:var(--sans);font-size:22px;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ t.category }}</span>
         {% endif %}
@@ -1013,7 +1013,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
   <div style="display:flex;align-items:center;gap:8px;padding:3px 0;{% if not loop.first %}border-top:1px solid var(--hairline);{% endif %}">
     <span class="emo xxl" style="width:24px;text-align:center;">{{ nature_emoji.get(row.nature_type, '·') }}</span>
     {% if row.slug %}
-    <a href="/tema/{{ row.slug }}/" style="font-family:var(--sans);font-size:22px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);text-decoration:none;">{{ nature_ro.get(row.nature_type, row.nature_type) }}</a>
+    <a href="{{ base }}/tema/{{ row.slug }}/" style="font-family:var(--sans);font-size:22px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);text-decoration:none;">{{ nature_ro.get(row.nature_type, row.nature_type) }}</a>
     {% else %}
     <span style="font-family:var(--sans);font-size:22px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ nature_ro.get(row.nature_type, row.nature_type) }}</span>
     {% endif %}
@@ -1044,7 +1044,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
     {% for tok in section5.ideo_tokens %}
     {% set tok_inner %}<span>{{ ideo_ro.get(tok.token, tok.token) }} <span style="color:var(--muted);font-size:16px;margin-left:6px;font-variant-numeric:tabular-nums;font-weight:500;">{{ tok.n }}</span></span>{% endset %}
     {% if tok.slug %}
-    <a href="/tema/{{ tok.slug }}/" style="font-family:var(--sans);font-size:20px;font-weight:500;padding:7px 14px;border:1.5px solid {{ 'var(--accent)' if tok.n > 30 else 'var(--rule-strong)' }};border-radius:3px;color:{{ 'var(--accent-dark)' if tok.n > 30 else 'var(--ink)' }};background:{{ '#FFF1ED' if tok.n > 30 else 'var(--bg)' }};text-decoration:none;display:inline-flex;align-items:center;">
+    <a href="{{ base }}/tema/{{ tok.slug }}/" style="font-family:var(--sans);font-size:20px;font-weight:500;padding:7px 14px;border:1.5px solid {{ 'var(--accent)' if tok.n > 30 else 'var(--rule-strong)' }};border-radius:3px;color:{{ 'var(--accent-dark)' if tok.n > 30 else 'var(--ink)' }};background:{{ '#FFF1ED' if tok.n > 30 else 'var(--bg)' }};text-decoration:none;display:inline-flex;align-items:center;">
       {{ ideo_ro.get(tok.token, tok.token) }} <span style="color:var(--muted);font-size:16px;margin-left:6px;font-variant-numeric:tabular-nums;font-weight:500;">{{ tok.n }}</span>
     </a>
     {% else %}
@@ -1116,7 +1116,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
   <div style="display:flex;align-items:center;gap:8px;padding:3px 0;{% if not loop.first %}border-top:1px solid var(--hairline);{% endif %}">
     <span class="emo xxl" style="width:24px;text-align:center;">{{ prof_emoji.get(row.profession, '·') }}</span>
     {% if row.slug %}
-    <a href="/tema/{{ row.slug }}/" style="font-family:var(--sans);font-size:22px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);text-decoration:none;">{{ prof_ro.get(row.profession, row.profession) }}</a>
+    <a href="{{ base }}/tema/{{ row.slug }}/" style="font-family:var(--sans);font-size:22px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);text-decoration:none;">{{ prof_ro.get(row.profession, row.profession) }}</a>
     {% else %}
     <span style="font-family:var(--sans);font-size:22px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ prof_ro.get(row.profession, row.profession) }}</span>
     {% endif %}
@@ -1191,10 +1191,10 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       <span class="rank-name person" style="display:flex;align-items:center;gap:7px;">
         {% if p.wikidata_qid and p.wikidata_qid in portraits %}
         <span class="portrait" style="width:22px;height:22px;border-radius:50%;overflow:hidden;flex-shrink:0;display:inline-flex;">
-          <img src="/portraits/{{ p.wikidata_qid }}.jpg" alt="" style="width:100%;height:100%;object-fit:cover;" loading="lazy">
+          <img src="{{ base }}/portraits/{{ p.wikidata_qid }}.jpg" alt="" style="width:100%;height:100%;object-fit:cover;" loading="lazy">
         </span>
         {% endif %}
-        {% if p.slug %}<a href="/persoana/{{ p.slug }}/" style="color:inherit;text-decoration:none;">{{ p.full_name }}</a>{% else %}{{ p.full_name }}{% endif %}
+        {% if p.slug %}<a href="{{ base }}/persoana/{{ p.slug }}/" style="color:inherit;text-decoration:none;">{{ p.full_name }}</a>{% else %}{{ p.full_name }}{% endif %}
       </span>
       <span style="font-family:var(--sans);font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ prof_ro.get(p.profession, p.profession or '—') }}</span>
       <div class="bar-wrap">
@@ -1355,12 +1355,12 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       </p>
     </div>
     <div>
-      <a href="/metodologie.html" style="text-decoration:none;color:inherit;display:inline-flex;align-items:center;gap:7px;font-family:var(--sans);font-size:10px;letter-spacing:.22em;text-transform:uppercase;font-weight:700;color:var(--gold);margin-bottom:8px;"><span class="emo md">⚗️</span> Metodologie</a>
+      <a href="{{ base }}/metodologie.html" style="text-decoration:none;color:inherit;display:inline-flex;align-items:center;gap:7px;font-family:var(--sans);font-size:10px;letter-spacing:.22em;text-transform:uppercase;font-weight:700;color:var(--gold);margin-bottom:8px;"><span class="emo md">⚗️</span> Metodologie</a>
       <p style="font-family:var(--sans);font-size:12.5px;line-height:1.6;color:rgba(255,255,255,.72);">
         Clasificare: curation manual + LLM batch (Claude Haiku + Gemini).
         Recunoaștere: Wikidata + Wikipedia pageviews.
         Harta: GeoJSON județe, surse publice.
-        <a href="/metodologie.html" style="color:#F7D777;text-decoration:underline;text-underline-offset:2px;">Citește metodologia completă →</a>
+        <a href="{{ base }}/metodologie.html" style="color:#F7D777;text-decoration:underline;text-underline-offset:2px;">Citește metodologia completă →</a>
       </p>
     </div>
     <div>
@@ -1511,7 +1511,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       const style = `font-family:var(--sans);font-size:20px;font-weight:500;padding:7px 14px;border:1.5px solid ${isHigh ? 'var(--accent)' : 'var(--rule-strong)'};border-radius:3px;color:${isHigh ? 'var(--accent-dark)' : 'var(--ink)'};background:${isHigh ? '#FFF1ED' : 'var(--bg)'};`;
       const inner = `${label} <span style="color:var(--muted);font-size:16px;margin-left:6px;font-variant-numeric:tabular-nums;font-weight:500;">${r.n}</span>`;
       return slug
-        ? `<a href="/tema/${slug}/" style="${style}text-decoration:none;display:inline-flex;align-items:center;">${inner}</a>`
+        ? `<a href="{{ base }}/tema/${slug}/" style="${style}text-decoration:none;display:inline-flex;align-items:center;">${inner}</a>`
         : `<span style="${style}">${inner}</span>`;
     }).join('');
   }
@@ -1642,7 +1642,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       const pct  = Math.round(p.street_count / maxF * 100);
       const href = p.slug ? `/persoana/${p.slug}/` : null;
       const portrait = (p.wikidata_qid && PORTRAITS.has(p.wikidata_qid))
-        ? `<span class="portrait" style="width:22px;height:22px;border-radius:50%;overflow:hidden;flex-shrink:0;display:inline-flex;"><img src="/portraits/${p.wikidata_qid}.jpg" alt="" style="width:100%;height:100%;object-fit:cover;" loading="lazy"></span>`
+        ? `<span class="portrait" style="width:22px;height:22px;border-radius:50%;overflow:hidden;flex-shrink:0;display:inline-flex;"><img src="{{ base }}/portraits/${p.wikidata_qid}.jpg" alt="" style="width:100%;height:100%;object-fit:cover;" loading="lazy"></span>`
         : '';
       const nameInner = portrait + escapeHtml(p.full_name);
       const nameEl = href
@@ -1749,7 +1749,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
         const qid = r.wikidata_qid;
         const hasPortrait = (qid && PORTRAITS.has(qid));
         const portrait = hasPortrait
-          ? `<span class="portrait"><img src="/portraits/${qid}.jpg" alt="" loading="lazy"></span>`
+          ? `<span class="portrait"><img src="{{ base }}/portraits/${qid}.jpg" alt="" loading="lazy"></span>`
           : '';
         const personSlug = r.slug || (qid ? qid.toLowerCase() : '');
         const personHref = personSlug ? `/persoana/${personSlug}/` : null;
@@ -1759,7 +1759,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       }
       const sqid = r.wikidata_qid;
       const sPortrait = (sqid && PORTRAITS.has(sqid))
-        ? `<span class="portrait"><img src="/portraits/${sqid}.jpg" alt="" loading="lazy"></span>`
+        ? `<span class="portrait"><img src="{{ base }}/portraits/${sqid}.jpg" alt="" loading="lazy"></span>`
         : '';
       const streetSlug = r.slug || '';
       const streetHref = streetSlug ? `/strada/${streetSlug}/` : null;

@@ -9,9 +9,9 @@
 <div class="detail-page">
 
   <div class="breadcrumb">
-    <a href="/">Acasă</a>
+    <a href="{{ base }}/">Acasă</a>
     <span class="sep">›</span>
-    <a href="/persoane/">Persoane</a>
+    <a href="{{ base }}/persoane/">Persoane</a>
     <span class="sep">›</span>
     <span>{{ p.full_name }}</span>
   </div>
@@ -21,7 +21,7 @@
     <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap; margin-top:10px;">
       {% if p.wikidata_qid %}
       <div class="portrait xl">
-        <img src="/portraits/{{ p.wikidata_qid }}.jpg" alt="{{ p.full_name }}"
+        <img src="{{ base }}/portraits/{{ p.wikidata_qid }}.jpg" alt="{{ p.full_name }}"
              onerror="this.parentElement.textContent='{{ p.full_name[:2] | upper }}'">
       </div>
       {% endif %}
@@ -54,7 +54,7 @@
       <div class="judet-label">{{ bucket.judet }} — {{ bucket.total }} stradă{% if bucket.total != 1 %}zi{% endif %}</div>
       <div class="uat-cluster">
         {% for u in bucket.uats %}
-          <a class="uat-pill" href="/oras/{{ bucket.judet | lower }}/{{ u.uat_slug }}/">{{ u.uat | title }}</a>
+          <a class="uat-pill" href="{{ base }}/oras/{{ bucket.judet | lower }}/{{ u.uat_slug }}/">{{ u.uat | title }}</a>
         {% endfor %}
       </div>
     </div>
@@ -70,11 +70,11 @@
         <div>
           {% if peer.wikidata_qid %}
           <span class="portrait" style="margin-right:6px;">
-            <img src="/portraits/{{ peer.wikidata_qid }}.jpg" alt="{{ peer.full_name }}"
+            <img src="{{ base }}/portraits/{{ peer.wikidata_qid }}.jpg" alt="{{ peer.full_name }}"
                  onerror="this.parentElement.textContent='{{ peer.full_name[:2] | upper }}'">
           </span>
           {% endif %}
-          <a href="/persoana/{{ peer.slug }}/">{{ peer.full_name }}</a>
+          <a href="{{ base }}/persoana/{{ peer.slug }}/">{{ peer.full_name }}</a>
         </div>
         <div class="rank-count">{{ peer.street_count }}</div>
       </div>

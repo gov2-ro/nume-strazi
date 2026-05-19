@@ -14,8 +14,15 @@
 (function () {
   'use strict';
 
-  const ASSET_BASE = '/_assets/sqljs-httpvfs/';
-  const DB_URL     = '/streets.db';
+  // Derive the site base from this script's own URL. Works at any mount point
+  // (root, /strazi/, etc.) without rebuild. Falls back to "/" if currentScript
+  // isn't available (older browsers loading via <script> in async contexts).
+  const SCRIPT_URL = (document.currentScript && document.currentScript.src) || '';
+  const SITE_BASE  = SCRIPT_URL
+    ? SCRIPT_URL.replace(/_assets\/db-client\.js.*$/, '')
+    : '/';
+  const ASSET_BASE = SITE_BASE + '_assets/sqljs-httpvfs/';
+  const DB_URL     = SITE_BASE + 'streets.db';
 
   // ── Init (lazy, one-shot) ────────────────────────────────────────────
   let _dbPromise = null;

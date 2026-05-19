@@ -73,7 +73,7 @@
 <div class="detail-page">
 
   <div class="breadcrumb">
-    <a href="/">Acasă</a>
+    <a href="{{ base }}/">Acasă</a>
     <span class="sep">›</span>
     <span>Caută</span>
   </div>
@@ -110,8 +110,8 @@ async function loadIndexes() {
   if (loaded) return;
   loaded = true;
   const [s, u] = await Promise.all([
-    fetch('/cauta/streets.json').then(r => r.json()),
-    fetch('/cauta/uats.json').then(r => r.json()),
+    fetch('{{ base }}/cauta/streets.json').then(r => r.json()),
+    fetch('{{ base }}/cauta/uats.json').then(r => r.json()),
   ]);
   STREETS = s;
   UATS = u;
@@ -164,7 +164,7 @@ function renderStreets(items) {
       </div>
       <div class="cnt">${s.t}</div>`;
     return s.p
-      ? `<a class="result-row" href="/strada/${s.s}/">${inner}</a>`
+      ? `<a class="result-row" href="{{ base }}/strada/${s.s}/">${inner}</a>`
       : `<div class="result-row disabled" title="Există în baza de date — fără pagină proprie încă">${inner}</div>`;
   }).join('');
 }
@@ -175,7 +175,7 @@ function renderUats(items) {
   if (!items.length) { sec.style.display = 'none'; return; }
   sec.style.display = 'block';
   div.innerHTML = items.map(u => `
-    <a class="result-row" href="/oras/${(u.j||'').toLowerCase()}/${u.s}/">
+    <a class="result-row" href="{{ base }}/oras/${(u.j||'').toLowerCase()}/${u.s}/">
       <div>
         <div class="name">${esc(u.n)}</div>
         <div class="sub">${u.j}</div>

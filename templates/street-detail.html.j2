@@ -7,7 +7,7 @@
 <div class="detail-page">
 
   <div class="breadcrumb">
-    <a href="/">Acasă</a>
+    <a href="{{ base }}/">Acasă</a>
     <span class="sep">›</span>
     <span>Stradă</span>
     <span class="sep">›</span>
@@ -30,7 +30,7 @@
       <span><strong>{{ judet_count }}</strong> județe</span>
       {% if honoree %}
         <span>·
-          <a href="/persoana/{{ honoree.slug }}/">{{ honoree.full_name }}</a>
+          <a href="{{ base }}/persoana/{{ honoree.slug }}/">{{ honoree.full_name }}</a>
           {% if honoree.profession %} · {{ honoree.profession }}{% endif %}
           {% if honoree.era %} · {{ honoree.era }}{% endif %}
         </span>
@@ -47,7 +47,7 @@
       {% set qid = honoree.qid %}
       {% if qid %}
       <div class="portrait xl" id="hero-portrait">
-        <img src="/portraits/{{ qid }}.jpg" alt="{{ honoree.full_name }}"
+        <img src="{{ base }}/portraits/{{ qid }}.jpg" alt="{{ honoree.full_name }}"
              onerror="this.parentElement.textContent='{{ honoree.full_name[:2] | upper }}'">
       </div>
       {% endif %}
@@ -74,7 +74,7 @@
       <div class="judet-label">{{ bucket.judet }} — {{ bucket.total }} stradă{% if bucket.total != 1 %}zi{% endif %}</div>
       <div class="uat-cluster">
         {% for u in bucket.uats %}
-          <a class="uat-pill" href="/oras/{{ bucket.judet | lower }}/{{ u.uat_slug }}/">{{ u.uat | title }}</a>
+          <a class="uat-pill" href="{{ base }}/oras/{{ bucket.judet | lower }}/{{ u.uat_slug }}/">{{ u.uat | title }}</a>
         {% endfor %}
       </div>
     </div>

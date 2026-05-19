@@ -14,6 +14,18 @@ DIST = Path("dist")
 TEMPLATES = Path("templates")
 DB_PATH = "data/streets.db"
 COUNTIES_SRC = Path("data/gis/romania-counties.geojson")
+DEFAULT_SITE_URL = "https://strazi.gov2.ro"
+
+
+def _normalize_base(raw: str) -> str:
+    """Normalize a subdirectory base path: '' (root), '/strazi' (no trailing slash)."""
+    raw = (raw or "").strip()
+    if not raw or raw == "/":
+        return ""
+    raw = raw.rstrip("/")
+    if not raw.startswith("/"):
+        raw = "/" + raw
+    return raw
 
 VARIANTS = {
     "default": ("index.html.j2", "index.html"),
@@ -26,7 +38,8 @@ VARIANTS = {
 STATIC_VARIANTS = {"methodology"}
 
 
-def build(db_path: str = DB_PATH, variant: str = "default") -> None:
+def build(db_path: str = DB_PATH, variant: str = "default",
+          base: str = "", site_url: str = DEFAULT_SITE_URL) -> None:
     DIST.mkdir(exist_ok=True)
 
     if variant in STATIC_VARIANTS:
@@ -49,7 +62,7 @@ def build(db_path: str = DB_PATH, variant: str = "default") -> None:
         data["portraits"] = [p.stem for p in sorted(portraits_dir.glob("*.jpg"))] \
             if portraits_dir.exists() else []
 
-    env = _make_env()
+    env = _make_env(base=base, site_url=site_url)
     template_name, output_name = VARIANTS[variant]
     tmpl = env.get_template(template_name)
     html = tmpl.render(**data)
@@ -63,12 +76,14 @@ def build(db_path: str = DB_PATH, variant: str = "default") -> None:
         print(f"  → {DIST}/ro-counties.geojson")
 
 
-def _make_env() -> jinja2.Environment:
+def _make_env(base: str = "", site_url: str = DEFAULT_SITE_URL) -> jinja2.Environment:
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(str(TEMPLATES)),
         autoescape=jinja2.select_autoescape(["html"]),
     )
     env.filters["enumerate"] = enumerate
+    env.globals["base"]     = base
+    env.globals["site_url"] = site_url
     return env
 
 
@@ -77,10 +92,11 @@ def _render(env: jinja2.Environment, template_name: str, out_path: Path, **ctx) 
     out_path.write_text(env.get_template(template_name).render(**ctx), encoding="utf-8")
 
 
-def build_detail_pages(db_path: str = DB_PATH) -> None:
+def build_detail_pages(db_path: str = DB_PATH,
+                       base: str = "", site_url: str = DEFAULT_SITE_URL) -> None:
     """Render all per-entity detail pages and index pages into dist/."""
     conn = site_queries.get_connection(db_path)
-    env = _make_env()
+    env = _make_env(base=base, site_url=site_url)
     portraits_dir = DIST / "portraits"
     portraits = [p.stem for p in sorted(portraits_dir.glob("*.jpg"))] \
         if portraits_dir.exists() else []
@@ -276,7 +292,18 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8000, help="Port for --serve (default: 8000)")
     parser.add_argument("--detail", action="store_true", help="Also build per-entity detail pages")
     parser.add_argument("--detail-only", action="store_true", help="Build only detail pages, skip main index")
+    parser.add_argument("--base", default="",
+                        help="Subdirectory prefix for all internal URLs (e.g. '/strazi'). Default: empty (root).")
+    parser.add_argument("--site-url", default=DEFAULT_SITE_URL,
+                        help=f"Canonical site origin for OG/canonical URLs. Default: {DEFAULT_SITE_URL}")
+    parser.add_argument("--mount", default="",
+                        help="When using --serve, mount the dist tree under this path (e.g. '/strazi'). Default: '/'.")
     args = parser.parse_args()
+
+    base     = _normalize_base(args.base)
+    site_url = args.site_url.rstrip("/")
+    mount    = _normalize_base(args.mount)
+
     if not args.detail_only:
         if args.variant == "both":
             variants = ["default", "v2"]
@@ -285,9 +312,9 @@ def main() -> None:
         else:
             variants = [args.variant]
         for v in variants:
-            build(db_path=args.db, variant=v)
+            build(db_path=args.db, variant=v, base=base, site_url=site_url)
     if args.detail or args.detail_only:
-        build_detail_pages(db_path=args.db)
+        build_detail_pages(db_path=args.db, base=base, site_url=site_url)
     if args.serve:
         import http.server
         import os
@@ -295,12 +322,36 @@ def main() -> None:
         import urllib.error
 
         FILTER_PORT = 8765  # filter_server.py default
+        MOUNT = mount  # captured from CLI; "" means root
 
         class SiteHandler(http.server.SimpleHTTPRequestHandler):
-            """Static file server that proxies /api/* and /portraits/* to filter_server."""
+            """Static file server that proxies /api/* and /portraits/* to filter_server.
+            If MOUNT is set, the dist tree is served under that prefix and any other
+            path returns 404 — simulating a shared-host subdirectory deployment."""
 
             def log_message(self, fmt, *args):
                 pass
+
+            def _strip_mount(self) -> bool:
+                """Strip MOUNT prefix from self.path. Return False if path doesn't match."""
+                if not MOUNT:
+                    return True
+                qmark = self.path.find("?")
+                pure = self.path if qmark < 0 else self.path[:qmark]
+                qs   = self.path[qmark:] if qmark >= 0 else ""
+                if pure == MOUNT or pure == MOUNT + "/":
+                    self.path = "/" + qs
+                    return True
+                if pure.startswith(MOUNT + "/"):
+                    self.path = pure[len(MOUNT):] + qs
+                    return True
+                return False
+
+            def _send_404(self) -> None:
+                self.send_response(404)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(b"Not found (outside mount)\n")
 
             def _proxy(self, upstream: str) -> None:
                 try:
@@ -373,6 +424,8 @@ def main() -> None:
                 return b"".join(self._headers_buffer).decode("latin-1", "replace")
 
             def do_GET(self):
+                if not self._strip_mount():
+                    self._send_404(); return
                 path = self.path.split("?")[0]
                 if path.startswith("/api/") or path.startswith("/portraits/"):
                     upstream = f"http://localhost:{FILTER_PORT}{self.path}"
@@ -383,6 +436,8 @@ def main() -> None:
                 super().do_GET()
 
             def do_HEAD(self):
+                if not self._strip_mount():
+                    self._send_404(); return
                 path = self.path.split("?")[0]
                 if path.startswith("/api/") or path.startswith("/portraits/"):
                     self.send_response(200); self.end_headers()
@@ -390,7 +445,8 @@ def main() -> None:
                 super().do_HEAD()
 
         os.chdir("dist")
-        print(f"Serving at http://localhost:{args.port}  (API proxied → :{FILTER_PORT}) …")
+        mount_msg = f"  mount={MOUNT}" if MOUNT else ""
+        print(f"Serving at http://localhost:{args.port}{MOUNT}/  (API proxied → :{FILTER_PORT}){mount_msg} …")
         http.server.test(HandlerClass=SiteHandler, port=args.port, bind="127.0.0.1")
 
 

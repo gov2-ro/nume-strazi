@@ -1,5 +1,24 @@
 # Activity History
 
+## 2026-05-19 — Subdirectory hosting (`--base /strazi`)
+
+Made every page in the site servable from an arbitrary subpath. Two layers:
+
+**Build-time prefix** for Jinja-rendered pages. `build_site.py` learned `--base` (default empty) and `--site-url` (default `https://strazi.gov2.ro`). Both are normalized and exposed as Jinja globals via `env.globals["base"]` / `env.globals["site_url"]`, so every template render picks them up without per-call wiring. Mechanical sed pass across `templates/*.j2` rewrote ~70 absolute paths (`href="/cauta/"`, `src="/portraits/…"`, `fetch('/cauta/streets.json')`, JS template literals like `\`/strada/${slug}/\``) to `{{ base }}/…`. Anchor links (`href="#…"`) left alone — they're page-local. `_meta.html.j2` recomposes `og:url` as `{{ site_url }}{{ base }}{{ og_url_path }}` and `og:image` likewise, so canonical URLs reflect the deployed subpath.
+
+**Runtime base detection** for the three non-Jinja files (`dist/_assets/db-client.js`, `dist/browser/index.html`, `dist/filter/index.html`). `db-client.js` derives `SITE_BASE` from `document.currentScript.src` by stripping `_assets/db-client.js`; works at any mount with no rebuild. The two HTML pages use relative paths (`../_assets/db-client.js`, `../cauta/`, `../strada/${slug}/`) — same effect, no build flag needed.
+
+**Local subdirectory testing.** `build_site.py --serve --port 9000 --mount /strazi` strips the mount prefix from incoming requests before serving from `dist/`, and returns 404 for any path outside the mount. Simulates a real Apache/Nginx subdirectory locally so we can verify the wiring without rsyncing to a host.
+
+**Verified end-to-end in Chrome.**
+- Default root build (no flag): regression check, 1121 KB landing renders with `/cauta/`, `/browser/`, etc. paths.
+- Subdirectory build (`--base /strazi`): landing renders with 61 `/strazi/`-prefixed links, the `/strazi/browser/` page loads 30,089 unique names through sql.js-httpvfs reading `/strazi/streets.db` via Range requests, and a sample detail page (`/strazi/strada/mihai-eminescu/`) has 311 prefixed links + correct `og:url = https://strazi.gov2.ro/strazi/strada/mihai-eminescu/`.
+- 404 sanity: `/cauta/` (outside `/strazi` mount) returns 404 as expected.
+
+**Docs.** `README.md` gained a "Subdirectory deployment" subsection under "Web frontend"; `CLAUDE.md` lists the new build invocation.
+
+---
+
 ## 2026-05-19 — Shared-host port: client-side SQLite via sql.js-httpvfs
 
 The whole app now works on a vanilla static host (Apache/Nginx, no PHP, no Python). The two pages that needed live filter queries — `/browser/` and `/filter/` — were rewired to run the same SQL client-side against a shipped 30 MB SQLite file, fetched on demand over HTTP Range requests. `filter_server.py` stays for local Python testing but is no longer required to view the site.

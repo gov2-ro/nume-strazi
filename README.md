@@ -199,6 +199,26 @@ rsync -a --delete dist/ user@host:public_html/
 The `dist/` tree is self-contained: HTML pages, the slim `streets.db`,
 portrait JPGs, and the vendored sql.js-httpvfs runtime under `dist/_assets/`.
 
+### Subdirectory deployment
+
+To host under a subpath like `https://example.com/strazi/` instead of the
+document root, pass `--base` and `--site-url` to the build:
+
+```bash
+python3 build_site.py --detail \
+  --base /strazi \
+  --site-url https://example.com
+
+# Local preview under the same mount (simulates Apache/Nginx subdirectory)
+python3 build_site.py --serve --port 9000 --mount /strazi
+# Opens at http://localhost:9000/strazi/
+```
+
+`--base` prefixes every internal link, asset path, and Open-Graph URL in
+the Jinja-rendered output. `db-client.js` and the two filter pages
+auto-detect their location at runtime, so they work at any mount point
+without rebuild.
+
 ---
 
 ## OSM enrichment

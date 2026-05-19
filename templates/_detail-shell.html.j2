@@ -276,14 +276,14 @@ a:hover { text-decoration: underline; }
 <body>
 
 <header class="site-nav">
-  <a href="/" class="brand">Cum ne numim străzile</a>
+  <a href="{{ base }}/" class="brand">Cum ne numim străzile</a>
   <nav>
-    <a href="/">Acasă</a>
-    <a href="/cauta/">Caută</a>
-    <a href="/browser/">Browser</a>
-    <a href="/persoane/">Persoane</a>
-    <a href="/teme/">Teme</a>
-    <a href="/judete/">Județe</a>
+    <a href="{{ base }}/">Acasă</a>
+    <a href="{{ base }}/cauta/">Caută</a>
+    <a href="{{ base }}/browser/">Browser</a>
+    <a href="{{ base }}/persoane/">Persoane</a>
+    <a href="{{ base }}/teme/">Teme</a>
+    <a href="{{ base }}/judete/">Județe</a>
   </nav>
 </header>
 
@@ -292,8 +292,8 @@ a:hover { text-decoration: underline; }
 {% include "_search_overlay.html.j2" %}
 
 <footer class="site-footer">
-  <span>Date: Autoritatea Electorală Permanentă · <a href="/metodologie.html">Metodologie</a></span>
-  <span>un proiect <a href="/">Cum ne numim străzile</a></span>
+  <span>Date: Autoritatea Electorală Permanentă · <a href="{{ base }}/metodologie.html">Metodologie</a></span>
+  <span>un proiect <a href="{{ base }}/">Cum ne numim străzile</a></span>
 </footer>
 
 </body>

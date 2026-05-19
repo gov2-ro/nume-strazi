@@ -117,8 +117,8 @@
     results.innerHTML = '<div class="gso-loading">Se încarcă indexul…</div>';
     try {
       const [s, u] = await Promise.all([
-        fetch('/cauta/streets.json').then(r => r.json()),
-        fetch('/cauta/uats.json').then(r => r.json()),
+        fetch('{{ base }}/cauta/streets.json').then(r => r.json()),
+        fetch('{{ base }}/cauta/uats.json').then(r => r.json()),
       ]);
       STREETS = s; UATS = u; loaded = true;
       doSearch(input.value);

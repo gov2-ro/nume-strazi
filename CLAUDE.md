@@ -95,6 +95,11 @@ python3 tools/fetch_portraits.py
 # Drops empty OSM tables + street_aliases, VACUUMs, page_size=4096. ~30 MB.
 python3 tools/build_dist_db.py
 
+# Build for a subdirectory deployment (e.g. https://example.com/strazi/)
+python3 build_site.py --detail --base /strazi
+# Test locally under the same prefix:
+python3 build_site.py --serve --port 9000 --mount /strazi
+
 # Run all named queries from docs/queries.sql
 python3 run_queries.py
 

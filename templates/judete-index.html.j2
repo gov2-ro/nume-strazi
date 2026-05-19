@@ -46,7 +46,7 @@ function escapeHtml(s) {
 <div class="detail-page" style="max-width:1640px;">
 
   <div class="breadcrumb">
-    <a href="/">Acasă</a>
+    <a href="{{ base }}/">Acasă</a>
     <span class="sep">›</span>
     <span>Județe</span>
   </div>
@@ -215,7 +215,7 @@ function escapeHtml(s) {
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;padding-top:4px;">
       {% for u in top_uats[:20] %}
-      <a href="/oras/{{ u.judet | lower }}/{{ u.slug }}/"
+      <a href="{{ base }}/oras/{{ u.judet | lower }}/{{ u.slug }}/"
          {% if u.is_capital %}title="Reședință de județ"{% endif %}
          style="display:inline-flex;align-items:center;gap:8px;background:var(--bg);{% if u.is_capital %}border:1px solid var(--gold);box-shadow:inset 3px 0 0 var(--gold);padding-left:14px;{% else %}border:1px solid var(--rule);{% endif %}border-radius:4px;padding:6px 12px;text-decoration:none;color:var(--ink);">
         {% if u.is_capital %}<span style="color:var(--gold);font-size:10px;line-height:1;" aria-hidden="true">◆</span>{% endif %}
@@ -226,7 +226,7 @@ function escapeHtml(s) {
       {% endfor %}
     </div>
     <div style="margin-top:14px;font-family:var(--sans);font-size:11px;color:var(--muted);">
-      <a href="/judete/lista/" style="color:var(--plaque);">Vezi toate {{ uats | length }} localitățile →</a>
+      <a href="{{ base }}/judete/lista/" style="color:var(--plaque);">Vezi toate {{ uats | length }} localitățile →</a>
     </div>
   </div>
 
@@ -335,7 +335,7 @@ function escapeHtml(s) {
 
     const topRows = top.map(s => {
       const tag = s.sl
-        ? `<a href="/strada/${s.sl}/" style="text-decoration:none;"><span class="street-tag small">${escapeHtml(s.n)}</span></a>`
+        ? `<a href="{{ base }}/strada/${s.sl}/" style="text-decoration:none;"><span class="street-tag small">${escapeHtml(s.n)}</span></a>`
         : `<span class="street-tag small">${escapeHtml(s.n)}</span>`;
       return `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--rule);">
         ${tag}
@@ -345,7 +345,7 @@ function escapeHtml(s) {
 
     const personsRows = persons.map((p, i) => {
       const nameEl = p.sl
-        ? `<a href="/persoana/${p.sl}/" style="color:var(--ink);text-decoration:none;font-weight:${i===0?'600':'500'};font-size:11.5px;">${escapeHtml(p.n)}</a>`
+        ? `<a href="{{ base }}/persoana/${p.sl}/" style="color:var(--ink);text-decoration:none;font-weight:${i===0?'600':'500'};font-size:11.5px;">${escapeHtml(p.n)}</a>`
         : `<span style="font-family:var(--sans);color:var(--ink);font-weight:${i===0?'600':'500'};font-size:11.5px;">${escapeHtml(p.n)}</span>`;
       return `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px solid var(--rule);">
         <span style="display:flex;align-items:center;gap:5px;">${genderDot(p.g)}${nameEl}</span>
@@ -355,7 +355,7 @@ function escapeHtml(s) {
 
     const rareRows = rare.map(s => {
       const tag = s.sl
-        ? `<a href="/strada/${s.sl}/" style="text-decoration:none;"><span class="street-tag small">${escapeHtml(s.n)}</span></a>`
+        ? `<a href="{{ base }}/strada/${s.sl}/" style="text-decoration:none;"><span class="street-tag small">${escapeHtml(s.n)}</span></a>`
         : `<span class="street-tag small">${escapeHtml(s.n)}</span>`;
       return `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--rule);">
         ${tag}

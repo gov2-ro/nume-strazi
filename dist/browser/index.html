@@ -345,18 +345,18 @@ body {
 .empty-state .big { font-size: 32px; }
 .empty-state p { font-size: 12px; }
 </style>
-<script src="/_assets/db-client.js"></script>
+<script src="../_assets/db-client.js"></script>
 </head>
 <body>
 
 <nav class="site-nav">
-  <a href="/" class="brand">Cum ne numim străzile</a>
+  <a href="../" class="brand">Cum ne numim străzile</a>
   <div class="nav-links">
-    <a href="/">Acasă</a>
-    <a href="/cauta/">Caută</a>
-    <a href="/browser/" class="active">Browser</a>
-    <a href="/judete/">Județe</a>
-    <a href="/metodologie.html">Metodologie</a>
+    <a href="../">Acasă</a>
+    <a href="../cauta/">Caută</a>
+    <a href="../browser/" class="active">Browser</a>
+    <a href="../judete/">Județe</a>
+    <a href="../metodologie.html">Metodologie</a>
   </div>
 </nav>
 
@@ -711,7 +711,7 @@ function renderTable() {
   tableRows.slice(tableOffset === 0 ? 0 : tableOffset).forEach(row => {
     const tr = document.createElement('tr');
     const slug = row.street_slug || '';
-    const link = slug ? `/strada/${slug}/` : null;
+    const link = slug ? `../strada/${slug}/` : null;
     const nameTp = link
       ? `<span class="tp"><a href="${link}">${esc(row.name)}</a></span>`
       : `<span class="tp">${esc(row.name)}</span>`;
@@ -723,7 +723,7 @@ function renderTable() {
     if (cls === 'saint')    clsBadge = `<span class="badge bs">Sf.</span> `;
 
     const portrait = row.wikidata_qid
-      ? `<img class="port-xs" src="/portraits/${row.wikidata_qid}.jpg" onerror="this.style.display='none'" alt="">`
+      ? `<img class="port-xs" src="../portraits/${row.wikidata_qid}.jpg" onerror="this.style.display='none'" alt="">`
       : '';
     const personCell = row.person_full_name
       ? `${portrait}${esc(row.person_full_name)}`
@@ -801,7 +801,7 @@ function renderTokens(rows) {
     let h = '';
     if (hasP) {
       h += `<span class="portrait">
-              <img src="/portraits/${row.wikidata_qid}.jpg"
+              <img src="../portraits/${row.wikidata_qid}.jpg"
                    onerror="this.parentElement.style.display='none'" alt="">
             </span>`;
     }
@@ -828,7 +828,7 @@ function showFooterInfo(row) {
   const f = document.getElementById('info-footer');
   let h = '';
 
-  const portSrc = row.wikidata_qid ? `/portraits/${row.wikidata_qid}.jpg` : null;
+  const portSrc = row.wikidata_qid ? `../portraits/${row.wikidata_qid}.jpg` : null;
   h += `<div class="info-port">${portSrc
     ? `<img src="${portSrc}" onerror="this.style.display='none'" alt="">`
     : '📍'}</div>`;
@@ -844,7 +844,7 @@ function showFooterInfo(row) {
   if (row.classification)   h += fld('Clasificare', CLS_LABEL[row.classification] || row.classification);
   if (row.street_slug) {
     h += `<div class="ifield"><span class="ilabel">Pagina</span>
-            <a class="info-link ival" href="/strada/${row.street_slug}/">↗ detalii</a></div>`;
+            <a class="info-link ival" href="../strada/${row.street_slug}/">↗ detalii</a></div>`;
   }
   h += `</div></div>`;
   h += `<div class="info-cnt">

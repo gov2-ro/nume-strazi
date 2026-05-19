@@ -268,12 +268,12 @@ a:hover { text-decoration: underline; }
   padding: 24px 0;
 }
 </style>
-<script src="/_assets/db-client.js"></script>
+<script src="../_assets/db-client.js"></script>
 </head>
 <body>
 
 <div class="topbar">
-  <a href="/" class="title">Cum ne numim străzile</a>
+  <a href="../" class="title">Cum ne numim străzile</a>
   <span class="sep">›</span>
   <span>Filtru avansat</span>
 </div>
@@ -556,13 +556,13 @@ function renderResults(data) {
         <tr>
           <td class="cell-name">
             ${r.street_slug
-              ? `<a href="/strada/${esc(r.street_slug)}/">${esc(r.name)}</a>`
+              ? `<a href="../strada/${esc(r.street_slug)}/">${esc(r.name)}</a>`
               : esc(r.name)}
           </td>
           <td class="cell-type">${esc(r.street_type || '')}</td>
           <td class="cell-uat">
             ${r.uat_slug
-              ? `<a href="/oras/${esc((r.judet||'').toLowerCase())}/${esc(r.uat_slug)}/">${esc(r.uat)}</a>`
+              ? `<a href="../oras/${esc((r.judet||'').toLowerCase())}/${esc(r.uat_slug)}/">${esc(r.uat)}</a>`
               : esc(r.uat)}
           </td>
           <td class="cell-jud">${esc(r.judet)}</td>

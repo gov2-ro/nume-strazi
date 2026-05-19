@@ -7,7 +7,7 @@
 <div class="detail-page">
 
   <div class="breadcrumb">
-    <a href="/">Acasă</a>
+    <a href="{{ base }}/">Acasă</a>
     <span class="sep">›</span>
     <span>Teme</span>
   </div>
@@ -34,7 +34,7 @@
       <div class="rank-row" style="grid-template-columns: minmax(0,1fr) 70px;">
         <div>
           <span class="emo">{{ t.emoji }}</span>
-          <a href="/tema/{{ t.slug }}/" style="font-weight:600; color:var(--ink); margin-left:6px;">{{ t.label }}</a>
+          <a href="{{ base }}/tema/{{ t.slug }}/" style="font-weight:600; color:var(--ink); margin-left:6px;">{{ t.label }}</a>
         </div>
         <div class="rank-count">{{ t.count }}</div>
       </div>
