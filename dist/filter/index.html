@@ -268,6 +268,7 @@ a:hover { text-decoration: underline; }
   padding: 24px 0;
 }
 </style>
+<script src="/_assets/db-client.js"></script>
 </head>
 <body>
 
@@ -513,9 +514,7 @@ async function fetchResults(params) {
   const apiParams = new URLSearchParams(params);
   apiParams.set('limit', state.limit);
   apiParams.set('offset', state.offset);
-  const res = await fetch(`/api/filter?${apiParams}`);
-  if (!res.ok) throw new Error(`API error ${res.status}`);
-  return res.json();
+  return await DbClient.filter(apiParams);
 }
 
 function clsBadge(row) {
@@ -630,8 +629,7 @@ document.getElementById('btn-clear').addEventListener('click', () => {
 
 (async () => {
   try {
-    const metaRes = await fetch('/api/meta');
-    state.meta = await metaRes.json();
+    state.meta = await DbClient.meta();
 
     const urlParams = readUrl();
     state.offset = parseInt(urlParams.get('offset') || '0', 10);
@@ -641,7 +639,7 @@ document.getElementById('btn-clear').addEventListener('click', () => {
     await runQuery();
   } catch (e) {
     document.getElementById('results-body').innerHTML =
-      `<div class="empty-state">Nu s-a putut conecta la server (${esc(e.message)}). Rulați: <code>python3 filter_server.py</code></div>`;
+      `<div class="empty-state">Eroare la încărcarea bazei de date: ${esc(e.message)}</div>`;
   }
 })();
 </script>

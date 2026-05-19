@@ -91,6 +91,10 @@ python3 tools/wiki_scope.py --limit 40   # repeat until no output
 # Fetch/refresh portrait thumbnails (run once; idempotent; skips already-cached)
 python3 tools/fetch_portraits.py
 
+# Build the slim production DB shipped to clients (sql.js-httpvfs reads this).
+# Drops empty OSM tables + street_aliases, VACUUMs, page_size=4096. ~30 MB.
+python3 tools/build_dist_db.py
+
 # Run all named queries from docs/queries.sql
 python3 run_queries.py
 

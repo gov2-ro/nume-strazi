@@ -345,6 +345,7 @@ body {
 .empty-state .big { font-size: 32px; }
 .empty-state p { font-size: 12px; }
 </style>
+<script src="/_assets/db-client.js"></script>
 </head>
 <body>
 
@@ -485,7 +486,6 @@ body {
 'use strict';
 
 /* ── CONFIG ── */
-const API       = '';          // same origin
 const PAGE_SIZE = 200;
 const AGG_LIMIT = 500;
 
@@ -536,7 +536,7 @@ function norm(s) {
 
 /* ── FETCH META & POPULATE DROPDOWNS ── */
 async function loadMeta() {
-  const meta = await fetch(`${API}/api/meta`).then(r => r.json());
+  const meta = await DbClient.meta();
 
   buildMenu('dd-classification', meta.classifications,
     v => CLS_LABEL[v] || v, 'classification');
@@ -656,7 +656,7 @@ function setView(v) {
   if (v === 'tabel' && tableRows.length === 0) { tableOffset = 0; fetchData(); }
 }
 
-/* ── BUILD QUERY STRING ── */
+/* ── BUILD QUERY PARAMS (URLSearchParams; passed to DbClient.filter) ── */
 function buildParams(extra = {}) {
   const p = new URLSearchParams();
   if (searchVal) p.set('name', searchVal);
@@ -664,14 +664,14 @@ function buildParams(extra = {}) {
     p.set(DD_PARAM[ddId], val);
   });
   Object.entries(extra).forEach(([k, v]) => p.set(k, v));
-  return p.toString();
+  return p;
 }
 
 /* ── FETCH TABLE DATA ── */
 async function fetchData() {
   setLoading(true);
-  const qs  = buildParams({ limit: PAGE_SIZE, offset: tableOffset, sort: 'count' });
-  const res = await fetch(`${API}/api/filter?${qs}`).then(r => r.json());
+  const params = buildParams({ limit: PAGE_SIZE, offset: tableOffset, sort: 'count' });
+  const res = await DbClient.filter(params);
 
   tableTotal = res.total;
   if (tableOffset === 0) tableRows = [];
@@ -685,8 +685,8 @@ async function fetchData() {
 /* ── FETCH COMPACT DATA ── */
 async function fetchCompact() {
   setLoading(true);
-  const qs  = buildParams({ aggregate: 1, limit: AGG_LIMIT, sort: 'count' });
-  const res = await fetch(`${API}/api/filter?${qs}`).then(r => r.json());
+  const params = buildParams({ aggregate: '1', limit: AGG_LIMIT, sort: 'count' });
+  const res = await DbClient.filter(params);
   renderTokens(res.rows);
   updateCountBar(res.total);
   setLoading(false);

@@ -1,5 +1,27 @@
 # Activity History
 
+## 2026-05-19 — Shared-host port: client-side SQLite via sql.js-httpvfs
+
+The whole app now works on a vanilla static host (Apache/Nginx, no PHP, no Python). The two pages that needed live filter queries — `/browser/` and `/filter/` — were rewired to run the same SQL client-side against a shipped 30 MB SQLite file, fetched on demand over HTTP Range requests. `filter_server.py` stays for local Python testing but is no longer required to view the site.
+
+**Slim DB.** `tools/build_dist_db.py` (new) copies `data/streets.db` → `dist/streets.db`, drops `osm_streets` + `street_osm_matches` (both 0 rows) and `street_aliases` (17k rows, not touched by the JS pages or `site_queries.py`), sets `PRAGMA page_size=4096` and `journal_mode=DELETE`, then VACUUMs. Result: 30 MB, −9% vs source. Idempotent.
+
+**Vendored sql.js-httpvfs.** `dist/_assets/sqljs-httpvfs/{sql-wasm.wasm, sqlite.worker.js, index.js}` pulled from `unpkg.com/sql.js-httpvfs@0.8.12/dist/`. Checked in so deployment is just `rsync dist/ host:public_html/` — no build step, no CDN dependency. The UMD bundle attaches `createDbWorker` to `window` when loaded via `<script>`.
+
+**Shared SQL client.** `dist/_assets/db-client.js` mirrors `filter_server.py` exactly: same `BASE_FROM`, `_SELECT_COLS`, `_SELECT_AGG`, `_CLS_MAP`, `_PERSON_COLS`, same `build_filter_query` conditional WHERE builder, same `_order_clause`. Exposes `window.DbClient.{meta, filter, getDb, normalize, slugify}`. `meta()` returns the same 13-key dict as `query_meta`; `filter(params)` accepts either `URLSearchParams` or a plain object (values may be `string | string[]` for multi-select) — that single shape covers `/browser/`'s single-select + `/filter/`'s multi-checkbox pattern. All SQL still goes through `?` placeholders. Adds `uat_slug` to non-aggregate rows (the `/filter/` table linked UATs via that field). The `normalize()` JS function mirrors `streets_lib.normalize_match()`: `î→a` first, then NFD + strip combining chars + lowercase — verified produces the same hashes for Romanian inputs.
+
+**Page ports.** `dist/browser/index.html` — replaced the 3 `fetch('/api/...')` calls with `DbClient.meta()` and `DbClient.filter(URLSearchParams)`; removed the `const API = ''` indirection; `buildParams()` now returns the `URLSearchParams` directly instead of a string. `dist/filter/index.html` — same swap (`fetchResults` and the init block). Updated error copy from "Rulați: python3 filter_server.py" to a generic DB-load error. Both pages add `<script src="/_assets/db-client.js"></script>` to `<head>`.
+
+**Dev-server Range support.** Python's `SimpleHTTPRequestHandler` doesn't honor `Range:` — it always returns the full file. `build_site.py --serve`'s `SiteHandler` (added earlier this session for API proxying) now implements partial-content responses: parses `bytes=start-end` (with suffix-byte support), seeks the file, returns 206 with `Content-Range` and `Accept-Ranges: bytes`, also handles 416 unsatisfiable ranges. Without this, sql.js-httpvfs pulls the whole 30 MB DB on every query during local dev. Apache/Nginx on the shared host handle this natively. Verified with `curl -H "Range: bytes=0-99"` — 206 + 100 bytes.
+
+**Smoke-tested in Chrome.** Loaded `/browser/` — ~88 range requests against `streets.db` (only the SQLite pages touched by the meta queries + the aggregate compact query), 30,089 unique names rendered, top counts match Python server (Florilor 532, Trandafirilor 496, Mihai Eminescu 300). No JS errors. `/filter/` — `105.343 rezultate` matches the original Python total. Portrait 404s in the network log are pre-existing (QIDs without portrait files; handled by `<img onerror=…>`).
+
+**Build/deploy command.** Added to `CLAUDE.md` common commands: `python3 tools/build_dist_db.py`. Run after each `build_db.py` rebuild before deploying.
+
+**Backlog.** Logged: (a) consider dropping the 3,042 pre-rendered detail pages and using a SPA-style template that queries the shipped DB by slug; (b) trim DB further by column / row pruning (target <20 MB).
+
+---
+
 ## 2026-05-19 — Browser page (`/browser/`)
 
 New explorer view at `/browser/` — filter bar on top + two layouts (Tabel / Compact), powered by `filter_server.py`.

@@ -320,13 +320,74 @@ def main() -> None:
                     self.send_response(502)
                     self.end_headers()
 
+            def _serve_range(self) -> bool:
+                """Honor a Range request for the current static file. Returns True if handled.
+                Production hosts (Apache/Nginx) handle this natively; we need it locally
+                so sql.js-httpvfs can fetch SQLite pages without pulling the whole DB."""
+                range_hdr = self.headers.get("Range")
+                if not range_hdr or not range_hdr.startswith("bytes="):
+                    return False
+                fpath = self.translate_path(self.path)
+                if not os.path.isfile(fpath):
+                    return False
+                try:
+                    size = os.path.getsize(fpath)
+                    spec = range_hdr[len("bytes="):].strip()
+                    start_s, _, end_s = spec.partition("-")
+                    if start_s == "":
+                        # suffix: last N bytes
+                        n = int(end_s)
+                        start, end = max(0, size - n), size - 1
+                    else:
+                        start = int(start_s)
+                        end   = int(end_s) if end_s else size - 1
+                    if start >= size or start > end:
+                        self.send_response(416)
+                        self.send_header("Content-Range", f"bytes */{size}")
+                        self.end_headers()
+                        return True
+                    end = min(end, size - 1)
+                    length = end - start + 1
+                    ctype = self.guess_type(fpath)
+                    with open(fpath, "rb") as f:
+                        f.seek(start)
+                        body = f.read(length)
+                    self.send_response(206)
+                    self.send_header("Content-Type", ctype)
+                    self.send_header("Content-Length", str(length))
+                    self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+                    self.send_header("Accept-Ranges", "bytes")
+                    self.end_headers()
+                    self.wfile.write(body)
+                    return True
+                except (ValueError, OSError):
+                    return False
+
+            def end_headers(self):
+                # advertise range support on every static response
+                if "Accept-Ranges" not in self._headers_buffer_str():
+                    self.send_header("Accept-Ranges", "bytes")
+                super().end_headers()
+
+            def _headers_buffer_str(self) -> str:
+                return b"".join(self._headers_buffer).decode("latin-1", "replace")
+
             def do_GET(self):
                 path = self.path.split("?")[0]
                 if path.startswith("/api/") or path.startswith("/portraits/"):
                     upstream = f"http://localhost:{FILTER_PORT}{self.path}"
                     self._proxy(upstream)
-                else:
-                    super().do_GET()
+                    return
+                if self._serve_range():
+                    return
+                super().do_GET()
+
+            def do_HEAD(self):
+                path = self.path.split("?")[0]
+                if path.startswith("/api/") or path.startswith("/portraits/"):
+                    self.send_response(200); self.end_headers()
+                    return
+                super().do_HEAD()
 
         os.chdir("dist")
         print(f"Serving at http://localhost:{args.port}  (API proxied → :{FILTER_PORT}) …")

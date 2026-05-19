@@ -140,6 +140,67 @@ python3 build_db.py --limit 5000
 
 ---
 
+## Web frontend
+
+The site is rendered as static HTML by `build_site.py` (landing pages, ~3k detail
+pages, the Browser explorer at `/browser/`, the advanced filter at `/filter/`).
+The two filter pages run live SQL queries client-side via
+[sql.js-httpvfs](https://github.com/phiresky/sql.js-httpvfs): the shipped
+SQLite file is fetched over HTTP Range requests, so only the pages a query
+touches are downloaded.
+
+```mermaid
+flowchart LR
+  subgraph build["Build (Python)"]
+    DB[("data/streets.db")]
+    SITE["build_site.py<br/>Jinja2 → static HTML"]
+    SLIM["tools/build_dist_db.py<br/>drop OSM tables<br/>VACUUM, page_size=4096"]
+    DIST[("dist/streets.db<br/>~30 MB")]
+  end
+  subgraph dep["Deploy (rsync)"]
+    HOST["shared host<br/>Apache / Nginx"]
+  end
+  subgraph runtime["Browser"]
+    PAGE["/browser/, /filter/<br/>db-client.js"]
+    WASM["sql.js-httpvfs<br/>(WASM)"]
+    RANGE["HTTP Range<br/>page reads"]
+  end
+
+  DB --> SITE
+  DB --> SLIM --> DIST
+  SITE --> HOST
+  DIST --> HOST
+  HOST --> PAGE
+  PAGE --> WASM
+  WASM --> RANGE --> HOST
+```
+
+No backend is required at runtime — `filter_server.py` exists for local Python
+testing only. Apache/Nginx serve `Accept-Ranges: bytes` natively.
+
+```bash
+# Build the slim production DB (drops empty OSM tables + street_aliases,
+# VACUUMs, sets page_size=4096). Run after each build_db.py rebuild.
+python3 tools/build_dist_db.py
+
+# Render the static site (landing + detail pages)
+python3 build_site.py --detail
+
+# Local preview at http://localhost:9000/
+python3 build_site.py --serve --port 9000
+```
+
+Deploy is a single command:
+
+```bash
+rsync -a --delete dist/ user@host:public_html/
+```
+
+The `dist/` tree is self-contained: HTML pages, the slim `streets.db`,
+portrait JPGs, and the vendored sql.js-httpvfs runtime under `dist/_assets/`.
+
+---
+
 ## OSM enrichment
 
 Streets can be enriched with OpenStreetMap geometry, road class, and an
@@ -264,9 +325,20 @@ echo 'export ANTHROPIC_API_KEY=sk-ant-...' >> ~/.zshrc
 ```
 .
 ├── build_db.py           # ETL: xlsx → SQLite (idempotent)
+├── build_site.py         # Jinja2 → static HTML (landing + detail pages); --serve dev
+├── filter_server.py      # Local Python filter API (optional; prod runs on sql.js)
 ├── seed_lookups.py       # Hand-curated starter seed for lookup tables
 ├── run_queries.py        # Runs all named queries from docs/queries.sql
 ├── streets_lib.py        # Shared normalisation helpers
+├── site_queries.py       # Query bindings for the static site
+├── templates/            # Jinja2 templates (landing, _detail-shell, partials)
+├── dist/                 # Build output (only sources committed)
+│   ├── filter/           # Advanced multi-filter UI (source)
+│   ├── browser/          # Browser explorer with Tabel/Compact views (source)
+│   ├── _assets/          # Shared frontend assets
+│   │   ├── db-client.js          # JS port of filter_server.py SQL
+│   │   └── sqljs-httpvfs/        # Vendored sql.js-httpvfs (wasm + worker)
+│   └── streets.db        # Slim DB shipped to clients (generated, not committed)
 ├── docs/
 │   ├── CODE_SPEC.md      # Full data-layer PRD
 │   ├── DESIGN_BRIEF.md   # Editorial direction for the publication
@@ -274,6 +346,7 @@ echo 'export ANTHROPIC_API_KEY=sk-ant-...' >> ~/.zshrc
 │   ├── BACKLOG.md        # Tracked issues and future work
 │   └── activity-history.md
 ├── tools/
+│   ├── build_dist_db.py        # data/streets.db → dist/streets.db (slim, VACUUM)
 │   ├── export_unclassified.py  # Export top-N unclassified keys to CSV
 │   ├── import_csv.py           # Upsert classified CSV into lookup tables
 │   ├── llm_classify.py         # Claude Haiku batch classifier
