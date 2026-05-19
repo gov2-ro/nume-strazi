@@ -94,6 +94,7 @@
 <script>
 (function() {
   if (window.__gsoInit) return; window.__gsoInit = true;
+  const BASE = "{{ base }}";
 
   const backdrop = document.getElementById('gso-backdrop');
   const input    = document.getElementById('gso-input');
@@ -161,7 +162,7 @@
     if (streets.length) {
       html += '<div class="gso-group-eyebrow">Străzi</div>';
       streets.forEach(s => {
-        const href = s.p ? `/strada/${s.s}/` : null;
+        const href = s.p ? `${BASE}/strada/${s.s}/` : null;
         items.push({ href });
         const tag = s.p ? '' : ' <span class="nopage">fără pagină</span>';
         html += s.p
@@ -172,7 +173,7 @@
     if (uats.length) {
       html += '<div class="gso-group-eyebrow">Orașe</div>';
       uats.forEach(u => {
-        const href = `/oras/${(u.j || '').toLowerCase()}/${u.s}/`;
+        const href = `${BASE}/oras/${(u.j || '').toLowerCase()}/${u.s}/`;
         items.push({ href });
         html += `<a class="gso-row" href="${href}" data-href="${href}"><span><span class="name">${esc(u.n)}</span><span class="sub">${esc(u.j || '')}</span></span><span class="cnt">${u.t}</span></a>`;
       });

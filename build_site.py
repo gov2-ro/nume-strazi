@@ -427,7 +427,7 @@ def main() -> None:
                 if not self._strip_mount():
                     self._send_404(); return
                 path = self.path.split("?")[0]
-                if path.startswith("/api/") or path.startswith("/portraits/"):
+                if path.startswith("/api/"):
                     upstream = f"http://localhost:{FILTER_PORT}{self.path}"
                     self._proxy(upstream)
                     return
@@ -439,7 +439,7 @@ def main() -> None:
                 if not self._strip_mount():
                     self._send_404(); return
                 path = self.path.split("?")[0]
-                if path.startswith("/api/") or path.startswith("/portraits/"):
+                if path.startswith("/api/"):
                     self.send_response(200); self.end_headers()
                     return
                 super().do_HEAD()

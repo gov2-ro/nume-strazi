@@ -109,17 +109,25 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [ ] UI: try compact version. Instead of showing multiple lists show one that's highly filterable. Start with stats, then a single filterable list of streets.
 
+- [x] create a shared hosting version (no Python, static or php ai)
+
+- [x] web ui. can be served from subfolder
+
 - [ ] Ui, break into stats and list of streets/names, with the above filter
 
 - [ ] UI: try a super dorpdown navigator, where it can reach all options via taxonomies, attributes, witih contextual keyboard shortcuts. or just search by visible terms. but how can we select more or exclude, to make it crazy good? With streer count in brackets?
 
 - [ ] street names profiles, convert it to map. shows towns that match the name.
 
+- [ ] for people, also show link to ro.wikipedia page. maybe even fetch some info besides the image?
+
 - [x] map mode. a choropleth map colored by different variables (genders, flowers, independence, universal, etc) — Done 2026-05-18. The existing `/judete/` map gained 8 new metrics: `person_pct`, `male_pct`, `foreign_pct`, `universal_pct`, `date_pct`, `flora_pct` (flori/copaci), `ideology_pct` next to the prior saint/numeric/female/nature. Scale auto-switches to min..max when the spread is tight so person/nature metrics show actual variation; 0..max stays for rare-event metrics. 11 chips total; default is now `person_pct`. Chip CSS was missing from the detail-shell — added local style block in `judete-index.html.j2`.
 
 - [ ] choropleth: option to render per-uat (not just per-județ). Currently the map is județ-level only; same chip metrics applied to UAT polygons would surface much finer signal (the urban/rural split, neighbourhood patterns). Blocked on UAT polygon source — admin_level=8 in OSM, parsed via osmium area assembler. Roughly: extract 3,200 UAT polygons → simplify (Mapshaper or `topojson-simplify`) → publish as `uats.topojson`. Plug into the same updateMetric() flow, swap geometry only.
 
 - [ ] create spider chart for judete, based on choice of street names
+
+- [ ] follow schema.org for appropriate entities - add to claude.md maybe?
 
 - [x] Harta din front page · statistici pe județ – select random județ on load
 
@@ -149,6 +157,8 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [ ] brainstorm on naming
 
+- [ ] generate custom stylized portraits for people
+
 - [ ] translate, localisation - translate UI and street names, where possible
 
 - [ ] Create analysis for each județ. also bigger cities, capitale de județ.. Compare regions. Have a look at the data and write the text.
@@ -161,3 +171,9 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [ ] look at where else we might find srteet names, as coduri poștale. see what's missing from which dataset (sectii vot, cod postal, osm)
 
+- [ ] create presentation video. With PLaywright and a scenario, subtitles and generated voiceover. Create youtube account / channel.
+
+## Post launch
+
+- [ ] traffic analytics
+- [ ] SEO webmasters registrations

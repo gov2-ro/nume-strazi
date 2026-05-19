@@ -201,23 +201,32 @@ portrait JPGs, and the vendored sql.js-httpvfs runtime under `dist/_assets/`.
 
 ### Subdirectory deployment
 
-To host under a subpath like `https://example.com/strazi/` instead of the
-document root, pass `--base` and `--site-url` to the build:
+To host under a subpath like `https://example.com/nume-strazi/` instead of the
+document root, pass `--base` and `--site-url` to the build. `--base` is baked
+into every link, portrait `src`, and JS path at build time — it must match the
+actual deployment path exactly, and must be passed on every rebuild.
 
 ```bash
-python3 build_site.py --detail \
-  --base /strazi \
+python3 build_site.py --variant all --detail \
+  --base /nume-strazi \
   --site-url https://example.com
-
-# Local preview under the same mount (simulates Apache/Nginx subdirectory)
-python3 build_site.py --serve --port 9000 --mount /strazi
-# Opens at http://localhost:9000/strazi/
 ```
 
-`--base` prefixes every internal link, asset path, and Open-Graph URL in
-the Jinja-rendered output. `db-client.js` and the two filter pages
-auto-detect their location at runtime, so they work at any mount point
-without rebuild.
+`--variant all` is required to rebuild `metodologie.html` alongside `index.html`;
+omitting it leaves the methodology page with stale (or empty) base paths.
+
+For local preview under the same mount:
+
+```bash
+# --base and --mount must agree so the rebuild uses the correct prefix
+python3 build_site.py --variant all --serve --port 9000 \
+  --base /nume-strazi --mount /nume-strazi
+# Opens at http://localhost:9000/nume-strazi/
+```
+
+`db-client.js` and the browser/filter pages use relative paths or derive their
+base from `document.currentScript.src` at runtime, so they work at any mount
+point without a rebuild flag.
 
 ---
 

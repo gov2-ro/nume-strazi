@@ -1,5 +1,42 @@
 # Activity History
 
+## 2026-05-19 — Subfolder hosting: JS link and portrait fixes
+
+Previous `--base` work only covered Jinja2-rendered HTML. JS-generated links
+(`/persoana/`, `/strada/`, `/tema/`) and portrait `img src` values inside JS
+template literals were still hardcoded without the base prefix — broken when
+served from a subfolder.
+
+**Template fixes (`templates/index.html.j2`, `templates/_search_overlay.html.j2`):**
+Added `const BASE = "{{ base }}";` (baked at build time) as a JS variable, then
+replaced all bare absolute paths in JS with `${BASE}/persoana/`, `${BASE}/strada/`,
+`${BASE}/tema/`, `${BASE}/portraits/`, `${BASE}/oras/`. The Jinja2 inline
+`{{ base }}/…` pattern inside JS template literals was also replaced with
+`${BASE}/…` for consistency. 6 paths fixed in `index.html.j2`, 2 in
+`_search_overlay.html.j2`.
+
+**Dev server fix (`build_site.py`):** Removed `/portraits/` from the
+proxy-to-filter_server list. Portraits live in `dist/portraits/` as static
+files; routing them to the (usually not running) `filter_server.py` caused 502
+errors. They now fall through to `SimpleHTTPRequestHandler` like any other
+static asset.
+
+**Workflow clarification:** `--serve` rebuilds the site before starting the
+server. The `--base` flag must be passed to both the build step and the serve
+step — `--mount` alone is not enough. `--variant all` is also required to
+rebuild `metodologie.html`; the default variant only rebuilds `index.html`.
+Correct invocation:
+```
+python3 build_site.py --variant all --detail --base /nume-strazi
+python3 build_site.py --variant all --serve --port 9000 --base /nume-strazi --mount /nume-strazi
+```
+
+Verified end-to-end with Playwright: all nav links, portrait images, JS-rendered
+person/street/theme tokens, and search overlay results correctly prefixed with
+`/nume-strazi/` on all page types (index, metodologie, UAT detail pages).
+
+---
+
 ## 2026-05-19 — Subdirectory hosting (`--base /strazi`)
 
 Made every page in the site servable from an arbitrary subpath. Two layers:

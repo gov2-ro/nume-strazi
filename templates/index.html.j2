@@ -16,6 +16,7 @@ const DATA_S4 = {{ section4 | tojson }};
 const DATA_S5 = {{ section5 | tojson }};
 const DATA_MUNICIPII = {{ municipii | tojson }};
 const PORTRAITS = new Set({{ portraits | tojson }});
+const BASE = "{{ base }}";
   </script>
   <style>
 :root {
@@ -1475,7 +1476,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
     if (el) el.innerHTML = _renderBarRows(rows,
       r => NATURE_RO[r.nature_type] || r.nature_type,
       r => NATURE_EMO[r.nature_type] || '·',
-      r => NATURE_SLUG[r.nature_type] ? `/tema/${NATURE_SLUG[r.nature_type]}/` : null,
+      r => NATURE_SLUG[r.nature_type] ? `${BASE}/tema/${NATURE_SLUG[r.nature_type]}/` : null,
       'olive');
   }
 
@@ -1484,7 +1485,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
     if (el) el.innerHTML = _renderBarRows(rows,
       r => PROF_RO[r.profession] || r.profession,
       r => PROF_EMO[r.profession] || '·',
-      r => PROF_SLUG[r.profession] ? `/tema/${PROF_SLUG[r.profession]}/` : null,
+      r => PROF_SLUG[r.profession] ? `${BASE}/tema/${PROF_SLUG[r.profession]}/` : null,
       '');
   }
 
@@ -1640,9 +1641,9 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       const flag = NAT_FLAG[p.nationality] || '🏳️';
       const prof = escapeHtml(PROF_RO_SMALL[p.profession] || p.profession || '—');
       const pct  = Math.round(p.street_count / maxF * 100);
-      const href = p.slug ? `/persoana/${p.slug}/` : null;
+      const href = p.slug ? `${BASE}/persoana/${p.slug}/` : null;
       const portrait = (p.wikidata_qid && PORTRAITS.has(p.wikidata_qid))
-        ? `<span class="portrait" style="width:22px;height:22px;border-radius:50%;overflow:hidden;flex-shrink:0;display:inline-flex;"><img src="{{ base }}/portraits/${p.wikidata_qid}.jpg" alt="" style="width:100%;height:100%;object-fit:cover;" loading="lazy"></span>`
+        ? `<span class="portrait" style="width:22px;height:22px;border-radius:50%;overflow:hidden;flex-shrink:0;display:inline-flex;"><img src="${BASE}/portraits/${p.wikidata_qid}.jpg" alt="" style="width:100%;height:100%;object-fit:cover;" loading="lazy"></span>`
         : '';
       const nameInner = portrait + escapeHtml(p.full_name);
       const nameEl = href
@@ -1716,7 +1717,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
     const maxPV = rows[0].wiki_ro_views || 1;
     container.innerHTML = rows.map(p => {
       const pct  = maxPV > 0 ? Math.round(p.wiki_ro_views / maxPV * 100) : 0;
-      const href = p.slug ? `/persoana/${p.slug}/` : null;
+      const href = p.slug ? `${BASE}/persoana/${p.slug}/` : null;
       const name = href
         ? `<a href="${href}" style="color:inherit;text-decoration:none;"><span class="rank-name person">${escapeHtml(p.full_name)}</span></a>`
         : `<span class="rank-name person">${escapeHtml(p.full_name)}</span>`;
@@ -1749,20 +1750,20 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
         const qid = r.wikidata_qid;
         const hasPortrait = (qid && PORTRAITS.has(qid));
         const portrait = hasPortrait
-          ? `<span class="portrait"><img src="{{ base }}/portraits/${qid}.jpg" alt="" loading="lazy"></span>`
+          ? `<span class="portrait"><img src="${BASE}/portraits/${qid}.jpg" alt="" loading="lazy"></span>`
           : '';
         const personSlug = r.slug || (qid ? qid.toLowerCase() : '');
-        const personHref = personSlug ? `/persoana/${personSlug}/` : null;
+        const personHref = personSlug ? `${BASE}/persoana/${personSlug}/` : null;
         const chip = `<span class="chip" style="font-size:${fs}px;">${escapeHtml(labelFn(r))}</span>`;
         const inner = portrait + (personHref ? `<a href="${personHref}" style="color:inherit;text-decoration:none;">${chip}</a>` : chip) + cnt;
         return `<span class="ctok person${isLeader ? ' leader' : ''}${hasPortrait ? ' has-portrait' : ''}">${inner}</span>`;
       }
       const sqid = r.wikidata_qid;
       const sPortrait = (sqid && PORTRAITS.has(sqid))
-        ? `<span class="portrait"><img src="{{ base }}/portraits/${sqid}.jpg" alt="" loading="lazy"></span>`
+        ? `<span class="portrait"><img src="${BASE}/portraits/${sqid}.jpg" alt="" loading="lazy"></span>`
         : '';
       const streetSlug = r.slug || '';
-      const streetHref = streetSlug ? `/strada/${streetSlug}/` : null;
+      const streetHref = streetSlug ? `${BASE}/strada/${streetSlug}/` : null;
       const plaque = `<span class="plaque" style="font-size:${fs}px;">${escapeHtml(labelFn(r))}</span>`;
       const innerS = sPortrait + (streetHref ? `<a href="${streetHref}" style="color:inherit;text-decoration:none;">${plaque}</a>` : plaque) + cnt;
       return `<span class="ctok street${isLeader ? ' leader' : ''}${sPortrait ? ' has-portrait' : ''}">${innerS}</span>`;
