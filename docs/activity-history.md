@@ -1,5 +1,19 @@
 # Activity History
 
+## 2026-05-21 — SVG icons + Wikipedia links
+
+Replaced all structural emoji (panel headers, kicker chips) with Lucide inline SVG icons; added Wikipedia fallback links to person detail pages.
+
+**SVG sprite** (`templates/_icons.html.j2` new, `tools/fetch_lucide_icons.py` new): fetched 29 Lucide 0.468.0 icons from GitHub CDN, stripped redundant inline attributes, rendered as an inline `<svg style="display:none">` sprite with `<symbol>` definitions. The fetch script discovered three icon renames in 0.468.0 vs the spec: `pie-chart → chart-pie`, `bar-chart-2 → chart-bar-big`, `home → house`.
+
+**Template wiring** (`_detail-shell.html.j2`, `index.html.j2`): added `.icon` CSS size variants (default 14px, `.sm`, `.md`, `.lg`, `.xl`) to both parent templates; included sprite partial after `<body>` in each.
+
+**Icon replacements** (20 swaps in `index.html.j2`; kicker swaps in `person-detail`, `street-detail`, `uat-detail`, `persons-index`, `themes-index`; 9 panel-label + 6 kicker swaps in `judete-index`): row-level per-category emojis (nature subtypes, professions, eras) left unchanged as `.emo`.
+
+**Wikipedia links** (`person-detail.html.j2`): replaced `wiki_ro_url`-only conditional with a two-tier fallback — if `wiki_ro_url` is NULL but `wikidata_qid` is set, derives a link via `Special:GoToLinkedPage/rowiki/{QID}` (stable Wikidata redirect, no HTTP at build time). All 206 persons with QIDs now show a "↗ Wikipedia română" link.
+
+Post-review cleanup: restored `fill="currentColor"` on `icon-tag` circle (the strip regex incorrectly removed it); removed dead `contest_emoji` Jinja2 dict from `index.html.j2`.
+
 ## 2026-05-20 — Shipped product quality (P2): DB trim, browser perf, stats bar, keyboard nav
 
 Four related improvements to the live product:

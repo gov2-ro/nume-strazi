@@ -12,7 +12,7 @@ Romanian-language interactive publication.
 
 ## Preview
 
-![Screenshot of the interactive street names browser](/dist/screenshot-nume-strazi.png)
+![Screenshot of the interactive street names browser](docs/screenshot-nume-strazi.png)
 
 ---
 
@@ -160,8 +160,8 @@ flowchart LR
   subgraph build["Build (Python)"]
     DB[("data/streets.db")]
     SITE["build_site.py<br/>Jinja2 → static HTML"]
-    SLIM["tools/build_dist_db.py<br/>drop OSM tables<br/>VACUUM, page_size=4096"]
-    DIST[("dist/streets.db<br/>~30 MB")]
+    SLIM["tools/build_dist_db.py<br/>materialise streets_dedup<br/>drop unused cols + tables<br/>VACUUM, page_size=4096"]
+    DIST[("dist/streets.db<br/>~13.5 MB")]
   end
   subgraph dep["Deploy (rsync)"]
     HOST["shared host<br/>Apache / Nginx"]
@@ -185,8 +185,9 @@ No backend is required at runtime — `filter_server.py` exists for local Python
 testing only. Apache/Nginx serve `Accept-Ranges: bytes` natively.
 
 ```bash
-# Build the slim production DB (drops empty OSM tables + street_aliases,
-# VACUUMs, sets page_size=4096). Run after each build_db.py rebuild.
+# Build the slim production DB (materialises streets_dedup as real table with
+# only client-needed columns, drops streets + unused tables, VACUUMs).
+# Run after each build_db.py rebuild. 30 MB → 13.5 MB.
 python3 tools/build_dist_db.py
 
 # Render the static site (landing + detail pages)
@@ -381,12 +382,18 @@ echo 'export ANTHROPIC_API_KEY=sk-ant-...' >> ~/.zshrc
 │   ├── BACKLOG.md        # Tracked issues and future work
 │   └── activity-history.md
 ├── tools/
-│   ├── build_dist_db.py        # data/streets.db → dist/streets.db (slim, VACUUM)
+│   ├── build_dist_db.py        # data/streets.db → dist/streets.db (materialise, slim, VACUUM)
 │   ├── export_unclassified.py  # Export top-N unclassified keys to CSV
 │   ├── import_csv.py           # Upsert classified CSV into lookup tables
 │   ├── llm_classify.py         # Claude Haiku batch classifier
+│   ├── llm_compare.py          # Compare two llm_classify CSVs for convergence
 │   ├── seed_top500.py          # Batch 1 curation (top-500 keys)
 │   ├── seed_batch2.py          # Batch 2 curation
+│   ├── fetch_portraits.py      # Wikidata P18 → Wikimedia thumbnails → dist/portraits/
+│   ├── wikidata_persons.py     # Fetch/replay Wikidata QIDs for persons
+│   ├── wiki_scope.py           # Fetch Wikipedia sitelinks + wiki_scope per person
+│   ├── fetch_lucide_icons.py   # Fetch Lucide SVG icons → templates/_icons.html.j2 sprite
+│   ├── gen_og_image.py         # Generate Open Graph preview images
 │   ├── osm_ingest.py           # PBF → osm_streets (osmium + shapely)
 │   ├── osm_match.py            # streets_dedup ↔ osm_streets join (pure SQL)
 │   ├── osm_score.py            # importance_v1 score + per-UAT z-score
