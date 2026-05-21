@@ -33,9 +33,12 @@
           {% if p.nationality and p.nationality != 'RO' %}<span>· <span class="tag">{{ p.nationality }}</span></span>{% endif %}
         </div>
         <div style="margin-top:10px; font-size:12px; color:var(--muted);">
-          {% if p.wiki_ro_url %}<a href="{{ p.wiki_ro_url }}" target="_blank" rel="noopener">↗ Wikipedia română</a>{% endif %}
+          {% set wiki_ro = p.wiki_ro_url or
+             ('https://www.wikidata.org/wiki/Special:GoToLinkedPage/rowiki/' ~ p.wikidata_qid
+              if p.wikidata_qid else none) %}
+          {% if wiki_ro %}<a href="{{ wiki_ro }}" target="_blank" rel="noopener">↗ Wikipedia română</a>{% endif %}
           {% if p.wikidata_qid %}
-            {% if p.wiki_ro_url %} · {% endif %}
+            {% if wiki_ro %} · {% endif %}
             <a href="https://www.wikidata.org/wiki/{{ p.wikidata_qid }}" target="_blank" rel="noopener">Wikidata {{ p.wikidata_qid }}</a>
           {% endif %}
         </div>
