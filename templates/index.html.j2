@@ -846,7 +846,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 <div class="statbar">
 
   <div class="group">
-    <div class="group-label"><span class="emo lg">📊</span> Scară</div>
+    <div class="group-label"><svg class="icon lg" aria-hidden="true"><use href="#icon-chart-bar-big"/></svg> Scară</div>
     <div class="scale-stack">
       <div class="item">
         <div class="v">{{ "{:,.0f}".format(section1.total_streets).replace(",", ".") }}</div>
@@ -860,7 +860,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
   </div>
 
   <div class="group">
-    <div class="group-label"><span class="emo lg">🏷️</span> Tematică</div>
+    <div class="group-label"><svg class="icon lg" aria-hidden="true"><use href="#icon-tag"/></svg> Tematică</div>
     <div class="tema-row">
       <div class="v">{{ lead_pct }}<span class="u">% {{ theme_ro[lead.category] | default(lead.category) }}</span></div>
     </div>
@@ -883,7 +883,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
   </div>
 
   <div class="group">
-    <div class="group-label"><span class="emo lg">⚥</span> Repartiție pe gen</div>
+    <div class="group-label"><svg class="icon lg" aria-hidden="true"><use href="#icon-users"/></svg> Repartiție pe gen</div>
     <div class="gen-row">
       <div class="v">{{ male_pct }}<span class="u">% B</span></div>
       <div class="frac">/ <span class="accent" style="font-weight:600;">{{ female_pct }}% F</span></div>
@@ -896,7 +896,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
   </div>
 
   <div class="group">
-    <div class="group-label"><span class="emo lg">🏆</span> Cei mai des onorați</div>
+    <div class="group-label"><svg class="icon lg" aria-hidden="true"><use href="#icon-trophy"/></svg> Cei mai des onorați</div>
     <div class="top-pair">
       {% if section1.top_men %}
       <div class="row">
@@ -922,7 +922,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 {# PANEL: CELE MAI FRECVENTE (s6, cluster cloud) #}
 <div class="panel s6 cluster-panel" id="cele-mai-intalnite">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo xl">🔝</span> Cele mai frecvente · Top 50</span>
+    <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-list-ordered"/></svg> Cele mai frecvente · Top 50</span>
   </div>
   <div id="s2-clusters">
     {# Populated by JS #}
@@ -934,7 +934,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
    Split into stacked Bărbați / Femei sub-sections so women have their own top. #}
 <div class="panel s6 cluster-panel" id="top-persoane">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo xl">👥</span> Top persoane onorate</span>
+    <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-users"/></svg> Top persoane onorate</span>
   </div>
   <div class="sub-section">
     <div class="sub-eyebrow"><span class="dot" style="background:var(--plaque);"></span>Bărbați<span class="meta" id="s3p-men-count"></span></div>
@@ -956,7 +956,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 {% set ns = namespace(cumulative=0) %}
 <div class="panel s4" id="tematica">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo xl">🧭</span> Repartiție tematică</span>
+    <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-chart-pie"/></svg> Repartiție tematică</span>
     <span class="panel-meta">{{ "{:,.0f}".format(theme_total).replace(",", ".") }} clasif.</span>
   </div>
   <div style="display:flex;gap:18px;align-items:center;">
@@ -1008,7 +1008,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 } %}
 <div class="panel s4">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo xl">🌿</span> Subtipuri · Natură</span>
+    <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-leaf"/></svg> Subtipuri · Natură</span>
   </div>
   <div id="s5-nature-list">
   {% set max_n = section5.nature_subtypes[0].n if section5.nature_subtypes else 1 %}
@@ -1041,7 +1041,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 } %}
 <div class="panel s4">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo xl">🚩</span> Tokeni ideologici</span>
+    <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-flag"/></svg> Tokeni ideologici</span>
   </div>
   <div id="s5-ideo-list" style="display:flex;flex-wrap:wrap;gap:6px;">
     {% for tok in section5.ideo_tokens %}
@@ -1065,7 +1065,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 {# PANEL: ECART DE GEN (s4) #}
 <div class="panel s4" id="pe-cine-onoram">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo xl">⚥</span> Ecart de gen</span>
+    <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-users"/></svg> Ecart de gen</span>
     <span class="panel-meta">{{ section3.total_m + section3.total_f }} pers.</span>
   </div>
   <div style="display:flex;gap:16px;align-items:start;">
@@ -1111,7 +1111,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 } %}
 <div class="panel s4">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo xl">🎓</span> Profesia persoanei onorate</span>
+    <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-graduation-cap"/></svg> Profesia persoanei onorate</span>
   </div>
   <div id="s3-prof-list">
   {% set max_prof = section3.profession_dist[0].n if section3.profession_dist else 1 %}
@@ -1144,7 +1144,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 } %}
 <div class="panel s4">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo xl">⏳</span> Epoca în care a trăit</span>
+    <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-hourglass"/></svg> Epoca în care a trăit</span>
   </div>
   <div id="s3-era-list">
   {% set max_era = section3.era_dist[0].n if section3.era_dist else 1 %}
@@ -1183,7 +1183,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 } %}
 <div id="s3-foreigners-panel" class="panel s8">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo xl">🌍</span> Personalități non-române honorate pe străzi</span>
+    <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-globe"/></svg> Personalități non-române honorate pe străzi</span>
     <span class="panel-meta" id="s3-foreigners-count">{{ section3.top_foreigners | length }} persoane</span>
   </div>
   {% set max_f = section3.top_foreigners[0].street_count if section3.top_foreigners else 1 %}
@@ -1247,7 +1247,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 {% set max_non_s = non_ro | map(attribute='streets') | max %}
 <div class="panel s8" id="nationalities-panel">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo xl">🌐</span> Naționalitatea personalităților onorate</span>
+    <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-globe"/></svg> Naționalitatea personalităților onorate</span>
     <span class="panel-meta" id="s3nat-meta">{{ total_p }} persoane · {{ "{:,.0f}".format(total_s).replace(",",".") }} străzi</span>
   </div>
 
@@ -1265,7 +1265,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 {# PANEL: RECUNOAȘTERE GLOBALĂ (s6) #}
 <div class="panel s6" id="recunoastere" style="display:none;">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo xl">🌍</span> Recunoaștere globală · Wikidata</span>
+    <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-star"/></svg> Recunoaștere globală · Wikidata</span>
     <span class="panel-meta">{{ wikidata_total }} persoane</span>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--rule-strong);border:1px solid var(--rule-strong);">
@@ -1293,7 +1293,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 {# PANEL: RENUMIRI placeholder (s6) #}
 <div class="panel s6" id="renumiri" style="display:none;">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo xl">📝</span> Renumiri</span>
+    <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-pencil-line"/></svg> Renumiri</span>
   </div>
   <div class="panel-caption" style="font-size:14px;">Secțiune în construcție — date indisponibile.</div>
 </div>
@@ -1319,13 +1319,13 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 {% set contest_order = ['flowers', 'trees', 'birds', 'animals', 'sky', 'trades'] %}
 <div id="s8-contests-panel" class="panel s12">
   <div class="panel-header">
-    <span class="panel-label"><span class="emo xl">🏟️</span> Conteste tematice · top 7 din fiecare familie</span>
+    <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-swords"/></svg> Conteste tematice · top 7 din fiecare familie</span>
   </div>
   <div class="subgrid-3">
     {% for key in contest_order %}
     {% set entries = section8.contests[key] %}
     <div style="background:var(--bg);padding:14px 16px;">
-      <div class="panel-label" style="margin-bottom:8px;"><span class="emo xl">{{ contest_emoji.get(key, '·') }}</span> {{ contest_labels[key] }}</div>
+      <div class="panel-label" style="margin-bottom:8px;"><svg class="icon xl" aria-hidden="true"><use href="#icon-swords"/></svg> {{ contest_labels[key] }}</div>
       {% if entries %}
         {% set max_e = entries[0].n %}
         {% for row in entries %}
@@ -1351,14 +1351,14 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 <footer class="site-footer" style="background:var(--ink-band);color:#FFFFFF;padding:24px 28px;">
   <div style="max-width:1640px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr 1fr;gap:36px;">
     <div>
-      <div style="font-family:var(--sans);font-size:10px;letter-spacing:.22em;text-transform:uppercase;font-weight:700;color:var(--gold);margin-bottom:8px;display:inline-flex;align-items:center;gap:7px;"><span class="emo md">📄</span> Despre date</div>
+      <div style="font-family:var(--sans);font-size:10px;letter-spacing:.22em;text-transform:uppercase;font-weight:700;color:var(--gold);margin-bottom:8px;display:inline-flex;align-items:center;gap:7px;"><svg class="icon md" aria-hidden="true"><use href="#icon-file-text"/></svg> Despre date</div>
       <p style="font-family:var(--sans);font-size:12.5px;line-height:1.6;color:rgba(255,255,255,.72);">
         Registrul Secțiilor de Vot, Autoritatea Electorală Permanentă, 14.05.2025.
         Descriere adrese cu alegători înregistrați.
       </p>
     </div>
     <div>
-      <a href="{{ base }}/metodologie.html" style="text-decoration:none;color:inherit;display:inline-flex;align-items:center;gap:7px;font-family:var(--sans);font-size:10px;letter-spacing:.22em;text-transform:uppercase;font-weight:700;color:var(--gold);margin-bottom:8px;"><span class="emo md">⚗️</span> Metodologie</a>
+      <a href="{{ base }}/metodologie.html" style="text-decoration:none;color:inherit;display:inline-flex;align-items:center;gap:7px;font-family:var(--sans);font-size:10px;letter-spacing:.22em;text-transform:uppercase;font-weight:700;color:var(--gold);margin-bottom:8px;"><svg class="icon md" aria-hidden="true"><use href="#icon-flask-conical"/></svg> Metodologie</a>
       <p style="font-family:var(--sans);font-size:12.5px;line-height:1.6;color:rgba(255,255,255,.72);">
         Clasificare: curation manual + LLM batch (Claude Haiku + Gemini).
         Recunoaștere: Wikidata + Wikipedia pageviews.
@@ -1367,7 +1367,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
       </p>
     </div>
     <div>
-      <div style="font-family:var(--sans);font-size:10px;letter-spacing:.22em;text-transform:uppercase;font-weight:700;color:var(--gold);margin-bottom:8px;display:inline-flex;align-items:center;gap:7px;"><span class="emo md">⌨️</span> Cod sursă</div>
+      <div style="font-family:var(--sans);font-size:10px;letter-spacing:.22em;text-transform:uppercase;font-weight:700;color:var(--gold);margin-bottom:8px;display:inline-flex;align-items:center;gap:7px;"><svg class="icon md" aria-hidden="true"><use href="#icon-terminal"/></svg> Cod sursă</div>
       <p style="font-family:var(--sans);font-size:12.5px;line-height:1.6;color:rgba(255,255,255,.72);">
         github.com/gov2-ro/nume-strazi
       </p>
