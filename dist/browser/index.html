@@ -337,6 +337,20 @@ body {
 .info-link { color: var(--plaque); font-size: 10.5px; text-decoration: none; }
 .info-link:hover { text-decoration: underline; }
 
+/* ── STATS BAR ── */
+.stats-bar {
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--rule);
+  padding: 3px 14px;
+  font-size: 10px; color: var(--muted);
+  display: flex; align-items: center; gap: 10px;
+  flex-shrink: 0; flex-wrap: wrap; min-height: 24px;
+}
+.stats-bar .sb-group { display: flex; align-items: center; gap: 5px; }
+.stats-bar .sb-label { color: var(--muted-2); text-transform: uppercase; letter-spacing: .06em; font-size: 9px; font-weight: 700; }
+.stats-bar strong { color: var(--ink-2); }
+.stats-bar .sb-sep { color: var(--rule-strong); margin: 0 2px; }
+
 /* ── EMPTY STATE ── */
 .empty-state {
   flex: 1; display: flex; align-items: center; justify-content: center;
@@ -368,7 +382,7 @@ body {
     <div class="fsep"></div>
 
     <div class="fdd" id="dd-classification">
-      <div class="fdd-btn" onclick="toggleDD('dd-classification')">
+      <div class="fdd-btn" tabindex="0" role="button" onclick="toggleDD('dd-classification')">
         <span class="lbl" id="lbl-classification">Clasificare</span><span class="arr">▾</span>
       </div>
       <div class="fdd-menu" id="menu-classification">
@@ -377,7 +391,7 @@ body {
     </div>
 
     <div class="fdd" id="dd-gender">
-      <div class="fdd-btn" onclick="toggleDD('dd-gender')">
+      <div class="fdd-btn" tabindex="0" role="button" onclick="toggleDD('dd-gender')">
         <span class="lbl" id="lbl-gender">Gen</span><span class="arr">▾</span>
       </div>
       <div class="fdd-menu" id="menu-gender">
@@ -386,7 +400,7 @@ body {
     </div>
 
     <div class="fdd" id="dd-profession">
-      <div class="fdd-btn" onclick="toggleDD('dd-profession')">
+      <div class="fdd-btn" tabindex="0" role="button" onclick="toggleDD('dd-profession')">
         <span class="lbl" id="lbl-profession">Profesie</span><span class="arr">▾</span>
       </div>
       <div class="fdd-menu" id="menu-profession">
@@ -395,7 +409,7 @@ body {
     </div>
 
     <div class="fdd" id="dd-era">
-      <div class="fdd-btn" onclick="toggleDD('dd-era')">
+      <div class="fdd-btn" tabindex="0" role="button" onclick="toggleDD('dd-era')">
         <span class="lbl" id="lbl-era">Eră</span><span class="arr">▾</span>
       </div>
       <div class="fdd-menu" id="menu-era">
@@ -404,7 +418,7 @@ body {
     </div>
 
     <div class="fdd" id="dd-nationality">
-      <div class="fdd-btn" onclick="toggleDD('dd-nationality')">
+      <div class="fdd-btn" tabindex="0" role="button" onclick="toggleDD('dd-nationality')">
         <span class="lbl" id="lbl-nationality">Naționalitate</span><span class="arr">▾</span>
       </div>
       <div class="fdd-menu" id="menu-nationality">
@@ -413,7 +427,7 @@ body {
     </div>
 
     <div class="fdd" id="dd-judet">
-      <div class="fdd-btn" onclick="toggleDD('dd-judet')">
+      <div class="fdd-btn" tabindex="0" role="button" onclick="toggleDD('dd-judet')">
         <span class="lbl" id="lbl-judet">Județ</span><span class="arr">▾</span>
       </div>
       <div class="fdd-menu" id="menu-judet" style="max-height:240px;overflow-y:auto">
@@ -422,7 +436,7 @@ body {
     </div>
 
     <div class="fdd" id="dd-street_type">
-      <div class="fdd-btn" onclick="toggleDD('dd-street_type')">
+      <div class="fdd-btn" tabindex="0" role="button" onclick="toggleDD('dd-street_type')">
         <span class="lbl" id="lbl-street_type">Tip</span><span class="arr">▾</span>
       </div>
       <div class="fdd-menu" id="menu-street_type">
@@ -441,6 +455,9 @@ body {
     <div class="spinner"></div>
     <span class="count-text" id="count-text">Se încarcă…</span>
   </div>
+
+  <!-- stats bar -->
+  <div class="stats-bar" id="stats-bar" style="display:none"></div>
 
   <!-- ── TABLE PANE ── -->
   <div class="pane" id="pane-tabel">
@@ -497,6 +514,7 @@ let tableOffset   = 0;
 let tableTotal    = 0;
 let tableRows     = [];
 let searchTimer   = null;
+let allRows       = [];        // pre-computed compact rows from data.json
 
 /* ── LABEL MAPPING ── */
 const DD_PARAM = {
@@ -534,19 +552,24 @@ function norm(s) {
     .trim();
 }
 
-/* ── FETCH META & POPULATE DROPDOWNS ── */
-async function loadMeta() {
-  const meta = await DbClient.meta();
+/* ── LOAD DATA.JSON & POPULATE DROPDOWNS ── */
+async function loadData() {
+  const data = await (await fetch('./data.json')).json();
+  allRows = data.rows;
+  populateMetaFromData(data.meta);
+  fetchCompact();
+}
 
-  buildMenu('dd-classification', meta.classifications,
+function populateMetaFromData(meta) {
+  buildMenu('dd-classification',
+    ['person','nature','place','category','saint','date','numeric'],
     v => CLS_LABEL[v] || v, 'classification');
-  buildMenu('dd-gender',      meta.genders,
-    v => GEN_LABEL[v] || v, 'gender');
-  buildMenu('dd-profession',  meta.professions, null, 'profession');
-  buildMenu('dd-era',         meta.eras,        null, 'era');
+  buildMenu('dd-gender',      meta.genders,       v => GEN_LABEL[v] || v, 'gender');
+  buildMenu('dd-profession',  meta.professions,   null, 'profession');
+  buildMenu('dd-era',         meta.eras,          null, 'era');
   buildMenu('dd-nationality', meta.nationalities, null, 'nationality');
-  buildMenu('dd-judet',       meta.judete,      null, 'judet');
-  buildMenu('dd-street_type', meta.street_types, null, 'street_type');
+  buildMenu('dd-judet',       meta.judete,        null, 'judet');
+  buildMenu('dd-street_type', meta.street_types,  null, 'street_type');
 }
 
 function buildMenu(ddId, values, labelFn, param) {
@@ -556,6 +579,8 @@ function buildMenu(ddId, values, labelFn, param) {
   const allItem = document.createElement('div');
   allItem.className = 'fdd-item toate sel';
   allItem.dataset.value = '';
+  allItem.setAttribute('tabindex', '-1');
+  allItem.setAttribute('role', 'option');
   allItem.innerHTML = `<div class="dot"></div>Toate`;
   allItem.addEventListener('click', e => { e.stopPropagation(); clearFilter(ddId); });
   menu.appendChild(allItem);
@@ -569,6 +594,8 @@ function buildMenu(ddId, values, labelFn, param) {
     const item = document.createElement('div');
     item.className = 'fdd-item';
     item.dataset.value = v;
+    item.setAttribute('tabindex', '-1');
+    item.setAttribute('role', 'option');
     item.innerHTML = `<div class="dot"></div>${esc(lbl)}`;
     item.addEventListener('click', e => { e.stopPropagation(); pickItem(ddId, v, lbl); });
     menu.appendChild(item);
@@ -667,7 +694,7 @@ function buildParams(extra = {}) {
   return p;
 }
 
-/* ── FETCH TABLE DATA ── */
+/* ── FETCH TABLE DATA (WASM path, lazy-loaded on first table view) ── */
 async function fetchData() {
   setLoading(true);
   const params = buildParams({ limit: PAGE_SIZE, offset: tableOffset, sort: 'count' });
@@ -682,14 +709,87 @@ async function fetchData() {
   setLoading(false);
 }
 
-/* ── FETCH COMPACT DATA ── */
-async function fetchCompact() {
+/* ── COMPACT DATA: pure JS filter over pre-loaded allRows ── */
+function fetchCompact() {
   setLoading(true);
-  const params = buildParams({ aggregate: '1', limit: AGG_LIMIT, sort: 'count' });
-  const res = await DbClient.filter(params);
-  renderTokens(res.rows);
-  updateCountBar(res.total);
+  const filtered = filterRows(allRows, filters, searchVal);
+  renderTokens(filtered.slice(0, AGG_LIMIT).map(toCompactRow));
+  updateCountBar(filtered.length);
+  updateStatsBar(filtered);
   setLoading(false);
+}
+
+function filterRows(rows, filters, searchVal) {
+  return rows.filter(r => {
+    if (searchVal && !r.nn.includes(searchVal)) return false;
+    const j  = filters['dd-judet'];
+    if (j  && !(r.j  || []).includes(j))  return false;
+    const st = filters['dd-street_type'];
+    if (st && !(r.st || []).includes(st)) return false;
+    const cl = filters['dd-classification'];
+    if (cl && r.cls !== cl)               return false;
+    if (filters['dd-gender']      && r.g  !== filters['dd-gender'])      return false;
+    if (filters['dd-profession']  && r.pr !== filters['dd-profession'])  return false;
+    if (filters['dd-era']         && r.er !== filters['dd-era'])         return false;
+    if (filters['dd-nationality'] && r.na !== filters['dd-nationality']) return false;
+    return true;
+  });
+}
+
+function toCompactRow(r) {
+  return {
+    name: r.n, name_count: r.c, street_slug: r.sl || null,
+    classification: r.cls || null, wikidata_qid: r.q || null,
+    person_full_name: r.pn || null, profession: r.pr || null,
+    nationality: r.na || null, gender: r.g || null,
+    era: r.er || null, wiki_scope: r.sc || null,
+    category: r.cat || null, subcategory: r.sub || null,
+    nature_type: r.nt || null, place_type: r.pt || null,
+    place_country: r.pc || null,
+  };
+}
+
+function updateStatsBar(rows) {
+  const bar = document.getElementById('stats-bar');
+  if (!rows.length) { bar.style.display = 'none'; return; }
+
+  const clsCounts = {};
+  let fCnt = 0, mCnt = 0, personCnt = 0;
+  const profCounts = {}, eraCounts = {}, natCounts = {};
+
+  rows.forEach(r => {
+    const cls = r.cls || 'necls';
+    clsCounts[cls] = (clsCounts[cls] || 0) + 1;
+    if (r.cls === 'person') {
+      personCnt++;
+      if (r.g === 'F') fCnt++;
+      else if (r.g === 'M') mCnt++;
+      if (r.pr) profCounts[r.pr] = (profCounts[r.pr] || 0) + 1;
+      if (r.er) eraCounts[r.er]  = (eraCounts[r.er]  || 0) + 1;
+      if (r.na) natCounts[r.na]  = (natCounts[r.na]  || 0) + 1;
+    }
+  });
+
+  const top = obj => Object.entries(obj).sort((a, b) => b[1] - a[1])[0]?.[0];
+  const pct = (n, d) => d ? Math.round(100 * n / d) + '%' : '—';
+
+  const parts = [];
+  const clsTop = Object.entries(clsCounts).sort((a, b) => b[1] - a[1]).slice(0, 3)
+    .map(([k, v]) => `${CLS_LABEL[k] || k} <strong>${Math.round(100 * v / rows.length)}%</strong>`)
+    .join(' · ');
+  parts.push(`<span class="sb-group"><span class="sb-label">Cls</span> ${clsTop}</span>`);
+
+  if (personCnt > 0) {
+    parts.push(`<span class="sb-sep">|</span>`);
+    parts.push(`<span class="sb-group"><span class="sb-label">Gen</span> F <strong>${pct(fCnt, personCnt)}</strong> · M <strong>${pct(mCnt, personCnt)}</strong></span>`);
+    const tp = top(profCounts), te = top(eraCounts), tn = top(natCounts);
+    if (tp) parts.push(`<span class="sb-group"><span class="sb-label">Profesie</span> <strong>${esc(tp)}</strong></span>`);
+    if (te) parts.push(`<span class="sb-group"><span class="sb-label">Eră</span> <strong>${esc(te)}</strong></span>`);
+    if (tn) parts.push(`<span class="sb-group"><span class="sb-label">Nat.</span> <strong>${esc(tn)}</strong></span>`);
+  }
+
+  bar.innerHTML = parts.join('');
+  bar.style.display = 'flex';
 }
 
 function loadMore() {
@@ -875,12 +975,54 @@ function updateCountBar(total) {
     `<strong>${total.toLocaleString('ro-RO')}</strong> rezultate`;
 }
 
-/* ── INIT ── */
-loadMeta().then(() => {
-  tableOffset = 0;
-  tableRows   = [];
-  fetchCompact();
+/* ── KEYBOARD NAVIGATION ── */
+document.getElementById('search-input').addEventListener('keydown', e => {
+  if (e.key === 'Escape') { e.target.blur(); closeAllDD(); }
 });
+
+document.addEventListener('keydown', e => {
+  const tag = document.activeElement.tagName.toLowerCase();
+  const isText = tag === 'input' || tag === 'textarea' || document.activeElement.isContentEditable;
+
+  if (e.key === '/' && !isText) {
+    e.preventDefault();
+    const inp = document.getElementById('search-input');
+    inp.focus(); inp.select();
+    return;
+  }
+
+  const openDD = document.querySelector('.fdd.open');
+  if (!openDD) return;
+
+  const items = [...openDD.querySelectorAll('.fdd-item')];
+  const cur = document.activeElement;
+  const idx = items.indexOf(cur);
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    items[Math.min(idx + 1, items.length - 1)]?.focus();
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (idx <= 0) openDD.querySelector('.fdd-btn')?.focus();
+    else items[idx - 1]?.focus();
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    closeAllDD();
+    openDD.querySelector('.fdd-btn')?.focus();
+  } else if ((e.key === 'Enter' || e.key === ' ') && cur.classList.contains('fdd-item')) {
+    e.preventDefault();
+    cur.click();
+  }
+});
+
+document.querySelectorAll('.fdd-btn').forEach(btn => {
+  btn.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); btn.click(); }
+  });
+});
+
+/* ── INIT ── */
+loadData();
 </script>
 </body>
 </html>
