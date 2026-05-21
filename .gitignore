@@ -5,7 +5,7 @@ data
 data/*
 # Generated database — rebuild with build_db.py
 data/streets.db
-
+*.code-workspace
 # Source registry files (public data, but large — download separately, see README)
 data/reference/
 
