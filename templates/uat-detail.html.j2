@@ -17,7 +17,7 @@
   </div>
 
   <div class="detail-hero">
-    <div class="kicker"><span class="emo">🏘️</span> Localitate · {{ judet }}</div>
+    <div class="kicker"><svg class="icon" aria-hidden="true"><use href="#icon-house"/></svg> Localitate · {{ judet }}</div>
     <h1>{{ uat | title }}</h1>
     <div class="meta-row">
       <span><strong>{{ total }}</strong> strad{% if total == 1 %}ă{% else %}ăzi{% endif %} înregistrate</span>
@@ -41,12 +41,12 @@
         {% for t in themes %}
         <div class="rank-row" style="grid-template-columns: minmax(0,1fr) 50px;">
           <div>
-            {% if t.theme == 'persoana' %}<span class="emo">👤</span>
-            {% elif t.theme == 'natura' %}<span class="emo">🌿</span>
-            {% elif t.theme == 'religios' %}<span class="emo">⛪</span>
-            {% elif t.theme == 'data' %}<span class="emo">📅</span>
-            {% elif t.theme == 'ideologic' %}<span class="emo">🚩</span>
-            {% else %}<span class="emo">📍</span>{% endif %}
+            {% if t.theme == 'persoana' %}<svg class="icon" aria-hidden="true"><use href="#icon-user"/></svg>
+            {% elif t.theme == 'natura' %}<svg class="icon" aria-hidden="true"><use href="#icon-leaf"/></svg>
+            {% elif t.theme == 'religios' %}<svg class="icon" aria-hidden="true"><use href="#icon-church"/></svg>
+            {% elif t.theme == 'data' %}<svg class="icon" aria-hidden="true"><use href="#icon-calendar"/></svg>
+            {% elif t.theme == 'ideologic' %}<svg class="icon" aria-hidden="true"><use href="#icon-flag"/></svg>
+            {% else %}<svg class="icon" aria-hidden="true"><use href="#icon-map-pin"/></svg>{% endif %}
             {{ t.theme | title }}
           </div>
           <div class="rank-count">{{ t.n }}</div>

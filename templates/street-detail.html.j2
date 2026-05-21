@@ -16,12 +16,12 @@
 
   <div class="detail-hero">
     <div class="kicker">
-      {% if theme == 'persoana' %}<span class="emo">👤</span> Persoană onorat{% if honoree and honoree.gender == 'F' %}ă{% else %}ă{% endif %}
-      {% elif theme == 'natura' %}<span class="emo">🌿</span> Natură
-      {% elif theme == 'religios' %}<span class="emo">⛪</span> Religios
-      {% elif theme == 'data' %}<span class="emo">📅</span> Dată / sărbătoare
-      {% elif theme == 'ideologic' %}<span class="emo">🚩</span> Ideologic
-      {% else %}<span class="emo">📍</span> Stradă
+      {% if theme == 'persoana' %}<svg class="icon" aria-hidden="true"><use href="#icon-user"/></svg> Persoană onorat{% if honoree and honoree.gender == 'F' %}ă{% else %}ă{% endif %}
+      {% elif theme == 'natura' %}<svg class="icon" aria-hidden="true"><use href="#icon-leaf"/></svg> Natură
+      {% elif theme == 'religios' %}<svg class="icon" aria-hidden="true"><use href="#icon-church"/></svg> Religios
+      {% elif theme == 'data' %}<svg class="icon" aria-hidden="true"><use href="#icon-calendar"/></svg> Dată / sărbătoare
+      {% elif theme == 'ideologic' %}<svg class="icon" aria-hidden="true"><use href="#icon-flag"/></svg> Ideologic
+      {% else %}<svg class="icon" aria-hidden="true"><use href="#icon-map-pin"/></svg> Stradă
       {% endif %}
     </div>
     <h1 class="plaque">{{ display_name }}</h1>
