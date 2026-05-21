@@ -52,7 +52,7 @@ function escapeHtml(s) {
   </div>
 
   <div class="detail-hero">
-    <div class="kicker"><span class="emo">🗺️</span> Județe</div>
+    <div class="kicker"><svg class="icon" aria-hidden="true"><use href="#icon-map"/></svg> Județe</div>
     <h1 style="font-size:32px; font-weight:700; font-family:var(--street);">Statistici pe județ</h1>
     <div class="meta-row">{{ section6.by_judet | length }} județe · date din registrul secțiilor de vot</div>
   </div>
@@ -60,7 +60,7 @@ function escapeHtml(s) {
   {# ── 1. HARTA ─────────────────────────────────────────────────────────── #}
   <div class="panel s12" id="harta" style="background:var(--surface-1);border:1px solid var(--rule);border-radius:6px;padding:16px 20px;margin-bottom:16px;">
     <div class="panel-header">
-      <span class="panel-label"><span class="emo xl">🗺️</span> Harta · statistici pe județ</span>
+      <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-map"/></svg> Harta · statistici pe județ</span>
       <div class="chip-row" id="s6-metric-row" style="margin:0;padding:0;border:none;flex-wrap:wrap;gap:6px;">
         <span class="label">Vedeți după</span>
         <button class="chip active" data-metric="person_pct">persoane</button>
@@ -87,7 +87,7 @@ function escapeHtml(s) {
         </div>
       </div>
       <div class="fingerprint" id="s6-fingerprint">
-        <div class="kicker"><span class="emo lg">🧬</span> Amprenta județului</div>
+        <div class="kicker"><svg class="icon lg" aria-hidden="true"><use href="#icon-dna"/></svg> Amprenta județului</div>
         <p style="font-family:var(--sans);font-size:12.5px;color:var(--muted);padding-top:20px;line-height:1.55;">
           Selectați un județ pe hartă.
         </p>
@@ -98,7 +98,7 @@ function escapeHtml(s) {
   {# ── 2. TABEL COMPARATIV ──────────────────────────────────────────────── #}
   <div class="panel s12" style="background:var(--surface-1);border:1px solid var(--rule);border-radius:6px;padding:16px 20px;margin-bottom:16px;">
     <div class="panel-header">
-      <span class="panel-label"><span class="emo xl">📊</span> Comparație județe</span>
+      <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-chart-bar-big"/></svg> Comparație județe</span>
       <span class="panel-meta">click pe coloană pentru sortare</span>
     </div>
     <div style="overflow-x:auto;">
@@ -121,12 +121,12 @@ function escapeHtml(s) {
   {# ── 3. AMPRENTE JUDEȚENE ─────────────────────────────────────────────── #}
   <div class="panel s12" style="background:var(--surface-1);border:1px solid var(--rule);border-radius:6px;padding:16px 20px;margin-bottom:16px;">
     <div class="panel-header">
-      <span class="panel-label"><span class="emo xl">🧬</span> Amprente județene · trei caractere</span>
+      <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-dna"/></svg> Amprente județene · trei caractere</span>
     </div>
     <div class="subgrid-3">
 
       <div style="background:var(--bg);padding:14px 16px;">
-        <div class="panel-label" style="margin-bottom:6px;"><span class="emo xl">💎</span> Cele mai exclusiviste</div>
+        <div class="panel-label" style="margin-bottom:6px;"><svg class="icon xl" aria-hidden="true"><use href="#icon-gem"/></svg> Cele mai exclusiviste</div>
         <div class="panel-caption" style="margin:0 0 8px;">Județe cu cele mai multe nume găsite doar acolo · ≥3 străzi local</div>
         {% set max_d = section8.judet_distinctive[0].n if section8.judet_distinctive else 1 %}
         {% for row in section8.judet_distinctive %}
@@ -140,7 +140,7 @@ function escapeHtml(s) {
       </div>
 
       <div style="background:var(--bg);padding:14px 16px;">
-        <div class="panel-label" style="margin-bottom:6px;"><span class="emo xl">🌾</span> Cele mai «rurale-poetice»</div>
+        <div class="panel-label" style="margin-bottom:6px;"><svg class="icon xl" aria-hidden="true"><use href="#icon-wheat"/></svg> Cele mai «rurale-poetice»</div>
         <div class="panel-caption" style="margin:0 0 8px;">Cota de străzi cu nume din natură (flori, copaci, ape, animale…)</div>
         {% set max_r = section8.judet_rural[0].pct if section8.judet_rural else 1 %}
         {% for row in section8.judet_rural %}
@@ -154,7 +154,7 @@ function escapeHtml(s) {
       </div>
 
       <div style="background:var(--bg);padding:14px 16px;">
-        <div class="panel-label" style="margin-bottom:6px;"><span class="emo xl">🚩</span> Cele mai «ideologice»</div>
+        <div class="panel-label" style="margin-bottom:6px;"><svg class="icon xl" aria-hidden="true"><use href="#icon-flag"/></svg> Cele mai «ideologice»</div>
         <div class="panel-caption" style="margin:0 0 8px;">Cota de străzi cu nume ideologic (libertate, victorie, unire…)</div>
         {% set max_i = section8.judet_ideo[0].pct if section8.judet_ideo else 1 %}
         {% for row in section8.judet_ideo %}
@@ -175,7 +175,7 @@ function escapeHtml(s) {
 
     <div class="panel s6" style="background:var(--surface-1);border:1px solid var(--rule);border-radius:6px;padding:16px 20px;">
       <div class="panel-header">
-        <span class="panel-label"><span class="emo xl">📜</span> Semnături regionale · ≥80% concentrare într-un județ</span>
+        <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-scroll"/></svg> Semnături regionale · ≥80% concentrare într-un județ</span>
         <span class="panel-meta">{{ section8.regional_signatures | length }} nume</span>
       </div>
       <div class="rank-list">
@@ -191,7 +191,7 @@ function escapeHtml(s) {
 
     <div class="panel s6" id="curiozitati" style="background:var(--surface-1);border:1px solid var(--rule);border-radius:6px;padding:16px 20px;">
       <div class="panel-header">
-        <span class="panel-label"><span class="emo xl">🔎</span> Curiozități unice naționale · doar într-un singur UAT</span>
+        <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-search"/></svg> Curiozități unice naționale · doar într-un singur UAT</span>
         <span class="panel-meta">selecție · geografice</span>
       </div>
       <div class="rank-list">
@@ -210,7 +210,7 @@ function escapeHtml(s) {
   {% set top_uats = uats | sort(attribute='total', reverse=true) | list %}
   <div class="panel s12" id="top-cities" style="background:var(--surface-1);border:1px solid var(--rule);border-radius:6px;padding:16px 20px;margin-bottom:24px;">
     <div class="panel-header">
-      <span class="panel-label"><span class="emo xl">🏙️</span> Cele mai mari localități · top 20</span>
+      <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-building-2"/></svg> Cele mai mari localități · top 20</span>
       <span class="panel-meta">după număr de străzi</span>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;padding-top:4px;">
@@ -365,14 +365,14 @@ function escapeHtml(s) {
 
     const fp = document.getElementById('s6-fingerprint');
     fp.innerHTML = `
-      <div class="kicker"><span class="emo lg">🧬</span> Amprenta județului</div>
+      <div class="kicker"><svg class="icon lg" aria-hidden="true"><use href="#icon-dna"/></svg> Amprenta județului</div>
       <div style="font-family:var(--sans);font-weight:700;font-size:20px;margin:2px 0 4px;letter-spacing:-.015em;color:var(--ink);">${feature.properties?.name || code}</div>
       <div style="font-family:var(--sans);font-size:11px;color:var(--muted);margin-bottom:14px;font-variant-numeric:tabular-nums;font-weight:500;">${(row.total_streets||0).toLocaleString('ro-RO')} de străzi · Sfinți ${(row.saint_pct||0).toFixed(1)}% · Feminin ${(row.female_pct||0).toFixed(1)}%</div>
-      <div class="kicker" style="margin-bottom:6px;"><span class="emo lg">🔝</span> Cele mai frecvente</div>
+      <div class="kicker" style="margin-bottom:6px;"><svg class="icon lg" aria-hidden="true"><use href="#icon-list-ordered"/></svg> Cele mai frecvente</div>
       <div style="margin-bottom:14px;">${topRows || '<span style="color:var(--muted)">—</span>'}</div>
-      <div class="kicker" style="margin-bottom:6px;"><span class="emo lg">👤</span> Persoane omagiate</div>
+      <div class="kicker" style="margin-bottom:6px;"><svg class="icon lg" aria-hidden="true"><use href="#icon-user"/></svg> Persoane omagiate</div>
       <div style="margin-bottom:14px;">${personsRows || '<span style="color:var(--muted)">—</span>'}</div>
-      <div class="kicker" style="margin-bottom:6px;"><span class="emo lg">💎</span> Cele mai rare (unice național)</div>
+      <div class="kicker" style="margin-bottom:6px;"><svg class="icon lg" aria-hidden="true"><use href="#icon-gem"/></svg> Cele mai rare (unice național)</div>
       <div>${rareRows || '<span style="color:var(--muted)">—</span>'}</div>
     `;
   }
