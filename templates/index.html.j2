@@ -69,6 +69,7 @@ body {
 /* ──────── ICONS ──────── */
 .icon { width: 14px; height: 14px; flex-shrink: 0; vertical-align: middle; stroke: currentColor; stroke-width: 1.75; fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .icon.sm { width: 11px; height: 11px; stroke-width: 1.9; }
+.icon.md { width: 12px; height: 12px; }
 .icon.lg { width: 18px; height: 18px; }
 .icon.xl { width: 22px; height: 22px; stroke-width: 1.6; }
 
@@ -799,6 +800,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
   </style>
 </head>
 <body>
+{% include "_icons.html.j2" %}
 
 <nav class="site-nav">
   <a href="{{ base }}/" class="brand">Cum ne numim străzile</a>
