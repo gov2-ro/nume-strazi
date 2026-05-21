@@ -92,6 +92,17 @@ def _render(env: jinja2.Environment, template_name: str, out_path: Path, **ctx) 
     out_path.write_text(env.get_template(template_name).render(**ctx), encoding="utf-8")
 
 
+def build_browser_data(db_path: str = DB_PATH) -> None:
+    """Generate dist/browser/data.json — pre-computed compact rows + meta."""
+    conn = site_queries.get_connection(db_path)
+    data = site_queries.browser_export(conn)
+    conn.close()
+    out = DIST / "browser" / "data.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(data, ensure_ascii=False, separators=(',', ':')), encoding="utf-8")
+    print(f"  → {out}  ({out.stat().st_size // 1024} KB)")
+
+
 def build_detail_pages(db_path: str = DB_PATH,
                        base: str = "", site_url: str = DEFAULT_SITE_URL) -> None:
     """Render all per-entity detail pages and index pages into dist/."""
@@ -313,6 +324,7 @@ def main() -> None:
             variants = [args.variant]
         for v in variants:
             build(db_path=args.db, variant=v, base=base, site_url=site_url)
+        build_browser_data(args.db)
     if args.detail or args.detail_only:
         build_detail_pages(db_path=args.db, base=base, site_url=site_url)
     if args.serve:

@@ -1744,6 +1744,97 @@ def explorer_indexes(conn: sqlite3.Connection) -> dict:
     return {"streets": street_idx, "uats": uat_idx}
 
 
+def browser_export(conn: sqlite3.Connection) -> dict:
+    """Pre-compute compact view data written to dist/browser/data.json.
+
+    Returns {"meta": {dropdown options}, "rows": [{compact row}, ...]}.
+    All grouped rows sorted by national count DESC; null fields omitted.
+    """
+    def col(sql):
+        return [r[0] for r in conn.execute(sql)]
+
+    meta = {
+        "judete":          col("SELECT DISTINCT judet FROM streets_dedup WHERE judet IS NOT NULL ORDER BY judet"),
+        "street_types":    col("SELECT DISTINCT street_type FROM streets_dedup WHERE street_type IS NOT NULL ORDER BY street_type"),
+        "professions":     col("SELECT DISTINCT profession FROM persons WHERE profession IS NOT NULL ORDER BY profession"),
+        "nationalities":   col("SELECT DISTINCT nationality FROM persons WHERE nationality IS NOT NULL ORDER BY nationality"),
+        "genders":         col("SELECT DISTINCT gender FROM persons WHERE gender IS NOT NULL ORDER BY gender"),
+        "eras":            col("SELECT DISTINCT era FROM persons WHERE era IS NOT NULL ORDER BY era"),
+        "wiki_scopes":     col("SELECT DISTINCT wiki_scope FROM persons WHERE wiki_scope IS NOT NULL ORDER BY wiki_scope"),
+        "categories":      col("SELECT DISTINCT category FROM name_categories WHERE category IS NOT NULL ORDER BY category"),
+        "subcategories":   col("SELECT DISTINCT subcategory FROM name_categories WHERE subcategory IS NOT NULL ORDER BY subcategory"),
+        "nature_types":    col("SELECT DISTINCT nature_type FROM nature_terms WHERE nature_type IS NOT NULL ORDER BY nature_type"),
+        "place_types":     col("SELECT DISTINCT place_type FROM place_refs WHERE place_type IS NOT NULL ORDER BY place_type"),
+        "place_countries": col("SELECT DISTINCT country FROM place_refs WHERE country IS NOT NULL ORDER BY country"),
+    }
+
+    raw = _rows(conn, """
+        SELECT
+            MAX(sd.name)            AS name,
+            sd.name_normalized,
+            MAX(sd.core_name)       AS core_name,
+            COUNT(*)                AS name_count,
+            GROUP_CONCAT(DISTINCT sd.judet)       AS judete,
+            GROUP_CONCAT(DISTINCT sd.street_type) AS street_types,
+            CASE
+                WHEN MAX(sd.is_numeric) = 1             THEN 'numeric'
+                WHEN MAX(sd.is_date)    = 1             THEN 'date'
+                WHEN MAX(sd.is_saint)   = 1             THEN 'saint'
+                WHEN MAX(p.core_name_norm)  IS NOT NULL THEN 'person'
+                WHEN MAX(n.core_name_norm)  IS NOT NULL THEN 'nature'
+                WHEN MAX(c.core_name_norm)  IS NOT NULL THEN 'category'
+                WHEN MAX(pr.core_name_norm) IS NOT NULL THEN 'place'
+                ELSE NULL
+            END AS classification,
+            MAX(p.wikidata_qid)   AS wikidata_qid,
+            MAX(p.full_name)      AS person_full_name,
+            MAX(p.profession)     AS profession,
+            MAX(p.nationality)    AS nationality,
+            MAX(p.gender)         AS gender,
+            MAX(p.era)            AS era,
+            MAX(p.wiki_scope)     AS wiki_scope,
+            MAX(c.category)       AS category,
+            MAX(c.subcategory)    AS subcategory,
+            MAX(n.nature_type)    AS nature_type,
+            MAX(pr.place_type)    AS place_type,
+            MAX(pr.country)       AS place_country
+        FROM streets_dedup sd
+        LEFT JOIN persons         p  ON p.core_name_norm  = sd.core_name_norm
+        LEFT JOIN name_categories c  ON c.core_name_norm  = sd.core_name_norm
+        LEFT JOIN nature_terms    n  ON n.core_name_norm  = sd.core_name_norm
+        LEFT JOIN place_refs      pr ON pr.core_name_norm = sd.core_name_norm
+        WHERE sd.name_normalized != ''
+        GROUP BY sd.name_normalized
+        ORDER BY name_count DESC
+    """)
+
+    rows = []
+    for r in raw:
+        core = r["core_name"] or r["name_normalized"]
+        row = {
+            "n":  r["name"],
+            "nn": r["name_normalized"],
+            "c":  r["name_count"],
+            "j":  r["judete"].split(",") if r["judete"] else [],
+            "st": [x for x in (r["street_types"] or "").split(",") if x],
+            "sl": slugify(core),
+        }
+        for src, dst in [
+            ("classification",  "cls"), ("wikidata_qid",    "q"),
+            ("person_full_name","pn"),  ("profession",      "pr"),
+            ("nationality",     "na"),  ("gender",          "g"),
+            ("era",             "er"),  ("wiki_scope",      "sc"),
+            ("category",        "cat"), ("subcategory",     "sub"),
+            ("nature_type",     "nt"),  ("place_type",      "pt"),
+            ("place_country",   "pc"),
+        ]:
+            if r.get(src) is not None:
+                row[dst] = r[src]
+        rows.append(row)
+
+    return {"meta": meta, "rows": rows}
+
+
 def municipii_index(conn: sqlite3.Connection) -> dict:
     """Per-municipiu data for the landing-page UAT filter dropdown.
 

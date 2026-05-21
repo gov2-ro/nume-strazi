@@ -1,5 +1,17 @@
 # Activity History
 
+## 2026-05-20 — Shipped product quality (P2): DB trim, browser perf, stats bar, keyboard nav
+
+Four related improvements to the live product:
+
+**DB trim** (`tools/build_dist_db.py`): replaced the shallow "drop 3 tables + VACUUM" approach with full materialization. The `streets_dedup` view is now written as a real table containing only the 11 columns actually referenced by `db-client.js`; the original `streets` table (127k rows, includes `artera_raw`, `id`, etc.) and the view are dropped. Also drops `streets_classified_pct`. Result: dist/streets.db shrinks from 30 MB → 13.5 MB (−59%).
+
+**Browser perf** (`site_queries.py`, `build_site.py`, `dist/browser/index.html`): added `browser_export()` to `site_queries.py` — one aggregate SQL query that produces all 30k grouped rows with every filterable field, plus 12 meta queries for dropdown options. `build_site.py` writes this to `dist/browser/data.json` (~3 MB) on every standard build. The browser compact view now fetches this JSON on load and filters client-side in JS — no WASM, no SQL on initial load. Table view still loads WASM lazily on first switch to it.
+
+**Live stats bar** (`dist/browser/index.html`): new `.stats-bar` strip below the result count showing top-3 classification types (%), gender split (F/M %), top profession, top era, top nationality for the current filter. Computed from the in-memory filtered rows synchronously on every filter change.
+
+**Keyboard navigation** (`dist/browser/index.html`): `tabindex="0"` + `role="button"` on all 7 filter dropdown buttons; `tabindex="-1"` + `role="option"` on all `.fdd-item` elements (including the "Toate" clear option). `/` shortcut focuses search; Enter/Space opens dropdown; ArrowDown/Up navigates items; Escape closes and returns focus to the button; Escape in search blurs it.
+
 ## 2026-05-19 — Subfolder hosting: JS link and portrait fixes
 
 Previous `--base` work only covered Jinja2-rendered HTML. JS-generated links

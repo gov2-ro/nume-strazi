@@ -10,6 +10,12 @@ Romanian-language interactive publication.
 
 ---
 
+## Preview
+
+![Screenshot of the interactive street names browser](/dist/screenshot-nume-strazi.png)
+
+---
+
 ## What it does
 
 - Ingests the registry xlsx into a normalised SQLite schema
