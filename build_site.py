@@ -54,6 +54,7 @@ def build(db_path: str = DB_PATH, variant: str = "default",
             "section5": site_queries.section5(conn),
             "section6": site_queries.section6(conn),
             "section8": site_queries.section8(conn),
+            "section_quirky": site_queries.section_quirky(conn),
             "municipii": site_queries.municipii_index(conn),
         }
         conn.close()

@@ -1299,6 +1299,124 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 </div>
 
 
+{# PANEL: KILOMETRI PE PERSOANĂ (Pick B-1) ─────────────────────────────────── #}
+{% if section_quirky.top_km %}
+{% set max_km = section_quirky.top_km[0].total_km if section_quirky.top_km else 1 %}
+<div class="panel s6" id="km-leaderboard">
+  <div class="panel-header">
+    <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-map-pin"/></svg> Cele mai lungi nume · km de asfalt</span>
+    <span class="panel-meta">top 15 · date OSM</span>
+  </div>
+  <div class="rank-list">
+    {% for p in section_quirky.top_km[:15] %}
+    <div class="rank-row" style="grid-template-columns:32px minmax(0,1fr) 60px 76px;">
+      <span style="font-family:var(--sans);font-size:11px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums;">{{ loop.index }}</span>
+      <span class="rank-name person" style="display:flex;align-items:center;gap:7px;">
+        {% if p.wikidata_qid and p.wikidata_qid in portraits %}
+        <span class="portrait" style="width:22px;height:22px;border-radius:50%;overflow:hidden;flex-shrink:0;display:inline-flex;">
+          <img src="{{ base }}/portraits/{{ p.wikidata_qid }}.jpg" alt="" style="width:100%;height:100%;object-fit:cover;" loading="lazy">
+        </span>
+        {% endif %}
+        {% if p.slug %}<a href="{{ base }}/persoana/{{ p.slug }}/" style="color:inherit;text-decoration:none;">{{ p.full_name }}</a>{% else %}{{ p.full_name }}{% endif %}
+      </span>
+      <div class="bar-wrap"><div class="bar" style="width:{{ (p.total_km / max_km * 100)|int }}%;"></div></div>
+      <span class="rank-count" style="white-space:nowrap;">{{ p.total_km }} <span style="font-size:10px;color:var(--muted);font-weight:500;">km</span></span>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="panel-caption" style="margin-top:10px;font-style:italic;">
+    Suma lungimilor segmentelor OSM mapate per nume.
+    Acoperire ~52% din străzile registrului; valorile sub-estimează absolutul dar clasamentul e stabil.
+  </div>
+</div>
+{% endif %}
+
+
+{# PANEL: IERARHIA STRĂZILOR PE CATEGORII (Pick B-2) ──────────────────────── #}
+{% if section_quirky.class_by_category %}
+{% set tier_colors = {
+  'principale':   '#0E4D92',
+  'intermediare': '#5F7A4E',
+  'rezidențiale': '#C7B49A',
+  'altele':       '#8A8A8A',
+} %}
+<div class="panel s6" id="prestige-hierarchy">
+  <div class="panel-header">
+    <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-chart-bar-big"/></svg> Ierarhia străzilor pe categorii</span>
+    <span class="panel-meta">% km · clase OSM</span>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:8px;padding-top:4px;">
+    {% for row in section_quirky.class_by_category %}
+    <div>
+      <div style="display:flex;justify-content:space-between;font-family:var(--sans);font-size:12px;margin-bottom:3px;">
+        <span style="font-weight:600;">{{ row.category }}</span>
+        <span style="color:var(--muted);font-variant-numeric:tabular-nums;">{{ row.total_km }} km</span>
+      </div>
+      <div style="display:flex;height:10px;border-radius:2px;overflow:hidden;background:var(--wash);">
+        {% for tier in section_quirky.tier_order %}
+          {% set pct = row[tier ~ '_pct'] %}
+          {% if pct > 0 %}
+          <div title="{{ tier }} · {{ pct }}%"
+               style="width:{{ pct }}%;background:{{ tier_colors[tier] }};"></div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <div style="display:flex;gap:14px;margin-top:12px;flex-wrap:wrap;font-family:var(--sans);font-size:11px;color:var(--muted);">
+    {% for tier in section_quirky.tier_order %}
+    <span style="display:inline-flex;align-items:center;gap:5px;">
+      <span style="width:10px;height:10px;border-radius:2px;background:{{ tier_colors[tier] }};"></span>{{ tier }}
+    </span>
+    {% endfor %}
+  </div>
+  <div class="panel-caption" style="margin-top:8px;font-style:italic;">
+    «Principale» = primary + secondary OSM. Persoanele și locurile primesc disproporționat străzi principale; flora rămâne aproape integral rezidențială.
+  </div>
+</div>
+{% endif %}
+
+
+{# PANEL: SELF-HONOR PER JUDEȚ (Pick C) ───────────────────────────────────── #}
+{% if section_quirky.self_honor_top %}
+<div class="panel s6" id="self-honor">
+  <div class="panel-header">
+    <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-house"/></svg> Județe care își onorează localii</span>
+    <span class="panel-meta">media națională {{ section_quirky.self_honor_national_pct }}%</span>
+  </div>
+  <div class="sub-section">
+    <div class="sub-eyebrow"><span class="dot" style="background:#5F7A4E;"></span>Top · localnici onorați</div>
+    {% set max_top = section_quirky.self_honor_top[0].pct if section_quirky.self_honor_top else 1 %}
+    {% for r in section_quirky.self_honor_top %}
+    <div class="rank-row" style="grid-template-columns:40px minmax(0,1fr) 60px 60px;">
+      <span style="font-family:var(--sans);font-size:12px;font-weight:700;letter-spacing:.04em;">{{ r.judet }}</span>
+      <div class="bar-wrap"><div class="bar" style="width:{{ (r.pct / max_top * 100)|int }}%;background:#5F7A4E;opacity:.85;"></div></div>
+      <span class="rank-count" style="text-align:right;">{{ r.pct }}%</span>
+      <span style="font-family:var(--sans);font-size:10.5px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums;">{{ r.self_honor_streets }}/{{ r.known_birth_streets }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="sub-section">
+    <div class="sub-eyebrow"><span class="dot" style="background:#A53A22;"></span>Bottom · cosmopolite</div>
+    {% set max_bot = section_quirky.self_honor_top[0].pct if section_quirky.self_honor_top else 1 %}
+    {% for r in section_quirky.self_honor_bottom %}
+    <div class="rank-row" style="grid-template-columns:40px minmax(0,1fr) 60px 60px;">
+      <span style="font-family:var(--sans);font-size:12px;font-weight:700;letter-spacing:.04em;">{{ r.judet }}</span>
+      <div class="bar-wrap"><div class="bar" style="width:{{ (r.pct / max_bot * 100)|int }}%;background:#A53A22;opacity:.6;"></div></div>
+      <span class="rank-count" style="text-align:right;">{{ r.pct }}%</span>
+      <span style="font-family:var(--sans);font-size:10.5px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums;">{{ r.self_honor_streets }}/{{ r.known_birth_streets }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="panel-caption" style="margin-top:10px;font-style:italic;">
+    «Localnici onorați» = personalități născute în județul X care primesc străzi în X.
+    Numitorul exclude personalitățile cu naștere necunoscută sau străină, ca să nu fie diluat de lacunele Wikidata (~50%).
+  </div>
+</div>
+{% endif %}
+
+
 {# PANEL: CONTESTE TEMATICE (s12, internal 3-col × 2-row grid) #}
 {% set contest_labels = {
   'animals': 'Animale',

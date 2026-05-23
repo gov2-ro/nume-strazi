@@ -153,6 +153,9 @@ CREATE TABLE persons (
     wiki_ro_url TEXT,
     wiki_en_url TEXT,
     wiki_ro_views INTEGER,
+    birth_place_qid TEXT,
+    birth_place_label TEXT,
+    birth_judet TEXT,
     notes TEXT
 );
 CREATE TABLE place_refs (

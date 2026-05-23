@@ -1,5 +1,24 @@
 # Activity History
 
+## 2026-05-23 — "Quirky stats" round 1: km per honoree, prestige hierarchy, self-honor index
+
+Brainstormed (`docs/BACKLOG.md` line 146, *"go wild, nerdy, quirky"*) and locked in two starter picks: OSM-based real-estate framing of honor (Pick B) and a Wikidata-driven self-honor index (Pick C). Pick A (cause-of-death breakdown) deferred.
+
+**Data layer.** Added two named queries to `docs/queries.sql`: `total_km_per_honoree` (joins `streets_dedup ↔ street_osm_matches ↔ osm_streets`, sums `length_m` per `core_name_norm`) and `highway_class_by_category` (same join, grouped by macro-classification × OSM `highway_class`). Added `self_honor_per_judet` and `most_parochial_honorees`. OSM pipeline (`osm_ingest` → `osm_match` → `osm_score`) was empty after a prior rebuild — replayed end-to-end; 52.2% registry coverage restored.
+
+**Birthplace pipeline (Pick C).** New `tools/wiki_birthplace.py` fetches Wikidata P19 for the 206 persons with QIDs, walks the P131 chain to land them in a Romanian județ when possible. Result: 133 birth places resolved, 106 inside a Romanian județ. CSV audit trail at `data/curation/wikidata_birthplaces.csv` with `--replay-csv` for build_db rebuild persistence. Two gotchas worth a note: (1) Wikidata's `P31` for counties is `Q1776764` (not the more obvious `Q15947`, which is the older/secondary typing — both accepted now). (2) Action-API endpoint was 429-rate-limited; the SPARQL endpoint is in worse shape (HTTP 429 with explicit "WDQS outage" message), so the tool avoids SPARQL entirely and discovers județe inline during the P131 walk by matching `Q1776764/Q15947` + label.
+
+**Site wiring.** New `site_queries.section_quirky()` returns `top_km` (top-20 leaderboard), `class_by_category` (bucketed into 4 prestige tiers: principale / intermediare / rezidențiale / altele — to make the stacked bar legible), and `self_honor_top` / `self_honor_bottom` (top-5 + bottom-5 with `known_birth_streets >= 20` floor so rural județe with single-digit denominators don't sit at the extremes). Extended `section6` with `self_honor_pct` so the existing `/judete/` choropleth can display it.
+
+Three new panels added to `templates/index.html.j2` (km leaderboard, prestige hierarchy bars, self-honor top/bottom). New chip `onorează localii` on `templates/judete-index.html.j2`. Verified visually via Chrome DevTools MCP — Harghita 31.4% leads the self-honor map; Ștefan cel Mare leads the km board at 320 km, ahead of Tudor Vladimirescu (291) and Eminescu (262). Prestige-hierarchy hypothesis confirmed: nature streets are ~95% residential km, while person streets get ~26% primary+secondary share.
+
+**Schema.** Added `birth_place_qid`, `birth_place_label`, `birth_judet` to `persons` in `build_db.py`. Brainstorm catalog (35+ candidate stats across 7 themes) saved at `/Users/pax/.claude/plans/let-s-touch-the-go-structured-taco.md` for future picks.
+
+**Coverage caveats logged in panel captions:** km totals under-count because OSM matches cover only 52% of registry streets (ranking is stable); self-honor denominator is "person-streets with known birth-județ" (only ~50% of QID-holding persons resolve to a Romanian județ, so foreign-born and unknown-birth honorees drop out cleanly).
+
+**Found-not-fixed.** `core_name_norm` rows `a. i. cuza` and `cuza voda` are mapped to Michel Vorm's QID (IJsselstein NL) — same regression flagged in BACKLOG's QID uniqueness guard item that didn't survive the last rebuild. Added a BACKLOG note with the replay-CSV remediation path.
+
+
 ## 2026-05-21 — SVG icons + Wikipedia links
 
 Replaced all structural emoji (panel headers, kicker chips) with Lucide inline SVG icons; added Wikipedia fallback links to person detail pages.

@@ -321,6 +321,103 @@ WHERE NOT EXISTS (
 ORDER BY o.importance_v1 DESC
 LIMIT 50;
 
+-- Self-honor index per județ: of person-streets in județ X whose honoree's
+-- birth_judet is known, what % were also born in județ X? "Knowing your own".
+-- Foreign-born or unknown-birth honorees fall out of the denominator so the
+-- numbers aren't deflated by Wikidata sparsity.
+-- :name self_honor_per_judet
+SELECT s.judet,
+       SUM(CASE WHEN p.birth_judet = s.judet THEN 1 ELSE 0 END) AS self_honor_streets,
+       SUM(CASE WHEN p.birth_judet IS NOT NULL THEN 1 ELSE 0 END) AS known_birth_streets,
+       COUNT(*) AS total_person_streets,
+       ROUND(100.0 * SUM(CASE WHEN p.birth_judet = s.judet THEN 1 ELSE 0 END)
+                   / NULLIF(SUM(CASE WHEN p.birth_judet IS NOT NULL THEN 1 ELSE 0 END), 0), 1)
+                                                                AS pct_self_honor_known
+FROM streets_dedup s
+JOIN persons p ON p.core_name_norm = s.core_name_norm
+GROUP BY s.judet
+ORDER BY pct_self_honor_known DESC;
+
+-- Most parochial honorees: persons whose streets cluster heavily in one județ.
+-- Useful for picking out local heroes.
+-- :name most_parochial_honorees
+WITH streets_per_person_judet AS (
+  SELECT p.core_name_norm, p.full_name, p.birth_judet, s.judet,
+         COUNT(*) AS streets_in_judet
+  FROM streets_dedup s JOIN persons p ON p.core_name_norm = s.core_name_norm
+  GROUP BY p.core_name_norm, s.judet
+),
+totals AS (
+  SELECT core_name_norm, SUM(streets_in_judet) AS total_streets
+  FROM streets_per_person_judet
+  GROUP BY core_name_norm
+)
+SELECT spj.full_name, spj.birth_judet, spj.judet AS dominant_judet,
+       spj.streets_in_judet, t.total_streets,
+       ROUND(100.0 * spj.streets_in_judet / t.total_streets, 1) AS pct_in_dominant
+FROM streets_per_person_judet spj
+JOIN totals t ON t.core_name_norm = spj.core_name_norm
+WHERE t.total_streets >= 5
+  AND 100.0 * spj.streets_in_judet / t.total_streets >= 50
+ORDER BY t.total_streets DESC, pct_in_dominant DESC
+LIMIT 40;
+
+
+-- Kilometers of OSM-mapped road per honored person, ranked.
+-- Reframes the "who has the most streets" question as "who owns the most asphalt".
+-- Coverage caveat: street_osm_matches covers ~52% of the registry, so absolute
+-- totals under-count, but the ranking is stable across the matched subset.
+-- :name total_km_per_honoree
+SELECT
+    p.full_name,
+    p.gender,
+    p.era,
+    p.profession,
+    p.nationality,
+    COUNT(DISTINCT sd.id)              AS matched_streets,
+    ROUND(SUM(o.length_m) / 1000.0, 2) AS total_km
+FROM streets_dedup        sd
+JOIN persons              p  ON p.core_name_norm = sd.core_name_norm
+JOIN street_osm_matches   m  ON m.street_id      = sd.id
+JOIN osm_streets          o  ON o.id             = m.osm_street_id
+GROUP BY p.core_name_norm
+ORDER BY total_km DESC
+LIMIT 50;
+
+-- Highway-class composition by macro-classification.
+-- Tests the prestige-hierarchy hypothesis: do person/military streets skew toward
+-- primary/secondary while nature/saint streets concentrate in residential/tertiary?
+-- :name highway_class_by_category
+WITH classified AS (
+  SELECT sd.id,
+    CASE
+      WHEN sd.is_numeric=1                       THEN 'numeric'
+      WHEN sd.is_date=1                          THEN 'date'
+      WHEN sd.is_saint=1                         THEN 'religious'
+      WHEN p.core_name_norm  IS NOT NULL         THEN 'person'
+      WHEN n.core_name_norm  IS NOT NULL         THEN 'nature'
+      WHEN pl.core_name_norm IS NOT NULL         THEN 'place'
+      WHEN c.core_name_norm  IS NOT NULL         THEN 'category'
+      ELSE 'unclassified'
+    END AS category
+  FROM streets_dedup sd
+  LEFT JOIN persons         p  ON p.core_name_norm  = sd.core_name_norm
+  LEFT JOIN nature_terms    n  ON n.core_name_norm  = sd.core_name_norm
+  LEFT JOIN place_refs      pl ON pl.core_name_norm = sd.core_name_norm
+  LEFT JOIN name_categories c  ON c.core_name_norm  = sd.core_name_norm
+)
+SELECT
+    cl.category,
+    o.highway_class,
+    COUNT(*)                            AS streets,
+    ROUND(SUM(o.length_m) / 1000.0, 1)  AS total_km
+FROM classified cl
+JOIN street_osm_matches m ON m.street_id    = cl.id
+JOIN osm_streets        o ON o.id           = m.osm_street_id
+GROUP BY cl.category, o.highway_class
+ORDER BY cl.category, total_km DESC;
+
+
 -- Curation coverage: how many distinct core_name_norm keys are classified,
 -- and what percentage of streets (weighted by frequency) they represent.
 -- :name classification_coverage

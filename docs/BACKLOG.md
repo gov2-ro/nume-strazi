@@ -143,7 +143,7 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [x] percent of nationalities of personalities. Universal. Local. — Done 2026-05-18. New "Naționalitatea personalităților onorate" panel on the landing page: side-by-side bars `după persoane` vs `după străzi (ponderate)`. Surfaced the asymmetry: non-Romanian personalities are 7.4% of persons but only 4.49% of streets — onorate proporțional pe mai puține străzi decât cota lor numerică. Source data via `section3.nationality_breakdown` in `site_queries.py`. Note: `wiki_scope` is too sparse (3 universal only) for a "Universal vs Local" sub-split to be informative; deferred until scope coverage improves.
 
-- [ ] Go wild, nerdy, quirky. The people, how old, what are the occupations? Reason of death?
+- [~] Go wild, nerdy, quirky. The people, how old, what are the occupations? Reason of death? *(partial 2026-05-23: brainstorm catalog saved to `/Users/pax/.claude/plans/let-s-touch-the-go-structured-taco.md` — 35+ candidate stats across 7 themes. Picks B + C shipped: km-per-honoree leaderboard, prestige-hierarchy stacked bar, self-honor index per județ. Cause-of-death/biographical-lifecycle picks deferred — natural next batch since `wiki_birthplace.py` already proved out the wbgetentities pattern for an extra Wikidata property.)*
 
 - [ ] Norm to population, street length, lanes, centrality. Order by number (absolute), relative to population, relative to population x street relevance
 
@@ -152,6 +152,10 @@ Items detected during sessions. Each entry has enough context to act on cold.
 - [x] **Wire real portraits into the Top Persoane list.** The dense dashboard now has a `.portrait` CSS class on each row of the s12 "Top persoane onorate" list, currently filled with parsed initials. When portrait images are available (Wikimedia thumbnails via `wikidata_persons.qid` is the obvious path), replace the initials with `<img>`. Layout already accommodates 26px circles without reflow. Wikimedia API: `https://commons.wikimedia.org/w/api.php?action=query&titles=File:<P18-value>&prop=imageinfo&iiprop=url&iiurlwidth=64`. Cache hashed thumbnails to `dist/portraits/<qid>.jpg` so the static site stays portable.
 
 - [ ] **Validate dark-statbar direction with stakeholders.** The bold-restyle pass moved the stats band from a light cream to dark ink (Bloomberg-feel). User brief said "white background" — interpreted as the main panels, with the statbar as a structural masthead. If user pushes back, flip `.statbar` to `background: var(--bg)` + `color: var(--ink)` and the rest of the design holds (panels, leader highlights, type scale all read fine on white-on-white as well).
+
+- [ ] if wikipedia/data missing – don't show anything instead of template links
+
+- [ ] **Cuza-family QID regression after rebuild** — `tools/wiki_birthplace.py` surfaced that `core_name_norm` rows for `a. i. cuza` and `cuza voda` are mapped to a non-Cuza QID (P19 = IJsselstein NL, which is Michel Vorm's birthplace). This is the same regression noted earlier in the QID uniqueness guard item — the manual `UPDATE persons SET wikidata_qid='Q294832'` fix wasn't replayed into `data/curation/wikidata_qids.csv`, so any DB rebuild reintroduces the bug. Action: confirm CSV has the correct Q294832 entries for these two keys, then re-run `wikidata_persons.py --replay-csv --force`. While at it, also patch `tools/wiki_birthplace.py` to skip persons whose QID conflicts with another person's QID (consistency guard).
 
 ## Later
 
@@ -179,3 +183,5 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [ ] traffic analytics
 - [ ] SEO webmasters registrations
+- [ ] write scientific paper(s). 1. method, 2. conclusions – co-publish with academic?
+- [ ] write articles, scena9 or such 

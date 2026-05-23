@@ -713,7 +713,14 @@ def section6(conn: sqlite3.Connection) -> dict:
                ROUND(100.0 * SUM(CASE WHEN p.wiki_scope = 'universal' THEN 1 ELSE 0 END) / COUNT(*), 2) AS universal_pct,
                ROUND(100.0 * SUM(CASE WHEN nt.core_name_norm IS NOT NULL THEN 1 ELSE 0 END) / COUNT(*), 1) AS nature_pct,
                ROUND(100.0 * SUM(CASE WHEN nt.nature_type IN ('flower','tree','plant','fruit','forest','orchard') THEN 1 ELSE 0 END) / COUNT(*), 2) AS flora_pct,
-               ROUND(100.0 * SUM(CASE WHEN nc.category = 'ideological' THEN 1 ELSE 0 END) / COUNT(*), 2) AS ideology_pct
+               ROUND(100.0 * SUM(CASE WHEN nc.category = 'ideological' THEN 1 ELSE 0 END) / COUNT(*), 2) AS ideology_pct,
+               -- self_honor_pct: of person-streets in this județ with a KNOWN
+               -- birth-județ on the honoree, what fraction were born locally.
+               -- Denominator excludes foreign-born and unknown-birth honorees so
+               -- the rate isn't deflated by Wikidata sparsity (~50% of QIDs).
+               ROUND(100.0 * SUM(CASE WHEN p.birth_judet = sd.judet THEN 1 ELSE 0 END)
+                           / NULLIF(SUM(CASE WHEN p.birth_judet IS NOT NULL THEN 1 ELSE 0 END), 0), 1)
+                                                                                  AS self_honor_pct
         FROM streets_dedup sd
         LEFT JOIN persons p ON p.core_name_norm = sd.core_name_norm
         LEFT JOIN nature_terms nt ON nt.core_name_norm = sd.core_name_norm
@@ -819,6 +826,140 @@ def section6(conn: sqlite3.Connection) -> dict:
         "top_per_judet": top_map,
         "rare_per_judet": rare_map,
         "persons_per_judet": persons_map,
+    }
+
+
+def section_quirky(conn: sqlite3.Connection) -> dict:
+    """
+    "Quirky" stats panels for the landing page:
+      - top_km            : honorees ranked by total OSM kilometers (Pick B-1)
+      - class_by_category : highway-class composition by classification (Pick B-2)
+      - self_honor_top    : județe where local-born honorees dominate (Pick C)
+      - self_honor_bottom : județe that honor outsiders more than their own
+    Coverage caveats:
+      - OSM joins: ~52% of registry streets are matched, so absolute km under-count
+        but rankings are stable.
+      - self_honor: only 106/206 honorees with QIDs land in a Romanian județ,
+        so the denominator is "person-streets with known birth-județ".
+    """
+    top_km = _rows(conn, """
+        SELECT
+            p.full_name,
+            p.gender,
+            p.profession,
+            p.wikidata_qid,
+            COUNT(DISTINCT sd.id)              AS matched_streets,
+            ROUND(SUM(o.length_m) / 1000.0, 1) AS total_km
+        FROM streets_dedup sd
+        JOIN persons p              ON p.core_name_norm = sd.core_name_norm
+        JOIN street_osm_matches m   ON m.street_id      = sd.id
+        JOIN osm_streets o          ON o.id             = m.osm_street_id
+        GROUP BY p.core_name_norm
+        ORDER BY total_km DESC
+        LIMIT 20
+    """)
+    for r in top_km:
+        r["slug"] = (r["wikidata_qid"] or "").lower() or slugify(r["full_name"] or "")
+
+    # Highway-class composition. Pivot client-side; here just return the long form
+    # plus per-category totals for share computations.
+    class_rows = _rows(conn, """
+        WITH classified AS (
+          SELECT sd.id,
+            CASE
+              WHEN sd.is_numeric=1                       THEN 'numerice'
+              WHEN sd.is_date=1                          THEN 'date'
+              WHEN sd.is_saint=1                         THEN 'religios'
+              WHEN p.core_name_norm  IS NOT NULL         THEN 'persoane'
+              WHEN n.core_name_norm  IS NOT NULL         THEN 'natură'
+              WHEN pl.core_name_norm IS NOT NULL         THEN 'locuri'
+              WHEN c.core_name_norm  IS NOT NULL         THEN 'categorii'
+              ELSE 'neclasificate'
+            END AS category
+          FROM streets_dedup sd
+          LEFT JOIN persons         p  ON p.core_name_norm  = sd.core_name_norm
+          LEFT JOIN nature_terms    n  ON n.core_name_norm  = sd.core_name_norm
+          LEFT JOIN place_refs      pl ON pl.core_name_norm = sd.core_name_norm
+          LEFT JOIN name_categories c  ON c.core_name_norm  = sd.core_name_norm
+        )
+        SELECT cl.category,
+               o.highway_class,
+               COUNT(*)                            AS streets,
+               ROUND(SUM(o.length_m) / 1000.0, 1)  AS total_km
+        FROM classified cl
+        JOIN street_osm_matches m ON m.street_id = cl.id
+        JOIN osm_streets o        ON o.id        = m.osm_street_id
+        GROUP BY cl.category, o.highway_class
+    """)
+    # Bucket OSM highway classes into 4 prestige tiers for a readable stacked bar.
+    tier_map = {
+        "primary":       "principale",
+        "secondary":     "principale",
+        "tertiary":      "intermediare",
+        "unclassified":  "intermediare",
+        "residential":   "rezidențiale",
+        "living_street": "rezidențiale",
+        "service":       "altele",
+        "pedestrian":    "altele",
+    }
+    tier_order = ["principale", "intermediare", "rezidențiale", "altele"]
+    # category_order chosen so the most visually-different categories come first.
+    category_order = ["persoane", "locuri", "categorii", "natură",
+                      "neclasificate", "date", "religios", "numerice"]
+
+    by_category: dict[str, dict[str, float]] = {}
+    for r in class_rows:
+        cat  = r["category"]
+        tier = tier_map.get(r["highway_class"], "altele")
+        by_category.setdefault(cat, {t: 0.0 for t in tier_order})
+        by_category[cat][tier] += r["total_km"] or 0
+
+    class_by_category = []
+    for cat in category_order:
+        if cat not in by_category:
+            continue
+        tiers     = by_category[cat]
+        total     = sum(tiers.values()) or 1.0
+        row       = {"category": cat, "total_km": round(total, 1)}
+        for t in tier_order:
+            row[t]            = round(tiers[t], 1)
+            row[t + "_pct"]   = round(100.0 * tiers[t] / total, 1)
+        class_by_category.append(row)
+
+    self_honor_rows = _rows(conn, """
+        SELECT s.judet,
+               COUNT(*)                                                       AS total_person_streets,
+               SUM(CASE WHEN p.birth_judet IS NOT NULL THEN 1 ELSE 0 END)    AS known_birth_streets,
+               SUM(CASE WHEN p.birth_judet = s.judet THEN 1 ELSE 0 END)      AS self_honor_streets,
+               ROUND(100.0 * SUM(CASE WHEN p.birth_judet = s.judet THEN 1 ELSE 0 END)
+                           / NULLIF(SUM(CASE WHEN p.birth_judet IS NOT NULL THEN 1 ELSE 0 END), 0), 1)
+                                                                              AS pct
+        FROM streets_dedup s
+        JOIN persons p ON p.core_name_norm = s.core_name_norm
+        GROUP BY s.judet
+        HAVING known_birth_streets >= 20
+        ORDER BY pct DESC
+    """)
+    self_honor_top    = self_honor_rows[:5]
+    self_honor_bottom = sorted(self_honor_rows, key=lambda r: r["pct"] or 0)[:5]
+
+    # National baseline so the panel can put județ values in context.
+    nat = _one(conn, """
+        SELECT
+          SUM(CASE WHEN p.birth_judet IS NOT NULL THEN 1 ELSE 0 END) AS known,
+          SUM(CASE WHEN p.birth_judet = s.judet THEN 1 ELSE 0 END)   AS self_count
+        FROM streets_dedup s
+        JOIN persons p ON p.core_name_norm = s.core_name_norm
+    """)
+    nat_pct = round(100.0 * nat["self_count"] / nat["known"], 1) if nat["known"] else 0.0
+
+    return {
+        "top_km":            top_km,
+        "class_by_category": class_by_category,
+        "tier_order":        tier_order,
+        "self_honor_top":    self_honor_top,
+        "self_honor_bottom": self_honor_bottom,
+        "self_honor_national_pct": nat_pct,
     }
 
 
