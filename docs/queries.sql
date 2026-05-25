@@ -443,3 +443,59 @@ SELECT
   ROUND(100.0 * SUM(CASE WHEN classification IS NOT NULL THEN street_count ELSE 0 END)
     / SUM(street_count), 1)                                              AS pct_streets_classified
 FROM streets_classified_pct;
+
+
+-- Honorees ranked by age at death (youngest first), weighted by street count.
+-- Reveals how many of Romania's most-honored figures died young.
+-- :name age_at_death
+SELECT
+    p.full_name,
+    p.birth_year,
+    p.death_year,
+    p.death_year - p.birth_year                  AS age_at_death,
+    p.gender,
+    p.profession,
+    p.wikidata_qid,
+    COUNT(DISTINCT sd.id)                        AS street_count
+FROM persons p
+JOIN streets_dedup sd ON sd.core_name_norm = p.core_name_norm
+WHERE p.birth_year IS NOT NULL
+  AND p.death_year IS NOT NULL
+  AND p.death_year > p.birth_year
+GROUP BY p.core_name_norm
+ORDER BY age_at_death;
+
+
+-- Cause-of-death distribution: persons and street count per raw label.
+-- :name cause_of_death_breakdown
+WITH sc AS (
+    SELECT core_name_norm, COUNT(DISTINCT id) AS street_count
+    FROM streets_dedup GROUP BY core_name_norm
+)
+SELECT
+    COALESCE(NULLIF(p.cause_of_death_label,''), 'necunoscută') AS cause_label,
+    COUNT(DISTINCT p.core_name_norm)  AS persons,
+    SUM(sc.street_count)              AS streets
+FROM persons p
+JOIN sc ON sc.core_name_norm = p.core_name_norm
+WHERE p.wikidata_qid IS NOT NULL
+GROUP BY cause_label
+ORDER BY streets DESC;
+
+
+-- Street count per birth century — shows which historical era Romania commemorates most.
+-- :name birth_century_distribution
+WITH sc AS (
+    SELECT core_name_norm, COUNT(DISTINCT id) AS street_count
+    FROM streets_dedup GROUP BY core_name_norm
+)
+SELECT
+    (p.birth_year / 100) * 100          AS century_start,
+    COUNT(DISTINCT p.core_name_norm)    AS persons,
+    SUM(sc.street_count)                AS streets
+FROM persons p
+JOIN sc ON sc.core_name_norm = p.core_name_norm
+WHERE p.birth_year IS NOT NULL
+  AND p.birth_year > 0
+GROUP BY century_start
+ORDER BY century_start;

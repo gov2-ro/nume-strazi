@@ -953,6 +953,113 @@ def section_quirky(conn: sqlite3.Connection) -> dict:
     """)
     nat_pct = round(100.0 * nat["self_count"] / nat["known"], 1) if nat["known"] else 0.0
 
+    # --- Biographical lifecycle (Pick A) -----------------------------------
+
+    age_rows = _rows(conn, """
+        SELECT p.full_name,
+               MIN(p.birth_year)                    AS birth_year,
+               MIN(p.death_year)                    AS death_year,
+               MIN(p.death_year) - MIN(p.birth_year) AS age_at_death,
+               p.gender, p.profession,
+               MIN(p.wikidata_qid)                  AS wikidata_qid,
+               COUNT(DISTINCT sd.id)                AS street_count
+        FROM persons p
+        JOIN streets_dedup sd ON sd.core_name_norm = p.core_name_norm
+        WHERE p.birth_year IS NOT NULL AND p.death_year IS NOT NULL
+          AND p.death_year > p.birth_year AND p.birth_year > 0
+        GROUP BY p.full_name
+        ORDER BY age_at_death
+    """)
+    for r in age_rows:
+        r["slug"] = (r["wikidata_qid"] or "").lower() or slugify(r["full_name"] or "")
+
+    # Weighted average age (street-count weighted)
+    total_streets = sum(r["street_count"] for r in age_rows) or 1
+    weighted_avg_age = round(
+        sum(r["age_at_death"] * r["street_count"] for r in age_rows) / total_streets, 1
+    )
+
+    # "Forever young" = died before 40, sorted by streets desc
+    young_dead = sorted(
+        [r for r in age_rows if r["age_at_death"] < 40],
+        key=lambda r: r["street_count"], reverse=True
+    )[:10]
+
+    # Cause-of-death macro-bucketing
+    def cause_macro(label: str | None) -> str:
+        if not label:
+            return "necunoscută"
+        l = label.lower()
+        if any(k in l for k in ("tuberculosis", "pneumonia", "typhus", "plague", "cancer",
+                                "hepatitis", "nephritis", "infarction", "stroke", "gout",
+                                "seizure", "foodborne", "lung", "infectious", "alzheimer",
+                                "asphyxia", "disease", "illness")):
+            return "boală"
+        if any(k in l for k in ("gunshot", "shooting", "execution", "decapitation",
+                                "breaking wheel", "poison", "ambush", "murder", "killed")):
+            return "violență"
+        if any(k in l for k in ("collision", "vehicle", "accident", "earthquake",
+                                "invention")):
+            return "accident"
+        return "altele"
+
+    cause_raw = _rows(conn, """
+        WITH sc AS (
+            SELECT core_name_norm, COUNT(DISTINCT id) AS street_count
+            FROM streets_dedup GROUP BY core_name_norm
+        )
+        SELECT
+            COALESCE(NULLIF(p.cause_of_death_label,''), '') AS cause_label,
+            COUNT(DISTINCT p.core_name_norm)  AS persons,
+            SUM(sc.street_count)              AS streets
+        FROM persons p
+        JOIN sc ON sc.core_name_norm = p.core_name_norm
+        WHERE p.wikidata_qid IS NOT NULL
+        GROUP BY cause_label
+        ORDER BY streets DESC
+    """)
+
+    macro_acc: dict[str, dict] = {}
+    for r in cause_raw:
+        macro = cause_macro(r["cause_label"] or "")
+        if macro not in macro_acc:
+            macro_acc[macro] = {"macro": macro, "persons": 0, "streets": 0}
+        macro_acc[macro]["persons"] += r["persons"]
+        macro_acc[macro]["streets"] += r["streets"]
+
+    macro_order = ["boală", "violență", "accident", "altele", "necunoscută"]
+    total_cause_streets = sum(v["streets"] for v in macro_acc.values()) or 1
+    cause_breakdown = []
+    for m in macro_order:
+        if m not in macro_acc:
+            continue
+        row = macro_acc[m]
+        row["pct"] = round(100.0 * row["streets"] / total_cause_streets, 1)
+        cause_breakdown.append(row)
+
+    # Birth-century distribution (street-weighted)
+    century_rows = _rows(conn, """
+        WITH sc AS (
+            SELECT core_name_norm, COUNT(DISTINCT id) AS street_count
+            FROM streets_dedup GROUP BY core_name_norm
+        )
+        SELECT (p.birth_year / 100) * 100   AS century_start,
+               COUNT(DISTINCT p.core_name_norm) AS persons,
+               SUM(sc.street_count)             AS streets
+        FROM persons p
+        JOIN sc ON sc.core_name_norm = p.core_name_norm
+        WHERE p.birth_year IS NOT NULL AND p.birth_year > 0
+        GROUP BY century_start
+        ORDER BY century_start
+    """)
+    # Format century label for display
+    for r in century_rows:
+        cs = r["century_start"]
+        if cs is not None:
+            r["century_label"] = f"sec. {abs(cs // 100) + 1}" + (" î.Hr." if cs < 0 else "")
+        else:
+            r["century_label"] = "?"
+
     return {
         "top_km":            top_km,
         "class_by_category": class_by_category,
@@ -960,6 +1067,11 @@ def section_quirky(conn: sqlite3.Connection) -> dict:
         "self_honor_top":    self_honor_top,
         "self_honor_bottom": self_honor_bottom,
         "self_honor_national_pct": nat_pct,
+        "age_rows":          age_rows,
+        "weighted_avg_age":  weighted_avg_age,
+        "young_dead":        young_dead,
+        "cause_breakdown":   cause_breakdown,
+        "century_rows":      century_rows,
     }
 
 

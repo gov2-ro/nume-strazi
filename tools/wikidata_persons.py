@@ -187,10 +187,12 @@ def replay_from_csv(csv_path: Path, conn: sqlite3.Connection, cursor: sqlite3.Cu
             print(f"  ~ overwrite {db_qid} → {qid}: {key}")
             overwrote += 1
 
-        # Uniqueness guard: reject if QID is already owned by a different key
+        # Uniqueness guard: reject if QID is already owned by a different person.
+        # Same-full_name aliases (e.g. "a. i. cuza" / "cuza voda" / "alexandru Ioan cuza")
+        # are legitimately expected to share a QID — only block cross-person collisions.
         dupe = cursor.execute(
-            "SELECT core_name_norm FROM persons WHERE wikidata_qid = ? AND core_name_norm != ?",
-            (qid, key)
+            "SELECT core_name_norm FROM persons WHERE wikidata_qid = ? AND core_name_norm != ? AND full_name != ?",
+            (qid, key, row["full_name"])
         ).fetchone()
         if dupe:
             print(f"  ⚠ duplicate QID {qid} already on '{dupe[0]}', skipping: {key}")
@@ -296,10 +298,10 @@ def main():
                 qid, confidence = match
                 auto = confidence >= args.confidence
 
-                # Uniqueness guard: check if this QID is already assigned to a different person
+                # Uniqueness guard: block cross-person QID collisions; allow same-full_name aliases.
                 cursor.execute(
-                    "SELECT core_name_norm FROM persons WHERE wikidata_qid = ? AND core_name_norm != ?",
-                    (qid, person["core_name_norm"])
+                    "SELECT core_name_norm FROM persons WHERE wikidata_qid = ? AND core_name_norm != ? AND full_name != ?",
+                    (qid, person["core_name_norm"], person["full_name"])
                 )
                 existing = cursor.fetchone()
                 if existing:

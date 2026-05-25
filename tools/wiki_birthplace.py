@@ -351,6 +351,29 @@ def main():
         ))
     conn.commit()
 
+    # Propagate birth_place to same-QID aliases (e.g. "a. i. cuza" / "cuza voda" share Q294832).
+    propagated = cursor.execute("""
+        UPDATE persons
+        SET birth_place_qid = (
+              SELECT src.birth_place_qid FROM persons src
+              WHERE src.wikidata_qid = persons.wikidata_qid
+                AND src.birth_place_qid IS NOT NULL LIMIT 1),
+            birth_place_label = (
+              SELECT src.birth_place_label FROM persons src
+              WHERE src.wikidata_qid = persons.wikidata_qid
+                AND src.birth_place_qid IS NOT NULL LIMIT 1),
+            birth_judet = (
+              SELECT src.birth_judet FROM persons src
+              WHERE src.wikidata_qid = persons.wikidata_qid
+                AND src.birth_place_qid IS NOT NULL LIMIT 1)
+        WHERE birth_place_qid IS NULL
+          AND wikidata_qid IN (
+              SELECT wikidata_qid FROM persons WHERE birth_place_qid IS NOT NULL)
+    """).rowcount
+    if propagated:
+        conn.commit()
+        print(f"  ↳ Propagated birth_place to {propagated} same-QID alias(es)")
+
     existing = load_csv()
     write_csv(existing + new_rows)
     print(f"\n✓ Updated {len(new_rows)} persons; CSV → {CSV_PATH}")

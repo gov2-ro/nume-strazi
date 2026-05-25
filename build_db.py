@@ -156,6 +156,8 @@ CREATE TABLE persons (
     birth_place_qid TEXT,
     birth_place_label TEXT,
     birth_judet TEXT,
+    cause_of_death_qid TEXT,
+    cause_of_death_label TEXT,
     notes TEXT
 );
 CREATE TABLE place_refs (

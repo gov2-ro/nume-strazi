@@ -1417,6 +1417,77 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 {% endif %}
 
 
+{# PANEL: CEI MAI TINERI ONORAȚI ──────────────────────────────────────────── #}
+{% if section_quirky.young_dead %}
+<div class="panel s6" id="young-dead">
+  <div class="panel-header">
+    <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-hourglass"/></svg> Onorați tineri · decedați sub 40 de ani</span>
+    <span class="panel-meta">vârstă medie ponderată {{ section_quirky.weighted_avg_age }} ani</span>
+  </div>
+  <div class="rank-list">
+    {% for p in section_quirky.young_dead %}
+    <div class="rank-row" style="grid-template-columns:32px minmax(0,1fr) 44px 60px;">
+      <span style="font-family:var(--sans);font-size:11px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums;">{{ loop.index }}</span>
+      <span class="rank-name person" style="display:flex;align-items:center;gap:7px;">
+        {% if p.wikidata_qid and p.wikidata_qid in portraits %}
+        <span class="portrait" style="width:22px;height:22px;border-radius:50%;overflow:hidden;flex-shrink:0;display:inline-flex;">
+          <img src="{{ base }}/portraits/{{ p.wikidata_qid }}.jpg" alt="" style="width:100%;height:100%;object-fit:cover;" loading="lazy">
+        </span>
+        {% endif %}
+        {% if p.slug %}<a href="{{ base }}/persoana/{{ p.slug }}/" style="color:inherit;text-decoration:none;">{{ p.full_name }}</a>{% else %}{{ p.full_name }}{% endif %}
+        <span style="font-family:var(--sans);font-size:10px;color:var(--muted);">{{ p.birth_year }}–{{ p.death_year }}</span>
+      </span>
+      <span class="rank-count" style="font-size:12px;white-space:nowrap;">{{ p.age_at_death }}<span style="font-size:10px;color:var(--muted);font-weight:500;"> ani</span></span>
+      <span style="font-family:var(--sans);font-size:10.5px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums;">{{ p.street_count }} str.</span>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="panel-caption" style="margin-top:10px;font-style:italic;">
+    Personalități cu {{ section_quirky.age_rows | length }} vârste cunoscute; media ponderată de {{ section_quirky.weighted_avg_age }} ani per stradă.
+  </div>
+</div>
+{% endif %}
+
+
+{# PANEL: CAUZA MORȚII ─────────────────────────────────────────────────────── #}
+{% if section_quirky.cause_breakdown %}
+{% set cause_colors = {
+  'boală':      '#4A7C59',
+  'violență':   '#A53A22',
+  'accident':   '#8A6C3A',
+  'altele':     '#6A6A6A',
+  'necunoscută': '#C0C0C0',
+} %}
+<div class="panel s6" id="cause-of-death">
+  <div class="panel-header">
+    <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-heart-crack"/></svg> Cauza morții honorarilor</span>
+    <span class="panel-meta">{{ section_quirky.cause_breakdown | sum(attribute='persons') }} personalități cu date Wikidata</span>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:10px;padding-top:4px;">
+    {% set max_streets = section_quirky.cause_breakdown[0].streets if section_quirky.cause_breakdown else 1 %}
+    {% for row in section_quirky.cause_breakdown %}
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;font-family:var(--sans);font-size:12px;margin-bottom:3px;">
+        <span style="font-weight:600;display:flex;align-items:center;gap:6px;">
+          <span style="width:8px;height:8px;border-radius:50%;background:{{ cause_colors.get(row.macro,'#999') }};flex-shrink:0;"></span>
+          {{ row.macro }}
+        </span>
+        <span style="color:var(--muted);font-variant-numeric:tabular-nums;">{{ row.persons }} pers. · {{ row.streets }} str.</span>
+      </div>
+      <div style="height:8px;border-radius:2px;background:var(--wash);">
+        <div style="height:100%;border-radius:2px;width:{{ (row.streets / max_streets * 100)|int }}%;background:{{ cause_colors.get(row.macro,'#999') }};opacity:.8;"></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="panel-caption" style="margin-top:12px;font-style:italic;">
+    «Boală» include tuberculoză, cancer, infarct etc. «Violență» include execuții, asasinate și ambuscade.
+    Baza de date acoperă P509 Wikidata pentru ~{{ ((section_quirky.cause_breakdown | sum(attribute='persons') - (section_quirky.cause_breakdown | selectattr('macro','eq','necunoscută') | sum(attribute='persons'))) / (section_quirky.cause_breakdown | sum(attribute='persons')) * 100)|int }}% din personalitățile cu QID.
+  </div>
+</div>
+{% endif %}
+
+
 {# PANEL: CONTESTE TEMATICE (s12, internal 3-col × 2-row grid) #}
 {% set contest_labels = {
   'animals': 'Animale',

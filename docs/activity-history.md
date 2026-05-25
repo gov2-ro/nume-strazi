@@ -1,5 +1,21 @@
 # Activity History
 
+## 2026-05-26 — Cuza QID fix + biographical lifecycle stats (Pick A)
+
+**Cuza QID regression (data integrity fix).** Four `core_name_norm` aliases for Alexandru Ioan Cuza (`a. i. cuza`, `cuza voda`, `al. i. cuza`, `alexandru Ioan cuza`) were either missing from `data/curation/wikidata_qids.csv` or carrying Michel Vorm's QID `Q208518` from a prior bad auto-match. Fixed: all four entries added to CSV with `Q294832`; uniqueness guard in `tools/wikidata_persons.py` updated to allow same-`full_name` aliases to share a QID (previously the guard blocked any QID already held by *any* other key, which made it impossible to have multiple name-forms for one person — now it only blocks *cross-person* collisions by checking `full_name !=`). Also added a propagation UPDATE to `tools/wiki_birthplace.py` that runs after every live-fetch pass: copies `birth_place_qid/label/birth_judet` from any resolved alias to all other aliases sharing the same QID (correlated subquery, idempotent). Bârlad/VS correctly propagated to all four Cuza aliases.
+
+**`tools/wiki_biostats.py` (new).** Fetches Wikidata P509 (cause of death), P569 (birth date), P570 (death date) for all 232 unique QIDs. Deduplicates by QID before fetching — same-person aliases don't generate redundant API calls. Propagates results to all aliases sharing a QID after writes. CSV audit trail at `data/curation/wikidata_biostats.csv`; `--replay-csv --force` for rebuild persistence. Result: 43 of 243 QID persons now have a cause-of-death label; 236/243 have birth year; 241/243 have death year.
+
+**New schema columns.** Added `cause_of_death_qid TEXT`, `cause_of_death_label TEXT` to `persons` in `build_db.py` and applied via `ALTER TABLE` to the live DB.
+
+**Three new named queries in `docs/queries.sql`:** `age_at_death`, `cause_of_death_breakdown`, `birth_century_distribution`.
+
+**`section_quirky()` extended.** Two new sub-sections: (1) age-at-death analysis — deduplicates by `full_name`, computes weighted average (58.0 years per street), produces "forever young" list (died < 40) sorted by street count; (2) cause-of-death macro breakdown — raw Wikidata labels bucketed into `boală` / `violență` / `accident` / `altele` / `necunoscută` in Python using keyword matching; (3) birth-century distribution as `century_rows` (available to templates, not yet displayed as a panel).
+
+**Two new landing-page panels.** `#young-dead` (s6): top-10 honorees who died before 40, with portrait thumbnails and dates, sorted by street count — Eminescu leads at 431 streets, died 39. `#cause-of-death` (s6): macro-category bars for boală/violență/accident/necunoscută; footnote shows ~18% P509 coverage of QID holders. `heart-crack` icon added to Lucide sprite; `tools/fetch_lucide_icons.py` updated.
+
+**Notable editorial findings:** 30 illness deaths vs 9 violent deaths (street-weighted: 1587 vs 546 streets for illness). "Violență" covers executions (Vlad Țepeș, Horia/Cloșca/Crișan), assassination (Iorga, Grozăvescu), and historically famous poisonings (Lăpușneanu). Tuberculosis alone accounts for 6 persons including Porumbescu (30 y.o.) and Panait Istrati.
+
 ## 2026-05-23 — "Quirky stats" round 1: km per honoree, prestige hierarchy, self-honor index
 
 Brainstormed (`docs/BACKLOG.md` line 146, *"go wild, nerdy, quirky"*) and locked in two starter picks: OSM-based real-estate framing of honor (Pick B) and a Wikidata-driven self-honor index (Pick C). Pick A (cause-of-death breakdown) deferred.

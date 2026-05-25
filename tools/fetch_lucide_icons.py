@@ -13,6 +13,7 @@ ICONS = [
     "swords", "file-text", "flask-conical", "terminal", "chart-bar-big",
     "tag", "trophy", "church", "calendar", "map-pin", "house",
     "map", "dna", "gem", "wheat", "scroll", "search", "building-2",
+    "heart-crack",
 ]
 
 _STRIP = re.compile(

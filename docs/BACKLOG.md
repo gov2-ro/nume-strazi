@@ -155,7 +155,7 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [ ] if wikipedia/data missing – don't show anything instead of template links
 
-- [ ] **Cuza-family QID regression after rebuild** — `tools/wiki_birthplace.py` surfaced that `core_name_norm` rows for `a. i. cuza` and `cuza voda` are mapped to a non-Cuza QID (P19 = IJsselstein NL, which is Michel Vorm's birthplace). This is the same regression noted earlier in the QID uniqueness guard item — the manual `UPDATE persons SET wikidata_qid='Q294832'` fix wasn't replayed into `data/curation/wikidata_qids.csv`, so any DB rebuild reintroduces the bug. Action: confirm CSV has the correct Q294832 entries for these two keys, then re-run `wikidata_persons.py --replay-csv --force`. While at it, also patch `tools/wiki_birthplace.py` to skip persons whose QID conflicts with another person's QID (consistency guard).
+- [x] **Cuza-family QID regression after rebuild** — Fixed 2026-05-26. Added all four aliases (`a. i. cuza`, `cuza voda`, `al. i. cuza`, `alexandru Ioan cuza`) to `data/curation/wikidata_qids.csv` with `Q294832`. Modified uniqueness guard in `wikidata_persons.py` to allow same-`full_name` aliases to share a QID (previously blocked cross-person only, now blocks cross-full_name). Added propagation step to `wiki_birthplace.py` to copy birth_place to all same-QID aliases after the main loop (SQLite correlated-subquery UPDATE). Stale IJsselstein data cleared and Bârlad (VS) propagated to all four aliases.
 
 ## Later
 
