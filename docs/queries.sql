@@ -499,3 +499,35 @@ WHERE p.birth_year IS NOT NULL
   AND p.birth_year > 0
 GROUP BY century_start
 ORDER BY century_start;
+
+
+-- Gender km gap: total OSM kilometers and average street length for F vs M honorees.
+-- :name gender_km_gap
+SELECT p.gender,
+       COUNT(DISTINCT p.full_name)                            AS honorees,
+       COUNT(DISTINCT sd.id)                                  AS matched_streets,
+       ROUND(SUM(o.length_m) / 1000.0, 1)                    AS total_km,
+       ROUND(AVG(o.length_m), 0)                             AS avg_length_m,
+       ROUND(SUM(o.length_m) / 1000.0
+             / COUNT(DISTINCT p.full_name), 1)               AS km_per_honoree
+FROM streets_dedup sd
+JOIN persons p              ON p.core_name_norm = sd.core_name_norm
+JOIN street_osm_matches m   ON m.street_id      = sd.id
+JOIN osm_streets o          ON o.id             = m.osm_street_id
+WHERE p.gender IN ('F', 'M')
+GROUP BY p.gender;
+
+
+-- Female honorees ranked by total km.
+-- :name female_km_leaderboard
+SELECT p.full_name, p.wikidata_qid,
+       COUNT(DISTINCT sd.id)                   AS streets,
+       ROUND(SUM(o.length_m) / 1000.0, 1)     AS km,
+       ROUND(AVG(o.length_m), 0)              AS avg_m
+FROM streets_dedup sd
+JOIN persons p              ON p.core_name_norm = sd.core_name_norm
+JOIN street_osm_matches m   ON m.street_id      = sd.id
+JOIN osm_streets o          ON o.id             = m.osm_street_id
+WHERE p.gender = 'F'
+GROUP BY p.full_name
+ORDER BY km DESC;

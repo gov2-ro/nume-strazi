@@ -1488,6 +1488,112 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 {% endif %}
 
 
+{# PANEL: DECALAJUL DE GEN · KM DE ASFALT ────────────────────────────────── #}
+{% if section_quirky.gender_km %}
+{% set F = section_quirky.gender_km.get('F', {}) %}
+{% set M = section_quirky.gender_km.get('M', {}) %}
+<div class="panel s6" id="gender-km-gap">
+  <div class="panel-header">
+    <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-users"/></svg> Decalajul de gen · km de asfalt</span>
+    <span class="panel-meta">date OSM · ~52% acoperire</span>
+  </div>
+
+  {# Proportional bar F vs M #}
+  {% set f_pct = section_quirky.gender_km_pct.get('F', 0) %}
+  {% set m_pct = section_quirky.gender_km_pct.get('M', 0) %}
+  <div style="display:flex;height:14px;border-radius:3px;overflow:hidden;margin-bottom:12px;margin-top:4px;">
+    <div title="Feminin {{ f_pct }}%" style="width:{{ f_pct }}%;background:#A53A22;opacity:.85;"></div>
+    <div title="Masculin {{ m_pct }}%" style="width:{{ m_pct }}%;background:#1A3A5C;opacity:.75;"></div>
+  </div>
+  <div style="display:flex;gap:16px;font-family:var(--sans);font-size:11px;color:var(--muted);margin-bottom:14px;">
+    <span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:2px;background:#A53A22;opacity:.85;"></span>Feminin {{ f_pct }}%</span>
+    <span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:2px;background:#1A3A5C;opacity:.75;"></span>Masculin {{ m_pct }}%</span>
+  </div>
+
+  {# Comparison table #}
+  <div style="display:grid;grid-template-columns:1fr 80px 80px;gap:4px 8px;font-family:var(--sans);font-size:12px;margin-bottom:14px;">
+    <span style="color:var(--muted);font-size:10.5px;"></span>
+    <span style="color:var(--muted);font-size:10.5px;text-align:right;">F</span>
+    <span style="color:var(--muted);font-size:10.5px;text-align:right;">M</span>
+    <span>km total</span>
+    <span style="text-align:right;font-weight:700;color:#A53A22;font-variant-numeric:tabular-nums;">{{ F.total_km }}</span>
+    <span style="text-align:right;font-weight:700;color:#1A3A5C;font-variant-numeric:tabular-nums;">{{ M.total_km }}</span>
+    <span>km / onorat·ă</span>
+    <span style="text-align:right;font-variant-numeric:tabular-nums;">{{ F.km_per_honoree }}</span>
+    <span style="text-align:right;font-variant-numeric:tabular-nums;">{{ M.km_per_honoree }}</span>
+    <span>lungime medie stradă</span>
+    <span style="text-align:right;font-variant-numeric:tabular-nums;">{{ F.avg_length_m }}m</span>
+    <span style="text-align:right;font-variant-numeric:tabular-nums;">{{ M.avg_length_m }}m</span>
+    <span>personalități onorate</span>
+    <span style="text-align:right;font-variant-numeric:tabular-nums;">{{ F.honorees }}</span>
+    <span style="text-align:right;font-variant-numeric:tabular-nums;">{{ M.honorees }}</span>
+  </div>
+
+  {# Female leaderboard #}
+  <div class="sub-eyebrow" style="margin-bottom:6px;">Top personalități feminine</div>
+  <div class="rank-list" style="gap:4px;">
+    {% for p in section_quirky.female_km_list[:8] %}
+    <div class="rank-row" style="grid-template-columns:22px minmax(0,1fr) 48px 44px;">
+      <span style="font-family:var(--sans);font-size:11px;color:var(--muted);text-align:right;">{{ loop.index }}</span>
+      <span class="rank-name person" style="display:flex;align-items:center;gap:6px;">
+        {% if p.wikidata_qid and p.wikidata_qid in portraits %}
+        <span class="portrait" style="width:18px;height:18px;border-radius:50%;overflow:hidden;flex-shrink:0;display:inline-flex;">
+          <img src="{{ base }}/portraits/{{ p.wikidata_qid }}.jpg" alt="" style="width:100%;height:100%;object-fit:cover;" loading="lazy">
+        </span>
+        {% endif %}
+        {% if p.slug %}<a href="{{ base }}/persoana/{{ p.slug }}/" style="color:inherit;text-decoration:none;">{{ p.full_name }}</a>{% else %}{{ p.full_name }}{% endif %}
+      </span>
+      <div class="bar-wrap"><div class="bar" style="width:{{ (p.km / (section_quirky.female_km_list[0].km or 1) * 100)|int }}%;background:#A53A22;opacity:.7;"></div></div>
+      <span class="rank-count" style="white-space:nowrap;">{{ p.km }}<span style="font-size:10px;color:var(--muted);font-weight:500;"> km</span></span>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="panel-caption" style="margin-top:10px;font-style:italic;">
+    Femeile onorate reprezintă {{ f_pct }}% din km de stradă (față de {{ ((F.honorees / (F.honorees + M.honorees)) * 100)|round(1) }}% din onorabili).
+    Strada feminină e în medie cu {{ ((1 - F.avg_length_m / M.avg_length_m) * 100)|round(0)|int }}% mai scurtă decât cea masculină.
+  </div>
+</div>
+{% endif %}
+
+
+{# PANEL: CANONUL NAȚIONAL + PERECHI SURPRINZĂTOARE ──────────────────────── #}
+{% if section_quirky.canon_set %}
+<div class="panel s6" id="canon-associations">
+  <div class="panel-header">
+    <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-dna"/></svg> Canonul național · co-apariții</span>
+    <span class="panel-meta">{{ section_quirky.n_uats_with_persons }} UAT-uri cu onorabili</span>
+  </div>
+
+  {# Canon chips #}
+  <div class="sub-eyebrow" style="margin-bottom:7px;">Prezenți în &gt;30% din localitățile cu personalități</div>
+  <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:16px;">
+    {% for r in section_quirky.canon_set %}
+    <span style="display:inline-flex;align-items:center;gap:4px;background:var(--wash);border:1px solid var(--rule);border-radius:12px;padding:3px 9px;font-family:var(--sans);font-size:11px;">
+      {{ r.name }}
+      <span style="font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;">{{ r.pct }}%</span>
+    </span>
+    {% endfor %}
+  </div>
+
+  {# Surprising pairs #}
+  <div class="sub-eyebrow" style="margin-bottom:6px;">Perechi surprinzătoare · ridicare față de șansă</div>
+  <div style="display:flex;flex-direction:column;gap:5px;">
+    {% for r in section_quirky.surprising_pairs[:10] %}
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 44px 36px;gap:4px;align-items:center;font-family:var(--sans);font-size:11.5px;">
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ r.name_a }} + {{ r.name_b }}">{{ r.name_a }} <span style="color:var(--muted);">+</span> {{ r.name_b }}</span>
+      <span style="font-size:10px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums;">{{ r.co_uats }} UAT</span>
+      <span style="text-align:right;font-weight:700;font-size:12px;font-variant-numeric:tabular-nums;color:#4A7C59;">×{{ r.lift }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="panel-caption" style="margin-top:10px;font-style:italic;">
+    «Ridicare» (lift) = de câte ori mai des apar împreună față de distribuția aleatorie.
+    Perechi filtrate: ambii cu &gt;5% prezență UAT; top-3 canonici excluși.
+  </div>
+</div>
+{% endif %}
+
+
 {# PANEL: CONTESTE TEMATICE (s12, internal 3-col × 2-row grid) #}
 {% set contest_labels = {
   'animals': 'Animale',

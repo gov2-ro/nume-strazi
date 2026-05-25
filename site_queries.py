@@ -1,6 +1,7 @@
 # site_queries.py
 import sqlite3
 from collections import defaultdict
+from itertools import combinations
 
 from streets_lib import slugify, fix_diacritics
 
@@ -1060,6 +1061,110 @@ def section_quirky(conn: sqlite3.Connection) -> dict:
         else:
             r["century_label"] = "?"
 
+    # --- Gender km gap -------------------------------------------------------
+
+    gender_rows = _rows(conn, """
+        SELECT p.gender,
+               COUNT(DISTINCT p.full_name)                          AS honorees,
+               COUNT(DISTINCT sd.id)                                AS matched_streets,
+               ROUND(SUM(o.length_m) / 1000.0, 1)                  AS total_km,
+               ROUND(AVG(o.length_m), 0)                           AS avg_length_m,
+               ROUND(SUM(o.length_m) / 1000.0
+                     / COUNT(DISTINCT p.full_name), 1)             AS km_per_honoree
+        FROM streets_dedup sd
+        JOIN persons p            ON p.core_name_norm = sd.core_name_norm
+        JOIN street_osm_matches m ON m.street_id      = sd.id
+        JOIN osm_streets o        ON o.id             = m.osm_street_id
+        WHERE p.gender IN ('F', 'M')
+        GROUP BY p.gender
+    """)
+    gender_km = {r["gender"]: r for r in gender_rows}
+
+    female_km_list = _rows(conn, """
+        SELECT p.full_name, p.wikidata_qid,
+               COUNT(DISTINCT sd.id)               AS streets,
+               ROUND(SUM(o.length_m) / 1000.0, 1) AS km,
+               ROUND(AVG(o.length_m), 0)           AS avg_m
+        FROM streets_dedup sd
+        JOIN persons p            ON p.core_name_norm = sd.core_name_norm
+        JOIN street_osm_matches m ON m.street_id      = sd.id
+        JOIN osm_streets o        ON o.id             = m.osm_street_id
+        WHERE p.gender = 'F'
+        GROUP BY p.full_name
+        ORDER BY km DESC
+    """)
+    for r in female_km_list:
+        r["slug"] = (r["wikidata_qid"] or "").lower() or slugify(r["full_name"] or "")
+
+    f_km  = gender_km.get("F", {}).get("total_km") or 0
+    m_km  = gender_km.get("M", {}).get("total_km") or 0
+    total_gkm = (f_km + m_km) or 1
+    gender_km_pct = {
+        "F": round(100.0 * f_km / total_gkm, 1),
+        "M": round(100.0 * m_km / total_gkm, 1),
+    }
+
+    # --- Association rules / national canon ----------------------------------
+    # Fetch person × UAT presence matrix (dedup by full_name so aliases don't
+    # inflate counts — a UAT "has Cuza" if any of his 4 name-forms are present).
+    presence_rows = _rows(conn, """
+        SELECT p.full_name, sd.siruta
+        FROM streets_dedup sd
+        JOIN persons p ON p.core_name_norm = sd.core_name_norm
+        GROUP BY p.full_name, sd.siruta
+    """)
+    person_uats: dict[str, set[int]] = {}
+    for r in presence_rows:
+        person_uats.setdefault(r["full_name"], set()).add(r["siruta"])
+
+    all_person_uats: set[int] = set()
+    for uats in person_uats.values():
+        all_person_uats |= uats
+    n_uats = len(all_person_uats)
+
+    # Canon set: names in ≥30% of UATs with any person street
+    canon_threshold = 0.30
+    canon_set = sorted(
+        [
+            {"name": name, "uats": len(uats),
+             "pct": round(100.0 * len(uats) / n_uats, 1)}
+            for name, uats in person_uats.items()
+            if len(uats) / n_uats >= canon_threshold
+        ],
+        key=lambda r: -r["uats"],
+    )
+
+    # Lift-ranked pairs: restrict to persons with ≥5% UAT support for tractability
+    min_support = max(5, int(0.05 * n_uats))
+    candidates = [(name, uats) for name, uats in person_uats.items()
+                  if len(uats) >= min_support]
+
+    pair_list = []
+    for (name_a, uats_a), (name_b, uats_b) in combinations(candidates, 2):
+        co = len(uats_a & uats_b)
+        if co < 5:
+            continue
+        sup_a  = len(uats_a) / n_uats
+        sup_b  = len(uats_b) / n_uats
+        sup_ab = co / n_uats
+        lift   = round(sup_ab / (sup_a * sup_b), 2)
+        pair_list.append({
+            "name_a":     name_a,
+            "name_b":     name_b,
+            "co_uats":    co,
+            "lift":       lift,
+            "conf_ab":    round(100.0 * co / len(uats_a), 1),  # P(B|A)
+            "sup_a":      len(uats_a),
+            "sup_b":      len(uats_b),
+        })
+
+    # Top pairs by lift; filter out trivially obvious (both in top-3 ubiquitous canon)
+    top3 = {r["name"] for r in canon_set[:3]}
+    surprising_pairs = sorted(
+        [p for p in pair_list if not (p["name_a"] in top3 and p["name_b"] in top3)],
+        key=lambda r: -r["lift"],
+    )[:12]
+
     return {
         "top_km":            top_km,
         "class_by_category": class_by_category,
@@ -1072,6 +1177,12 @@ def section_quirky(conn: sqlite3.Connection) -> dict:
         "young_dead":        young_dead,
         "cause_breakdown":   cause_breakdown,
         "century_rows":      century_rows,
+        "gender_km":         gender_km,
+        "gender_km_pct":     gender_km_pct,
+        "female_km_list":    female_km_list,
+        "canon_set":         canon_set,
+        "surprising_pairs":  surprising_pairs,
+        "n_uats_with_persons": n_uats,
     }
 
 
