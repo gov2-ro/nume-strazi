@@ -1,5 +1,11 @@
 # Activity History
 
+## 2026-06-07 — Data-quality + tooling: year-streets fix + run_queries formats
+
+**CERNAVODĂ year-number fix (BACKLOG P2).** CERNAVODĂ's 5 "numeric" streets (1848, 1877, 1907, 1919, 1933) are all commemorative years that `NUMERIC_RE` (`^\d+[A-Za-z]?$`) misfiles as `is_numeric` — it has zero true block numbering. The `is_numeric` schema flag is locked (CLAUDE.md), so fixed at the query level in `docs/queries.sql`: `anonymous_uats` now excludes bare 4-digit years in 1700–2099 (`name GLOB '[0-9][0-9][0-9][0-9]' AND CAST BETWEEN …`) and computes `lowest` as `MIN(CAST(name AS INTEGER))` (was a lexicographic `MIN(name)` that returned '1' for any list — a latent bug). New companion query `commemorative_year_streets` lists the 48 year-streets across the dataset (1907 ×23, 1848 ×16, 1877 ×3, …). CIORANI (PH, 1–218 contiguous) stays the true #1 anonymous UAT.
+
+**`run_queries.py --format` (BACKLOG P3).** Added `--format table|json|csv` (default `table`, behavior unchanged), `--name <slug>` to run one query, and `--limit N` (table caps at 15 as before; json/csv emit all rows unless limited). JSON keys output by query name, or emits the bare payload when `--name` is given; CSV writes `# name` separators between queries in a multi-query run. Validated the full catalog (38 queries) through `--format json` — zero errors, valid JSON. REGEXP/log shims preserved.
+
 ## 2026-06-07 — Geographic-ego + lifecycle panels (quirky batch, existing data)
 
 New `site_queries.section_geo(conn)` + three landing panels, all from `persons.birth_judet`/`birth_year` already in the DB (no new Wikidata pulls). Deduplicated by `full_name` so a person's alias-forms (Cuza ×4) count once.

@@ -254,11 +254,35 @@ ORDER BY s.uat;
 
 -- Numeric/anonymous streets by UAT (the CIORANI phenomenon)
 -- :name anonymous_uats
+-- Numbered ("anonymous") streets per UAT — TRUE block numbering only.
+-- Bare 4-digit years (1848, 1877, 1907, 1933 …) are commemorative dates that
+-- NUMERIC_RE misfiles as is_numeric; they're excluded here and surfaced
+-- separately in commemorative_year_streets. Without this filter CERNAVODĂ (CT)
+-- looked like it had 5 anonymous streets numbered up to 1933 — in fact all five
+-- are years and it has zero block numbering. `lowest` also fixed to a numeric
+-- MIN (was a lexicographic MIN(name): '1' < '10' < '2').
 SELECT uat, judet, COUNT(*) AS anonymous_streets,
-       MIN(name) AS lowest, MAX(CAST(name AS INTEGER)) AS highest
+       MIN(CAST(name AS INTEGER)) AS lowest,
+       MAX(CAST(name AS INTEGER)) AS highest
 FROM streets_dedup
 WHERE is_numeric=1
+  AND NOT (name GLOB '[0-9][0-9][0-9][0-9]'
+           AND CAST(name AS INTEGER) BETWEEN 1700 AND 2099)
 GROUP BY uat ORDER BY anonymous_streets DESC;
+
+-- Streets named after a bare year — commemorative dates misfiled as is_numeric.
+-- 1848 (revoluție), 1877/1878 (independență), 1907 (răscoala), 1918 (unirea),
+-- 1933 (Grivița), 1989 (revoluție). The complement of the year-filter above.
+-- :name commemorative_year_streets
+SELECT CAST(name AS INTEGER) AS year,
+       COUNT(*)              AS streets,
+       COUNT(DISTINCT uat)   AS uats
+FROM streets_dedup
+WHERE is_numeric=1
+  AND name GLOB '[0-9][0-9][0-9][0-9]'
+  AND CAST(name AS INTEGER) BETWEEN 1700 AND 2099
+GROUP BY name
+ORDER BY streets DESC;
 
 -- Longest street names (poetic outliers)
 -- :name longest_names
