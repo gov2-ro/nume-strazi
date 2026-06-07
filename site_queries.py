@@ -1186,6 +1186,146 @@ def section_quirky(conn: sqlite3.Connection) -> dict:
     }
 
 
+def section_lexical(conn: sqlite3.Connection) -> dict:
+    """
+    Linguistic / textual quirks + frequency anomalies — existing data only,
+    no Wikidata or OSM dependency. All over distinct non-numeric street names.
+
+      - first_letters     : A–Z distribution (distinct names + streets per letter)
+      - palindromes        : names that read the same backwards (core ≥ 5 chars)
+      - longest / shortest : char-length extremes among display names
+      - prepositional      : "reads as a sentence" names (La Fântână, Sub Coastă…)
+      - near_universal      : present in all-but-one județ, with the single holdout
+      - universal_count     : names present in every județ
+      - singleton_pct       : share of names that exist in exactly one UAT
+    """
+    import re
+
+    rows = _rows(conn, """
+        SELECT name_normalized AS n, MIN(name) AS disp,
+               COUNT(*) AS streets, COUNT(DISTINCT siruta) AS uats
+        FROM streets_dedup
+        WHERE is_numeric = 0 AND name_normalized != ''
+        GROUP BY name_normalized
+    """)
+    total_names = len(rows)
+
+    # Per-name județ sets — drives the near-universal / universal anomaly.
+    jud_rows = _rows(conn, """
+        SELECT DISTINCT name_normalized AS n, judet
+        FROM streets_dedup
+        WHERE is_numeric = 0 AND name_normalized != ''
+    """)
+    name_jud: dict[str, set] = defaultdict(set)
+    all_jud: set = set()
+    for r in jud_rows:
+        name_jud[r["n"]].add(r["judet"])
+        all_jud.add(r["judet"])
+    total_jud = len(all_jud)
+    JUDET_NAMES = {
+        "AB": "Alba", "AG": "Argeș", "AR": "Arad", "B": "București", "BC": "Bacău",
+        "BH": "Bihor", "BN": "Bistrița-Năsăud", "BR": "Brăila", "BT": "Botoșani",
+        "BV": "Brașov", "BZ": "Buzău", "CJ": "Cluj", "CL": "Călărași",
+        "CS": "Caraș-Severin", "CT": "Constanța", "CV": "Covasna", "DB": "Dâmbovița",
+        "DJ": "Dolj", "GJ": "Gorj", "GL": "Galați", "GR": "Giurgiu", "HD": "Hunedoara",
+        "HR": "Harghita", "IF": "Ilfov", "IL": "Ialomița", "IS": "Iași",
+        "MH": "Mehedinți", "MM": "Maramureș", "MS": "Mureș", "NT": "Neamț",
+        "OT": "Olt", "PH": "Prahova", "SB": "Sibiu", "SJ": "Sălaj", "SM": "Satu Mare",
+        "SV": "Suceava", "TL": "Tulcea", "TM": "Timiș", "TR": "Teleorman",
+        "VL": "Vâlcea", "VN": "Vrancea", "VS": "Vaslui",
+    }
+
+    # First-letter distribution (a–z only; numerics already excluded).
+    letter_acc: dict[str, dict] = {}
+    for r in rows:
+        ch = r["n"][:1]
+        if "a" <= ch <= "z":
+            d = letter_acc.setdefault(ch, {"letter": ch.upper(), "names": 0, "streets": 0})
+            d["names"]   += 1
+            d["streets"] += r["streets"]
+    first_letters = [letter_acc[c] for c in sorted(letter_acc)]
+    max_letter_names = max((d["names"] for d in first_letters), default=1)
+
+    # Artifacts to keep out of the lexical curios: enumerated block-streets
+    # ("A III-a") and raw road-segment descriptions ("DN65A de la km 100+900…").
+    _ENUM_RE = re.compile(r"^a [ivxlcdm]+-?a?$")
+    _ROAD_RE = re.compile(r"\bkm \d|^d[njc]\s?\d")
+
+    # Palindromes — same backwards after dropping non-alphanumerics.
+    def core(s: str) -> str:
+        return re.sub(r"[^a-z0-9]", "", s)
+    palindromes = sorted(
+        [{"disp": r["disp"], "streets": r["streets"], "uats": r["uats"]}
+         for r in rows
+         if len(core(r["n"])) >= 5 and core(r["n"]) == core(r["n"])[::-1]
+         and not _ENUM_RE.match(r["n"])],
+        key=lambda r: -r["streets"],
+    )
+
+    # Length extremes among display names (collapse internal whitespace first).
+    # Shortest restricted to single-token real words (≥3 chars) — single-letter
+    # block streets and enumerators aren't interesting here.
+    def dlen(s: str) -> int:
+        return len(re.sub(r"\s+", " ", s.strip()))
+    short_cand = [r for r in rows
+                  if " " not in r["disp"].strip() and r["disp"].strip().isalpha()
+                  and dlen(r["disp"]) >= 3]
+    shortest = [{"disp": r["disp"], "len": dlen(r["disp"]), "streets": r["streets"]}
+                for r in sorted(short_cand, key=lambda r: (dlen(r["disp"]), -r["streets"]))[:8]]
+    long_cand = [r for r in rows if not _ROAD_RE.search(r["n"])]
+    longest  = [{"disp": r["disp"], "len": dlen(r["disp"]), "streets": r["streets"]}
+                for r in sorted(long_cand, key=lambda r: -dlen(r["disp"]))[:8]]
+
+    # "Reads as a sentence" — first token is a preposition/locative.
+    PREPS = {"la", "sub", "catre", "peste", "intre", "spre", "dupa",
+             "langa", "din", "in", "pe", "dinspre", "dintre", "deasupra"}
+    prep_rows = [r for r in rows
+                 if " " in r["n"] and r["n"].split(" ")[0] in PREPS]
+    prep_total_names   = len(prep_rows)
+    prep_total_streets = sum(r["streets"] for r in prep_rows)
+    prepositional = sorted(
+        [{"disp": r["disp"], "streets": r["streets"]} for r in prep_rows],
+        key=lambda r: -r["streets"],
+    )[:18]
+
+    # Frequency anomaly: names in exactly total_jud-1 of total_jud județe.
+    near_universal = []
+    universal_count = 0
+    for r in rows:
+        seen = name_jud[r["n"]]
+        if len(seen) == total_jud:
+            universal_count += 1
+        elif len(seen) == total_jud - 1:
+            missing = (all_jud - seen).pop()
+            near_universal.append({
+                "disp": r["disp"], "streets": r["streets"],
+                "missing": missing,
+                "missing_name": JUDET_NAMES.get(missing, missing),
+            })
+    near_universal.sort(key=lambda r: -r["streets"])
+
+    # Singletons ("dictionary hapax"): names that exist in exactly one UAT.
+    singletons = sum(1 for r in rows if r["uats"] == 1)
+    singleton_pct = round(100.0 * singletons / total_names, 1) if total_names else 0.0
+
+    return {
+        "total_names":        total_names,
+        "total_jud":          total_jud,
+        "first_letters":      first_letters,
+        "max_letter_names":   max_letter_names,
+        "palindromes":        palindromes,
+        "shortest":           shortest,
+        "longest":            longest,
+        "prepositional":      prepositional,
+        "prep_total_names":   prep_total_names,
+        "prep_total_streets": prep_total_streets,
+        "near_universal":     near_universal,
+        "universal_count":    universal_count,
+        "singletons":         singletons,
+        "singleton_pct":      singleton_pct,
+    }
+
+
 def section8(conn: sqlite3.Connection) -> dict:
     ciorani_row = _one(conn, """
         SELECT COUNT(*) AS total,

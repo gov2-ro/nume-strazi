@@ -1,5 +1,19 @@
 # Activity History
 
+## 2026-06-07 — Lexical quirks + frequency anomalies (quirky batch, existing data only)
+
+New `site_queries.section_lexical(conn)` + four landing-page panels. Zero new data — pure SQL over `streets_dedup` (non-numeric names) plus Python post-processing. `get_connection` doesn't register a `regexp` shim, so all matching is `substr`/`LIKE` in SQL or Python `re` after the fetch.
+
+**`section_lexical()`** pulls one distinct-name aggregate (29,737 non-numeric names with street/UAT counts) plus a `(name_normalized, judet)` presence list, then derives:
+- **first_letters** — A–Z distribution of distinct names (C dominates at 3,282; diacritics fold to base letter since `name_normalized` is ASCII).
+- **palindromes** — `core(name)` (alphanumerics only) ≥5 chars and equal reversed. Filtered out enumerator artifacts (`A III-a`, `A XIX-a`) via `^a [ivxlcdm]+-?a?$`. 8 real ones: Sebeș (7 str.), Anina (6), Salaș, Ciric, Laval, Potop, Seles, Somoș.
+- **longest / shortest** — char-length extremes. Longest excludes raw road-segment descriptions (`\bkm \d|^d[njc]\s?\d`) so highway rows like "DN65A de la km 100+900…" drop out; top is "Florin Popescu - Campion Olimpic Sydnei 2000" (44 ch.). Shortest restricted to single-token alphabetic words ≥3 ch (Tei, Olt, Iza, Dej…) so single-letter block-streets don't dominate.
+- **prepositional** — first token in a locative-preposition set (la/sub/peste/după/între…); 517 names / 662 streets. "Reads-as-a-sentence" rural toponymy: Peste Vale (13), Sub Coastă (13), Pe Vale, După Grădini.
+- **near_universal / universal_count** — per-name județ set vs all 42. 19 names in every județ; 22 in exactly 41/42, each tagged with its single holdout județ. București is the most common holdout (absent from rural flower/tree lists — Trandafirilor −B, Morii −B, Stadionului −B), which is itself the editorial point.
+- **singletons** — 22,687 names (76.3%) exist in exactly one UAT nationwide (shown as a caption stat).
+
+**Template** (`templates/index.html.j2`): four new `s6` panels before the contests panel — `#abecedar` (flex bar strip, new inline CSS), `#curiozitati-lexicale` (palindrome/shortest chips + longest list), `#nume-propozitii` (rank-row bars), `#nume-universale` (name + holdout-județ + street count). Reused existing `.panel`/`.sub-section`/`.rank-row`/`.bar-wrap` patterns. Wired `section_lexical` into `build_site.py` context. Icons reused: list-ordered, search, map-pin, globe. Build verified; all four ids present with real data in `dist/index.html`.
+
 ## 2026-05-26 — Gender km gap + association rules / national canon
 
 **Gender km gap panel (`#gender-km-gap`, s6).** New `gender_km` and `female_km_list` keys in `section_quirky()`. Proportional bar (F 2.5% / M 97.5%) + comparison table (km total, km per honoree, avg street length, honoree count) + female leaderboard with portraits. Headline: female honorees command 2.5% of total person-street km despite making up 4.9% of honorees; female streets are on average 19% shorter than male streets (575m vs 708m). Two new named queries added: `gender_km_gap`, `female_km_leaderboard`.

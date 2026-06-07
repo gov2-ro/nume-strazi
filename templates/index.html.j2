@@ -1594,6 +1594,126 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 {% endif %}
 
 
+{# PANEL: ABECEDAR · LITERA INIȚIALĂ ──────────────────────────────────────── #}
+{% if section_lexical.first_letters %}
+<div class="panel s6" id="abecedar">
+  <div class="panel-header">
+    <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-list-ordered"/></svg> Abecedar · litera inițială</span>
+    <span class="panel-meta">{{ "{:,.0f}".format(section_lexical.total_names).replace(",", ".") }} nume distincte</span>
+  </div>
+  <div style="display:flex;align-items:flex-end;gap:3px;height:110px;padding-top:6px;">
+    {% for L in section_lexical.first_letters %}
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;" title="{{ L.letter }} · {{ L.names }} nume · {{ L.streets }} străzi">
+      <div style="width:100%;background:#1A3A5C;opacity:.78;border-radius:1px 1px 0 0;height:{{ (L.names / section_lexical.max_letter_names * 100)|round(1) }}%;min-height:1px;"></div>
+      <span style="font-family:var(--sans);font-size:9px;color:var(--muted);margin-top:3px;">{{ L.letter }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="panel-caption" style="margin-top:10px;font-style:italic;">
+    Câte nume distincte încep cu fiecare literă. C domină (cooperative, biserici, nume proprii); diacriticele sunt pliate pe litera de bază.
+  </div>
+</div>
+{% endif %}
+
+
+{# PANEL: CURIOZITĂȚI LEXICALE ─────────────────────────────────────────────── #}
+{% if section_lexical.palindromes or section_lexical.longest %}
+<div class="panel s6" id="curiozitati-lexicale">
+  <div class="panel-header">
+    <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-search"/></svg> Curiozități lexicale</span>
+  </div>
+
+  {% if section_lexical.palindromes %}
+  <div class="sub-section">
+    <div class="sub-eyebrow"><span class="dot" style="background:#6A4E7A;"></span>Palindromuri · se citesc la fel în ambele sensuri</div>
+    <div style="display:flex;flex-wrap:wrap;gap:5px;">
+      {% for p in section_lexical.palindromes %}
+      <span style="display:inline-flex;align-items:center;gap:5px;background:var(--wash);border:1px solid var(--rule);border-radius:12px;padding:3px 9px;font-family:var(--sans);font-size:11.5px;">
+        {{ p.disp }}
+        <span style="font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;">{{ p.streets }} str.</span>
+      </span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="sub-section">
+    <div class="sub-eyebrow"><span class="dot" style="background:#8A6C3A;"></span>Cele mai lungi nume</div>
+    {% for r in section_lexical.longest[:5] %}
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-family:var(--sans);font-size:11.5px;padding:2px 0;{% if not loop.first %}border-top:1px solid var(--hairline);{% endif %}">
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ r.disp }}</span>
+      <span style="color:var(--muted);font-variant-numeric:tabular-nums;flex-shrink:0;">{{ r.len }} car.</span>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="sub-section">
+    <div class="sub-eyebrow"><span class="dot" style="background:#5F7A4E;"></span>Cele mai scurte nume · un singur cuvânt</div>
+    <div style="display:flex;flex-wrap:wrap;gap:5px;">
+      {% for r in section_lexical.shortest %}
+      <span style="display:inline-flex;align-items:center;gap:5px;background:var(--wash);border:1px solid var(--rule);border-radius:12px;padding:3px 9px;font-family:var(--sans);font-size:11.5px;">
+        {{ r.disp }}
+        <span style="font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;">{{ r.streets }} str.</span>
+      </span>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="panel-caption" style="margin-top:10px;font-style:italic;">
+    {{ section_lexical.singletons }} nume ({{ section_lexical.singleton_pct }}%) apar într-o singură localitate din toată țara.
+  </div>
+</div>
+{% endif %}
+
+
+{# PANEL: NUME CA PROPOZIȚII ───────────────────────────────────────────────── #}
+{% if section_lexical.prepositional %}
+<div class="panel s6" id="nume-propozitii">
+  <div class="panel-header">
+    <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-map-pin"/></svg> Nume ca propoziții · toponime descriptive</span>
+    <span class="panel-meta">{{ section_lexical.prep_total_names }} nume · {{ section_lexical.prep_total_streets }} străzi</span>
+  </div>
+  <div class="rank-list" style="gap:3px;">
+    {% set max_prep = section_lexical.prepositional[0].streets %}
+    {% for r in section_lexical.prepositional[:14] %}
+    <div class="rank-row" style="grid-template-columns:minmax(0,1fr) 90px 44px;">
+      <span class="rank-name">{{ r.disp }}</span>
+      <div class="bar-wrap"><div class="bar olive" style="width:{{ (r.streets / max_prep * 100)|int }}%;"></div></div>
+      <span class="rank-count" style="white-space:nowrap;">{{ r.streets }}<span style="font-size:10px;color:var(--muted);font-weight:500;"> str.</span></span>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="panel-caption" style="margin-top:10px;font-style:italic;">
+    Nume care încep cu o prepoziție locativă (La, Sub, Peste, După, Între…) — toponimie rurală care descrie poziția: «Peste Vale», «Sub Coastă», «După Grădini».
+  </div>
+</div>
+{% endif %}
+
+
+{# PANEL: NUME APROAPE UNIVERSALE ──────────────────────────────────────────── #}
+{% if section_lexical.near_universal %}
+<div class="panel s6" id="nume-universale">
+  <div class="panel-header">
+    <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-globe"/></svg> Nume în toate județele · mai puțin unul</span>
+    <span class="panel-meta">{{ section_lexical.universal_count }} nume în toate {{ section_lexical.total_jud }}</span>
+  </div>
+  <div class="sub-eyebrow" style="margin-bottom:6px;">Prezente în {{ section_lexical.total_jud - 1 }} din {{ section_lexical.total_jud }} de județe — și județul care lipsește</div>
+  <div class="rank-list" style="gap:3px;">
+    {% for r in section_lexical.near_universal[:14] %}
+    <div class="rank-row" style="grid-template-columns:minmax(0,1fr) 60px 50px;">
+      <span class="rank-name">{{ r.disp }}</span>
+      <span style="font-family:var(--sans);font-size:10.5px;color:#A53A22;text-align:right;font-weight:600;" title="lipsește în {{ r.missing_name }}">− {{ r.missing }}</span>
+      <span class="rank-count" style="white-space:nowrap;text-align:right;">{{ r.streets }}<span style="font-size:10px;color:var(--muted);font-weight:500;"> str.</span></span>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="panel-caption" style="margin-top:10px;font-style:italic;">
+    «− {{ section_lexical.near_universal[0].missing }}» = singurul județ fără acel nume. București (B) e absent din multe liste rurale de flori și pomi (Trandafirilor, Morii) — un oraș nu numește străzi ca un sat.
+  </div>
+</div>
+{% endif %}
+
+
 {# PANEL: CONTESTE TEMATICE (s12, internal 3-col × 2-row grid) #}
 {% set contest_labels = {
   'animals': 'Animale',
