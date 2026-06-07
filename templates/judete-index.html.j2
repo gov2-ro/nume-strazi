@@ -5,6 +5,7 @@
 
 {% block head_scripts %}
 <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
 <style>
 .chip-row {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
@@ -62,7 +63,10 @@ function escapeHtml(s) {
     <div class="panel-header">
       <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-map"/></svg> Harta · statistici pe județ</span>
       <div class="chip-row" id="s6-metric-row" style="margin:0;padding:0;border:none;flex-wrap:wrap;gap:6px;">
-        <span class="label">Vedeți după</span>
+        <span class="label">Nivel</span>
+        <button class="chip lvl active" data-level="judet">Județe</button>
+        <button class="chip lvl" data-level="uat">Localități</button>
+        <span class="label" style="margin-left:10px;">Vedeți după</span>
         <button class="chip active" data-metric="person_pct">persoane</button>
         <button class="chip" data-metric="female_pct">femei</button>
         <button class="chip" data-metric="male_pct">bărbați</button>
@@ -243,6 +247,7 @@ function escapeHtml(s) {
   const personsPerJudet = DATA_S6.persons_per_judet || {};
 
   let activeMetric = 'person_pct';
+  let level = 'judet';                 // 'judet' | 'uat'
   const metricLabels = {
     person_pct:    '% străzi numite după persoane',
     female_pct:    '% străzi cu nume feminin',
@@ -261,59 +266,114 @@ function escapeHtml(s) {
   const colorScale = d3.scaleSequential()
     .interpolator(d3.interpolateRgb('#F4EFE6', '#A53A22'));
 
-  function updateMetric(metric) {
-    activeMetric = metric;
-    document.querySelectorAll('#s6-metric-row .chip').forEach(c =>
-      c.classList.toggle('active', c.dataset.metric === metric)
-    );
-    const values = DATA_S6.by_judet.map(d => d[metric] || 0);
-    const minVal = d3.min(values);
-    const maxVal = d3.max(values);
-    // Use min..max scaling so clustered metrics (e.g. person_pct ranging
-    // 8–13%) still differentiate. Fall back to 0..max when the spread is
-    // very wide (rare-event metrics like female_pct already show contrast).
+  const svg = d3.select('#s6-map');
+  let projection, path;
+  let judetGeo = null;                 // cached county FeatureCollection
+  let uatGeo = null, uatBySiruta = null, uatLoading = false;
+
+  function setupSvg(geo) {
+    const width  = svg.node().parentElement.clientWidth;
+    const height = width * 0.62;
+    svg.attr('viewBox', `0 0 ${width} ${height}`);
+    projection = d3.geoMercator().fitSize([width, height], geo);
+    path = d3.geoPath().projection(projection);
+  }
+
+  // Recolour the active level and update the scale legend from its own values.
+  function applyColors() {
+    document.querySelectorAll('#s6-metric-row .chip[data-metric]').forEach(c =>
+      c.classList.toggle('active', c.dataset.metric === activeMetric));
+    const values = level === 'judet'
+      ? DATA_S6.by_judet.map(d => d[activeMetric] || 0)
+      : Object.values(uatBySiruta || {}).map(d => d[activeMetric] || 0);
+    const minVal = d3.min(values) || 0;
+    const maxVal = d3.max(values) || 0;
+    // min..max scaling so clustered metrics (person_pct ~8–13%) differentiate;
+    // fall back to 0..max when the spread is very wide.
     const domainMin = (maxVal - minVal) / Math.max(maxVal, 0.001) > 0.5 ? 0 : minVal;
     colorScale.domain([domainMin, maxVal]);
     document.getElementById('s6-scale-min').textContent = domainMin.toFixed(1) + '%';
     document.getElementById('s6-scale-max').textContent = maxVal.toFixed(1) + '%';
-    document.getElementById('s6-scale-label').textContent = metricLabels[metric];
-    d3.selectAll('.judet-path').attr('fill', d => {
-      const code = d.properties?.cod;
-      const row  = byJudet[code];
-      return row ? colorScale(row[metric] || 0) : '#EEEAE0';
+    document.getElementById('s6-scale-label').textContent =
+      metricLabels[activeMetric] + (level === 'uat' ? ' · pe localități' : '');
+    if (level === 'judet') {
+      d3.selectAll('.judet-path').attr('fill', d => {
+        const row = byJudet[d.properties?.cod];
+        return row ? colorScale(row[activeMetric] || 0) : '#EEEAE0';
+      });
+    } else {
+      d3.selectAll('.uat-path').attr('fill', d => {
+        const row = uatBySiruta[String(d.properties?.siruta)];
+        return row ? colorScale(row[activeMetric] || 0) : '#ECE8DF';
+      });
+    }
+  }
+
+  function updateMetric(metric) { activeMetric = metric; applyColors(); }
+
+  function drawJudet(geo) {
+    setupSvg(geo);
+    svg.selectAll('*').remove();
+    svg.selectAll('.judet-path')
+      .data(geo.features).join('path')
+      .attr('class', 'judet-path').attr('d', path)
+      .attr('stroke', '#FAF8F3').attr('stroke-width', 0.9).style('cursor', 'pointer')
+      .on('click', (event, d) => renderFingerprint(d))
+      .on('mouseenter', function() { d3.select(this).attr('stroke-width', 1.8).attr('stroke', '#15171A'); })
+      .on('mouseleave', function() { d3.select(this).attr('stroke-width', 0.9).attr('stroke', '#FAF8F3'); });
+    applyColors();
+  }
+
+  function drawUat(geo) {
+    setupSvg(geo);
+    svg.selectAll('*').remove();
+    svg.selectAll('.uat-path')
+      .data(geo.features).join('path')
+      .attr('class', 'uat-path').attr('d', path)
+      .attr('stroke', '#FFFFFF').attr('stroke-width', 0.3).style('cursor', 'pointer')
+      .on('click', (event, d) => renderUatCard(d))
+      .on('mouseenter', function() { d3.select(this).attr('stroke-width', 1.1).attr('stroke', '#15171A'); })
+      .on('mouseleave', function() { d3.select(this).attr('stroke-width', 0.3).attr('stroke', '#FFFFFF'); });
+    applyColors();
+  }
+
+  function switchLevel(lv) {
+    if (lv === level) return;
+    document.querySelectorAll('#s6-metric-row .chip[data-level]').forEach(c =>
+      c.classList.toggle('active', c.dataset.level === lv));
+    if (lv === 'judet') { level = 'judet'; if (judetGeo) drawJudet(judetGeo); return; }
+    if (uatGeo && uatBySiruta) { level = 'uat'; drawUat(uatGeo); return; }
+    if (uatLoading) return;
+    uatLoading = true;
+    document.getElementById('s6-scale-label').textContent = 'se încarcă localitățile…';
+    Promise.all([
+      fetch('../ro-uats.topojson').then(r => r.json()),
+      fetch('uat-metrics.json').then(r => r.json()),
+    ]).then(([topo, metrics]) => {
+      const objKey = Object.keys(topo.objects)[0];
+      uatGeo = topojson.feature(topo, topo.objects[objKey]);
+      uatBySiruta = metrics.by_siruta || {};
+      level = 'uat'; uatLoading = false; drawUat(uatGeo);
+    }).catch(() => {
+      uatLoading = false;
+      document.querySelector('#s6-metric-row .chip[data-level="judet"]').classList.add('active');
+      document.querySelector('#s6-metric-row .chip[data-level="uat"]').classList.remove('active');
+      document.getElementById('s6-scale-label').textContent = 'localitățile sunt indisponibile';
     });
   }
 
-  document.querySelectorAll('#s6-metric-row .chip').forEach(btn => {
+  document.querySelectorAll('#s6-metric-row .chip[data-metric]').forEach(btn => {
     btn.addEventListener('click', () => updateMetric(btn.dataset.metric));
+  });
+  document.querySelectorAll('#s6-metric-row .chip[data-level]').forEach(btn => {
+    btn.addEventListener('click', () => switchLevel(btn.dataset.level));
   });
 
   fetch('../ro-counties.geojson')
     .then(r => r.json())
     .then(geo => {
-      const svg = d3.select('#s6-map');
-      const cellWidth = svg.node().parentElement.clientWidth;
-      const width  = cellWidth;
-      const height = width * 0.62;
-      svg.attr('viewBox', `0 0 ${width} ${height}`);
-
-      const projection = d3.geoMercator().fitSize([width, height], geo);
-      const path = d3.geoPath().projection(projection);
-
-      svg.selectAll('.judet-path')
-        .data(geo.features)
-        .join('path')
-        .attr('class', 'judet-path')
-        .attr('d', path)
-        .attr('stroke', '#FAF8F3')
-        .attr('stroke-width', 0.9)
-        .style('cursor', 'pointer')
-        .on('click', (event, d) => renderFingerprint(d))
-        .on('mouseenter', function() { d3.select(this).attr('stroke-width', 1.8).attr('stroke', '#15171A'); })
-        .on('mouseleave', function() { d3.select(this).attr('stroke-width', 0.9).attr('stroke', '#FAF8F3'); });
-
-      updateMetric('person_pct');
-
+      judetGeo = geo;
+      drawJudet(geo);
       const randomFeature = geo.features[Math.floor(Math.random() * geo.features.length)];
       renderFingerprint(randomFeature);
     })
@@ -322,6 +382,37 @@ function escapeHtml(s) {
         '<p style="font-family:var(--sans);font-size:12px;color:var(--muted);padding:14px 0;">Harta indisponibilă.</p>'
       );
     });
+
+  // Compact click card for a UAT polygon (the județ fingerprint is too data-heavy
+  // to precompute for 1.2k localități, so this shows the key metrics + a page link).
+  function renderUatCard(feature) {
+    const sir = String(feature.properties?.siruta);
+    const row = (uatBySiruta || {})[sir];
+    const fp  = document.getElementById('s6-fingerprint');
+    if (!row) {
+      fp.innerHTML = `<div class="kicker"><svg class="icon lg" aria-hidden="true"><use href="#icon-building-2"/></svg> Localitate</div>
+        <div style="font-family:var(--sans);font-weight:700;font-size:18px;margin:2px 0 4px;">${escapeHtml(feature.properties?.nume || sir)}</div>
+        <p style="font-family:var(--sans);font-size:12px;color:var(--muted);padding-top:8px;">Fără date de străzi în registru (sub 10 străzi sau neacoperită de registru).</p>`;
+      return;
+    }
+    const rows = [
+      ['Persoane', 'person_pct'], ['Natură', 'nature_pct'],
+      ['Sfinți', 'saint_pct'], ['Feminin', 'female_pct'],
+      ['Ideologic', 'ideology_pct'], ['Anonime', 'numeric_pct'],
+    ].map(([k, mk]) => `<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--rule);">
+        <span style="font-family:var(--sans);font-size:11.5px;color:var(--muted);">${k}</span>
+        <span style="font-family:var(--sans);font-size:11.5px;font-variant-numeric:tabular-nums;${mk === activeMetric ? 'font-weight:700;color:var(--accent-dark);' : ''}">${(row[mk]||0).toFixed(1)}%</span>
+      </div>`).join('');
+    const pageLink = row.slug
+      ? `<a href="{{ base }}/oras/${(row.judet||'').toLowerCase()}/${row.slug}/" style="display:inline-block;margin-top:12px;font-family:var(--sans);font-size:11.5px;color:var(--plaque);">Vezi pagina localității →</a>`
+      : '';
+    fp.innerHTML = `
+      <div class="kicker"><svg class="icon lg" aria-hidden="true"><use href="#icon-building-2"/></svg> Localitate · ${escapeHtml(row.judet)}</div>
+      <div style="font-family:var(--sans);font-weight:700;font-size:19px;margin:2px 0 4px;letter-spacing:-.015em;">${escapeHtml((row.uat||'').replace(/^(MUNICIPIUL|ORAŞ|ORAȘ|COMUNA) /,''))}</div>
+      <div style="font-family:var(--sans);font-size:11px;color:var(--muted);margin-bottom:12px;font-variant-numeric:tabular-nums;">${(row.total_streets||0).toLocaleString('ro-RO')} de străzi · nume frecvent: <strong style="color:var(--ink);font-weight:600;">${escapeHtml(row.modal||'—')}</strong></div>
+      ${rows}
+      ${pageLink}`;
+  }
 
   function renderFingerprint(feature) {
     const code    = feature.properties?.cod;

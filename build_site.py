@@ -14,6 +14,7 @@ DIST = Path("dist")
 TEMPLATES = Path("templates")
 DB_PATH = "data/streets.db"
 COUNTIES_SRC = Path("data/gis/romania-counties.geojson")
+UATS_TOPO_SRC = Path("data/gis/ro-uats.topojson")
 DEFAULT_SITE_URL = "https://strazi.gov2.ro"
 
 
@@ -275,6 +276,16 @@ def build_detail_pages(db_path: str = DB_PATH,
             DIST / "judete" / "lista" / "index.html",
             judete=judete_list, uats=uats)
     print("    → dist/judete/lista/index.html")
+
+    # ── UAT-level choropleth assets (lazy-loaded by the județe map) ──────────
+    uat_metrics = site_queries.section6_uat(conn)
+    (DIST / "judete" / "uat-metrics.json").write_text(
+        json.dumps(uat_metrics, ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8")
+    print(f"    → dist/judete/uat-metrics.json ({uat_metrics['uat_count']} UATs)")
+    if UATS_TOPO_SRC.exists():
+        shutil.copy(UATS_TOPO_SRC, DIST / "ro-uats.topojson")
+        print("    → dist/ro-uats.topojson")
 
     # ── Explorer JSON + page ─────────────────────────────────────────────────
     indexes = site_queries.explorer_indexes(conn)

@@ -48,6 +48,25 @@ panels; if a number is off, the wiring regressed.
 - [ ] View-source or network tab: page fetches `/ro-counties.geojson` (root-relative);
   d3 loaded only on pages that have a map.
 
+## Județe map — UAT-level choropleth (added later 2026-06-07)
+
+Open `/judete/`.
+
+- [ ] Map header shows a **Nivel** toggle: `Județe` (active) / `Localități`, then the
+  metric chips.
+- [ ] Click **Localități** → after a brief load the map redraws with **~1,171 UAT
+  polygons** colored; rural communes with no registry streets (and the 8 Bucharest
+  sectors) stay grey. Scale label gains "· pe localități".
+- [ ] Switch metric chips while in Localități mode → recolors, legend min/max update
+  from the UAT value range (not the județ range).
+- [ ] Click a colored UAT → right panel shows a compact card: name, județ, total
+  streets, modal name, 6 metric rows (active metric bolded), and "Vezi pagina
+  localității →" **only** for UATs that have a detail page (the 108 seats/municipii).
+- [ ] Click a grey UAT → card says "Fără date de străzi în registru".
+- [ ] Toggle back to **Județe** → original choropleth + fingerprint return; no reload.
+- [ ] Network tab: `ro-uats.topojson` and `judete/uat-metrics.json` fetched **only**
+  after first switching to Localități (lazy), not on page load.
+
 ## Cross-cutting
 
 - [ ] No JS console errors on the landing page or a street page.

@@ -725,6 +725,69 @@ def section5(conn: sqlite3.Connection) -> dict:
     }
 
 
+def section6_uat(conn: sqlite3.Connection, min_streets: int = 10) -> dict:
+    """Per-UAT version of the section6 choropleth metrics, keyed by siruta
+    (as a string, to join the ro-uats.topojson `siruta` property).
+
+    Same metric formulas as `section6.by_judet` but GROUP BY siruta. UATs below
+    `min_streets` are excluded so tiny denominators don't blow out the colour
+    scale — those polygons render grey on the map. self_honor_pct uses the UAT's
+    own județ as the "born locally" test.
+
+    Lazy-loaded by the județe map when the user switches to the localități level,
+    so it's written to its own JSON rather than embedded in the page.
+    """
+    rows = _rows(conn, """
+        SELECT sd.siruta, sd.judet, sd.uat,
+               COUNT(*) AS total_streets,
+               ROUND(100.0 * SUM(sd.is_saint) / COUNT(*), 1)                              AS saint_pct,
+               ROUND(100.0 * SUM(sd.is_numeric) / COUNT(*), 1)                            AS numeric_pct,
+               ROUND(100.0 * SUM(sd.is_date) / COUNT(*), 2)                               AS date_pct,
+               ROUND(100.0 * SUM(CASE WHEN p.gender = 'F' THEN 1 ELSE 0 END) / COUNT(*), 2) AS female_pct,
+               ROUND(100.0 * SUM(CASE WHEN p.gender = 'M' THEN 1 ELSE 0 END) / COUNT(*), 1) AS male_pct,
+               ROUND(100.0 * SUM(CASE WHEN p.core_name_norm IS NOT NULL THEN 1 ELSE 0 END) / COUNT(*), 1) AS person_pct,
+               ROUND(100.0 * SUM(CASE WHEN p.nationality IS NOT NULL AND p.nationality != 'RO' THEN 1 ELSE 0 END) / COUNT(*), 2) AS foreign_pct,
+               ROUND(100.0 * SUM(CASE WHEN p.wiki_scope = 'universal' THEN 1 ELSE 0 END) / COUNT(*), 2) AS universal_pct,
+               ROUND(100.0 * SUM(CASE WHEN nt.core_name_norm IS NOT NULL THEN 1 ELSE 0 END) / COUNT(*), 1) AS nature_pct,
+               ROUND(100.0 * SUM(CASE WHEN nt.nature_type IN ('flower','tree','plant','fruit','forest','orchard') THEN 1 ELSE 0 END) / COUNT(*), 2) AS flora_pct,
+               ROUND(100.0 * SUM(CASE WHEN nc.category = 'ideological' THEN 1 ELSE 0 END) / COUNT(*), 2) AS ideology_pct,
+               ROUND(100.0 * SUM(CASE WHEN p.birth_judet = sd.judet THEN 1 ELSE 0 END)
+                           / NULLIF(SUM(CASE WHEN p.birth_judet IS NOT NULL THEN 1 ELSE 0 END), 0), 1) AS self_honor_pct
+        FROM streets_dedup sd
+        LEFT JOIN persons p          ON p.core_name_norm  = sd.core_name_norm
+        LEFT JOIN nature_terms nt    ON nt.core_name_norm = sd.core_name_norm
+        LEFT JOIN name_categories nc ON nc.core_name_norm = sd.core_name_norm
+        GROUP BY sd.siruta
+        HAVING COUNT(*) >= ?
+    """, (min_streets,))
+
+    # Modal (most-frequent) cultural name per UAT, for the click card.
+    modal = {r["siruta"]: r["display_name"] for r in _rows(conn, """
+        SELECT siruta, display_name FROM (
+          SELECT siruta, MIN(name) AS display_name, COUNT(*) AS cnt,
+                 ROW_NUMBER() OVER (PARTITION BY siruta ORDER BY COUNT(*) DESC, MIN(name)) AS rn
+          FROM streets_dedup
+          WHERE is_numeric = 0 AND core_name IS NOT NULL
+          GROUP BY siruta, name_normalized
+        ) WHERE rn = 1
+    """)}
+
+    # Which UATs have a rendered detail page (for the "vezi pagina" link).
+    page_slug = {u["siruta"]: u["slug"] for u in enumerate_uats(conn)}
+
+    by_siruta: dict[str, dict] = {}
+    for r in rows:
+        sir = r["siruta"]
+        d = {k: r[k] for k in r if k != "siruta"}
+        d["uat"]      = fix_diacritics(r["uat"])
+        d["modal"]    = modal.get(sir, "—")
+        d["slug"]     = page_slug.get(sir)        # None if no page
+        by_siruta[str(sir)] = d
+
+    return {"by_siruta": by_siruta, "min_streets": min_streets,
+            "uat_count": len(by_siruta)}
+
+
 def section6(conn: sqlite3.Connection) -> dict:
     by_judet = _rows(conn, """
         SELECT judet,

@@ -1,5 +1,15 @@
 # Activity History
 
+## 2026-06-07 — UAT-level choropleth (toggle on the județe map)
+
+The județe map (`/judete/`) now has a **Nivel: Județe / Localități** toggle that re-renders the same chip metrics at UAT granularity (BACKLOG "choropleth: option to render per-uat"). The polygon source the backlog assumed was missing already existed in the repo: `data/gis/ro-uats.topojson` (3,175 admin_level-8 polygons, `siruta` property).
+
+**Data** (`site_queries.section6_uat`): mirrors `section6.by_judet`'s metric formulas but `GROUP BY siruta`, filtered to ≥10 streets so tiny denominators don't blow out the colour scale. Returns `by_siruta` keyed by string siruta (to join the topojson `siruta`), each with the 12 metrics + total_streets + județ + display name + modal cultural name + detail-page slug (None for the ~1,071 without a page). 1,179 UATs qualify (the registry only has named streets for 1,207 UATs total — rural communes largely use house numbers). JSON is 357 KB → `dist/judete/uat-metrics.json`. `build_site.py` also copies the topojson to `dist/ro-uats.topojson`.
+
+**Render** (`judete-index.html.j2`): added `topojson-client@3` in head_scripts. Rewrote the map IIFE to be level-aware — `applyColors()` recolours the active level and recomputes the legend domain from that level's own value range; `switchLevel()` lazy-fetches the topojson + metrics on the first switch to Localități, converts via `topojson.feature(...)`, and caches both. UAT polygons get a click card (name, județ, streets, modal name, 6 metric rows with the active one bolded, plus a "Vezi pagina" link only when a detail page exists). Toggling back to Județe restores the original choropleth + fingerprint with no reload. New asset fetches use page-relative paths (`../ro-uats.topojson`, `uat-metrics.json`) like the existing `../ro-counties.geojson`, so subfolder hosting still works.
+
+**Join coverage:** 1,171 / 1,179 metric UATs match a topojson polygon; the 8 misses are Bucharest sectors (179xxx) + 2 others not in the UAT topojson — they render grey, consistent with the known Bucharest-sector gap. Verified: standalone render + `node --check` on all four inline scripts (syntax OK), join overlap confirmed, full `--detail-only` build clean.
+
 ## 2026-06-07 — Toponym → map: per-street geographic dot-map
 
 Each street-detail page (`/strada/<slug>/`) now opens its "Prezență geografică" section with a d3 map of Romania showing where the name occurs (BACKLOG "street names profiles → map").
