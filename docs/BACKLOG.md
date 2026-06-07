@@ -109,15 +109,15 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [x] UI: search from anywhere, with `/` or `Ctrl/Command + k` ? — Done 2026-05-18. `templates/_search_overlay.html.j2` partial included from `_detail-shell.html.j2` and all top-level templates. `/` (when not in a text input) or `Cmd/Ctrl+K` opens; Esc closes; arrows + Enter navigate. Reuses `/cauta/*.json` indexes and the `p` flag for "fără pagină" rows.
 
-- [ ] UI: try compact version. Instead of showing multiple lists show one that's highly filterable. Start with stats, then a single filterable list of streets.
+- [x] UI: try compact version. Instead of showing multiple lists show one that's highly filterable. Start with stats, then a single filterable list of streets. — Satisfied by the `/browser` page (live `.stats-bar` + 7 filters + a single compact/table list over 30k names). Enhanced 2026-06-07 with live per-option counts (see line below).
 
 - [x] create a shared hosting version (no Python, static or php ai)
 
 - [x] web ui. can be served from subfolder
 
-- [ ] Ui, break into stats and list of streets/names, with the above filter
+- [x] Ui, break into stats and list of streets/names, with the above filter — Done via the `/browser` page (stats bar above a filterable name list).
 
-- [ ] UI: try a super dorpdown navigator, where it can reach all options via taxonomies, attributes, witih contextual keyboard shortcuts. or just search by visible terms. but how can we select more or exclude, to make it crazy good? With streer count in brackets?
+- [~] UI: try a super dorpdown navigator, where it can reach all options via taxonomies, attributes, witih contextual keyboard shortcuts. or just search by visible terms. but how can we select more or exclude, to make it crazy good? With streer count in brackets? — Partial 2026-06-07: the `/browser` filter dropdowns now show **live result counts in brackets** next to every option, computed from the other active filters (`updateFilterCounts()` over in-memory `allRows`); zero-result options dim out. Keyboard nav already existed (`/`, arrows, Enter/Space, Esc). **Still open:** multi-select within a filter and exclude/negation ("select more or exclude") — both single-select today; would need `filters[ddId]` to become a {include:Set, exclude:Set} and `filterRows` + `pickItem` reworked.
 
 - [x] street names profiles, convert it to map. shows towns that match the name. — Done 2026-06-07. Each `/strada/<slug>/` detail page now renders a d3 dot-map of Romania with one point per locality that has the name (sized by occurrence count, hover tooltip). Coordinates from `data/gis/populatie-romania-siruta-coords.csv` (99% of registry sirutas matched), attached server-side in `site_queries.street_detail` as `map_points`; the SVG + script live in `street-detail.html.j2`, reusing the existing `ro-counties.geojson` outline and `geoMercator().fitSize` pattern from the județe map. Degrades gracefully (map omitted) if a name has zero geocoded UATs or the CSV is missing.
 

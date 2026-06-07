@@ -67,6 +67,21 @@ Open `/judete/`.
 - [ ] Network tab: `ro-uats.topojson` and `judete/uat-metrics.json` fetched **only**
   after first switching to Localități (lazy), not on page load.
 
+## Browser filters — live counts in brackets (added later 2026-06-07)
+
+Open `/browser/` (compact view is default).
+
+- [ ] Open any filter dropdown (e.g. Clasificare) → each option shows a right-aligned
+  count badge; "Toate" shows the total for the current other-filters context.
+- [ ] Pick Clasificare = Persoană → open Profesie → counts now reflect only person
+  rows (writer ~65, poet ~39…); options with 0 matches under the current context dim
+  out. The Clasificare dropdown's own counts stay full (a filter's counts ignore its
+  own selection so you can still see alternatives).
+- [ ] Type in search → all dropdown counts update to the search-filtered context.
+- [ ] Switch to Tabel view → counts still update (they read the same in-memory rows).
+- [ ] Counts are name-counts (match the "N rezultate" bar), formatted ro-RO
+  (thousands dot).
+
 ## Cross-cutting
 
 - [ ] No JS console errors on the landing page or a street page.

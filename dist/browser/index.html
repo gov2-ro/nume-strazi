@@ -148,6 +148,14 @@ body {
 .fdd-item.toate { color: var(--muted); font-style: italic; }
 .fdd-item.toate.sel { color: var(--ink-2); font-style: normal; background: transparent; font-weight: 400; }
 .fdd-item.toate.sel .dot { opacity: 0; }
+.fdd-item .fdd-count {
+  margin-left: auto; padding-left: 12px;
+  font-size: 10px; color: var(--muted-2);
+  font-variant-numeric: tabular-nums; flex-shrink: 0;
+}
+.fdd-item.sel .fdd-count { color: var(--plaque); }
+.fdd-item.empty { opacity: .4; }
+.fdd-item.empty .fdd-count { color: var(--muted-2); }
 .fdd-divider { height: 1px; background: var(--hairline); margin: 3px 0; }
 
 /* ── VIEW TOGGLE ── */
@@ -581,7 +589,7 @@ function buildMenu(ddId, values, labelFn, param) {
   allItem.dataset.value = '';
   allItem.setAttribute('tabindex', '-1');
   allItem.setAttribute('role', 'option');
-  allItem.innerHTML = `<div class="dot"></div>Toate`;
+  allItem.innerHTML = `<div class="dot"></div>Toate<span class="fdd-count"></span>`;
   allItem.addEventListener('click', e => { e.stopPropagation(); clearFilter(ddId); });
   menu.appendChild(allItem);
 
@@ -596,7 +604,7 @@ function buildMenu(ddId, values, labelFn, param) {
     item.dataset.value = v;
     item.setAttribute('tabindex', '-1');
     item.setAttribute('role', 'option');
-    item.innerHTML = `<div class="dot"></div>${esc(lbl)}`;
+    item.innerHTML = `<div class="dot"></div>${esc(lbl)}<span class="fdd-count"></span>`;
     item.addEventListener('click', e => { e.stopPropagation(); pickItem(ddId, v, lbl); });
     menu.appendChild(item);
   });
@@ -706,6 +714,7 @@ async function fetchData() {
 
   renderTable();
   updateCountBar(tableTotal);
+  updateFilterCounts();
   setLoading(false);
 }
 
@@ -716,7 +725,45 @@ function fetchCompact() {
   renderTokens(filtered.slice(0, AGG_LIMIT).map(toCompactRow));
   updateCountBar(filtered.length);
   updateStatsBar(filtered);
+  updateFilterCounts();
   setLoading(false);
+}
+
+/* ── LIVE PER-OPTION COUNTS ("count in brackets") ──
+   For each filter, count names that match all OTHER active filters + search,
+   tallied by that filter's own field — so each option shows what it would
+   yield. Computed over the in-memory allRows; cheap (7 × 30k). */
+const COUNT_VALS = {
+  'dd-classification': r => [r.cls],
+  'dd-gender':         r => [r.g],
+  'dd-profession':     r => [r.pr],
+  'dd-era':            r => [r.er],
+  'dd-nationality':    r => [r.na],
+  'dd-judet':          r => (r.j  || []),
+  'dd-street_type':    r => (r.st || []),
+};
+
+function updateFilterCounts() {
+  if (!allRows.length) return;
+  Object.keys(DD_PARAM).forEach(ddId => {
+    const others = Object.assign({}, filters);
+    delete others[ddId];                       // counts ignore this filter's own pick
+    const base = filterRows(allRows, others, searchVal);
+    const tally = {};
+    const getVals = COUNT_VALS[ddId];
+    base.forEach(r => getVals(r).forEach(v => {
+      if (v != null && v !== '') tally[v] = (tally[v] || 0) + 1;
+    }));
+    const menu = document.getElementById(`menu-${DD_PARAM[ddId]}`);
+    menu.querySelectorAll('.fdd-item').forEach(item => {
+      const span = item.querySelector('.fdd-count');
+      if (!span) return;
+      const val = item.dataset.value;
+      const n = val === '' ? base.length : (tally[val] || 0);
+      span.textContent = n.toLocaleString('ro-RO');
+      item.classList.toggle('empty', val !== '' && n === 0);
+    });
+  });
 }
 
 function filterRows(rows, filters, searchVal) {

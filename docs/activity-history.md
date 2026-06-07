@@ -1,5 +1,13 @@
 # Activity History
 
+## 2026-06-07 — Browser filters: live result counts in brackets
+
+The `/browser` page already covered the "stats + single filterable list" backlog idea (live `.stats-bar` + 7 filter dropdowns + compact/table views over 30k names). Added the missing piece from the "super dropdown navigator" item: **a live result count next to every filter option** (`dist/browser/index.html`, the hand-authored static page — `build_site` only regenerates `data.json`).
+
+`updateFilterCounts()` runs after every filter/search change (called from `fetchCompact` and `fetchData`). For each of the 7 filters it filters `allRows` by all the *other* active filters + search, tallies by that filter's own field (`COUNT_VALS` maps each dd to its row field; județ/street_type are arrays so a name counts toward each of its values), and writes the number into a `.fdd-count` badge on each option. A filter's own counts ignore its own selection, so alternatives stay visible. Options with 0 matches in the current context get `.empty` (dimmed). "Toate" shows the other-filters total. Counts are name-counts (consistent with the "N rezultate" bar), ro-RO formatted. Cost is ~7 × 30k per update — negligible.
+
+Verified: `node --check` on the page script (syntax OK); count logic simulated against `data.json` (cls=person → writer 65 / poet 39 / politician 28…; județ B 4,742 top). **Still open** (logged in BACKLOG): multi-select and exclude/negation within a filter — both still single-select.
+
 ## 2026-06-07 — UAT-level choropleth (toggle on the județe map)
 
 The județe map (`/judete/`) now has a **Nivel: Județe / Localități** toggle that re-renders the same chip metrics at UAT granularity (BACKLOG "choropleth: option to render per-uat"). The polygon source the backlog assumed was missing already existed in the repo: `data/gis/ro-uats.topojson` (3,175 admin_level-8 polygons, `siruta` property).
