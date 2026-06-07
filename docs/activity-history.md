@@ -1,5 +1,15 @@
 # Activity History
 
+## 2026-06-07 — Toponym → map: per-street geographic dot-map
+
+Each street-detail page (`/strada/<slug>/`) now opens its "Prezență geografică" section with a d3 map of Romania showing where the name occurs (BACKLOG "street names profiles → map").
+
+**Data** (`site_queries.py`): new lazy-cached `_siruta_coords()` reads `data/gis/populatie-romania-siruta-coords.csv` into `{siruta -> (lat, lon)}` (3,180 rows; 1,201/1,207 = 99% of registry sirutas match). `street_detail()` attaches a `map_points` list — one `{lat, lon, uat, judet, count, slug}` per UAT that has the name, sorted by count. Missing coords (the ~1%) are dropped; the caption notes how many fell out. The GIS file already existed in the repo (also used by `osm_ingest.py`), so no new dependency.
+
+**Render** (`templates/street-detail.html.j2`): loads d3@7 in `head_scripts` only when `map_points` is non-empty; injects the points via `| tojson`; fetches the shipped `ro-counties.geojson` and draws the outline + circles using the same `geoMercator().fitSize` projection as the județe choropleth. Circles are `scaleSqrt`-sized by count (2.6–7 px), brick-red, with a hover tooltip (UAT name · județ · count). Path uses root-relative `{{ base }}/ro-counties.geojson` (subfolder-hosting-safe). Falls back to removing the SVG if the fetch fails.
+
+Verified: render-tested Trandafirilor (496 points, valid embedded JSON), full `--detail-only` build completed clean (3,042 files, exit 0), single-UAT names render one dot. `dist/` is gitignored so only the two source files are committed.
+
 ## 2026-06-07 — Data-quality + tooling: year-streets fix + run_queries formats
 
 **CERNAVODĂ year-number fix (BACKLOG P2).** CERNAVODĂ's 5 "numeric" streets (1848, 1877, 1907, 1919, 1933) are all commemorative years that `NUMERIC_RE` (`^\d+[A-Za-z]?$`) misfiles as `is_numeric` — it has zero true block numbering. The `is_numeric` schema flag is locked (CLAUDE.md), so fixed at the query level in `docs/queries.sql`: `anonymous_uats` now excludes bare 4-digit years in 1700–2099 (`name GLOB '[0-9][0-9][0-9][0-9]' AND CAST BETWEEN …`) and computes `lowest` as `MIN(CAST(name AS INTEGER))` (was a lexicographic `MIN(name)` that returned '1' for any list — a latent bug). New companion query `commemorative_year_streets` lists the 48 year-streets across the dataset (1907 ×23, 1848 ×16, 1877 ×3, …). CIORANI (PH, 1–218 contiguous) stays the true #1 anonymous UAT.

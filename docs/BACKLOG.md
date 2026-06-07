@@ -119,7 +119,7 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [ ] UI: try a super dorpdown navigator, where it can reach all options via taxonomies, attributes, witih contextual keyboard shortcuts. or just search by visible terms. but how can we select more or exclude, to make it crazy good? With streer count in brackets?
 
-- [ ] street names profiles, convert it to map. shows towns that match the name.
+- [x] street names profiles, convert it to map. shows towns that match the name. — Done 2026-06-07. Each `/strada/<slug>/` detail page now renders a d3 dot-map of Romania with one point per locality that has the name (sized by occurrence count, hover tooltip). Coordinates from `data/gis/populatie-romania-siruta-coords.csv` (99% of registry sirutas matched), attached server-side in `site_queries.street_detail` as `map_points`; the SVG + script live in `street-detail.html.j2`, reusing the existing `ro-counties.geojson` outline and `geoMercator().fitSize` pattern from the județe map. Degrades gracefully (map omitted) if a name has zero geocoded UATs or the CSV is missing.
 
 - [ ] for people, also show link to ro.wikipedia page. maybe even fetch some info besides the image?
 

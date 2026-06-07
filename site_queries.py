@@ -1,9 +1,34 @@
 # site_queries.py
+import csv
 import sqlite3
 from collections import defaultdict
 from itertools import combinations
+from pathlib import Path
 
 from streets_lib import slugify, fix_diacritics
+
+_COORDS_CSV = Path(__file__).resolve().parent / "data" / "gis" / "populatie-romania-siruta-coords.csv"
+_SIRUTA_COORDS: dict | None = None
+
+
+def _siruta_coords() -> dict:
+    """Lazy-load {siruta:int -> (lat, lon)} from the GIS coords CSV (cached).
+
+    Covers ~99% of registry UAT sirutas. Returns {} if the file is missing so
+    map features degrade gracefully rather than breaking the build.
+    """
+    global _SIRUTA_COORDS
+    if _SIRUTA_COORDS is None:
+        _SIRUTA_COORDS = {}
+        if _COORDS_CSV.exists():
+            with open(_COORDS_CSV, encoding="utf-8") as f:
+                for row in csv.DictReader(f):
+                    try:
+                        _SIRUTA_COORDS[int(row["siruta"])] = (
+                            round(float(row["lat"]), 5), round(float(row["long"]), 5))
+                    except (TypeError, ValueError, KeyError):
+                        continue
+    return _SIRUTA_COORDS
 
 
 def get_connection(db_path: str) -> sqlite3.Connection:
@@ -1966,6 +1991,19 @@ def street_detail(conn: sqlite3.Connection, name_normalized: str) -> dict:
     for b in judet_list:
         b["uats"].sort(key=lambda u: (-u["count"], u["uat"]))
 
+    # Geographic footprint: one point per UAT that has the name, for the map.
+    coords = _siruta_coords()
+    map_points = []
+    for u in per_uat.values():
+        c = coords.get(u["siruta"])
+        if c:
+            map_points.append({
+                "lat": c[0], "lon": c[1],
+                "uat": u["uat"], "judet": u["judet"],
+                "count": u["count"], "slug": u["uat_slug"],
+            })
+    map_points.sort(key=lambda p: -p["count"])
+
     honoree = None
     if first["person_core"]:
         honoree = {
@@ -1989,6 +2027,7 @@ def street_detail(conn: sqlite3.Connection, name_normalized: str) -> dict:
         "theme":         _street_theme(dict(first)),
         "honoree":       honoree,
         "per_judet":     judet_list,
+        "map_points":    map_points,
         "is_saint":      bool(first["is_saint"]),
         "is_date":       bool(first["is_date"]),
         "nature_type":   first["nature_type"],
