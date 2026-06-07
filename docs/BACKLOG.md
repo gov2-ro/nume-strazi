@@ -143,6 +143,11 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [x] percent of nationalities of personalities. Universal. Local. — Done 2026-05-18. New "Naționalitatea personalităților onorate" panel on the landing page: side-by-side bars `după persoane` vs `după străzi (ponderate)`. Surfaced the asymmetry: non-Romanian personalities are 7.4% of persons but only 4.49% of streets — onorate proporțional pe mai puține străzi decât cota lor numerică. Source data via `section3.nationality_breakdown` in `site_queries.py`. Note: `wiki_scope` is too sparse (3 universal only) for a "Universal vs Local" sub-split to be informative; deferred until scope coverage improves.
 
+- [ ] **Quirky picks blocked on extra data** (logged 2026-06-07 while building the geo-ego batch):
+  - *"Honored while still alive"* — needs the date a street was first named, which the AEP registry doesn't carry. Blocked unless a dated/renaming source lands (ties into the Renumiri P2 item).
+  - *"Died in exile"* — needs place-of-death (Wikidata **P20**). Only P19 (birthplace) is pulled today. A `tools/wiki_deathplace.py` mirroring `wiki_birthplace.py` would unblock it.
+  - *"Born outside present borders"* substitute — 25 honorees have `birth_place_label` set but `birth_judet` NULL (Babeș/Viena, Asachi/Herța, Russo/Chișinău — the lost-territories story). Built-and-skipped: the underlying P19 matches have visible errors (Vasile Lupu→Chester, Magheru→Birmingham, Rosetti→Linares) that would surface as bad data. Needs a QID-audit pass on birthplaces before this panel is safe to ship.
+
 - [~] Go wild, nerdy, quirky. The people, how old, what are the occupations? Reason of death? *(partial 2026-05-23: brainstorm catalog saved to `/Users/pax/.claude/plans/let-s-touch-the-go-structured-taco.md` — 35+ candidate stats across 7 themes. Picks B + C shipped: km-per-honoree leaderboard, prestige-hierarchy stacked bar, self-honor index per județ. Cause-of-death/biographical-lifecycle picks deferred — natural next batch since `wiki_birthplace.py` already proved out the wbgetentities pattern for an extra Wikidata property.)*
 
 - [ ] Norm to population, street length, lanes, centrality. Order by number (absolute), relative to population, relative to population x street relevance

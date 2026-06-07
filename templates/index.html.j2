@@ -1714,6 +1714,101 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 {% endif %}
 
 
+{# PANEL: SECOLUL NAȘTERII ─────────────────────────────────────────────────── #}
+{% if section_quirky.century_rows %}
+<div class="panel s6" id="secole-nastere">
+  <div class="panel-header">
+    <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-hourglass"/></svg> Secolul nașterii · pe câte străzi</span>
+    <span class="panel-meta">străzi ponderate</span>
+  </div>
+  <div class="rank-list" style="gap:3px;">
+    {% set max_cent = section_quirky.century_rows | map(attribute='streets') | max %}
+    {% for r in section_quirky.century_rows %}
+    {% if r.persons > 0 %}
+    <div class="rank-row" style="grid-template-columns:64px minmax(0,1fr) 60px 44px;">
+      <span style="font-family:var(--sans);font-size:11px;font-weight:600;">{{ r.century_label }}</span>
+      <div class="bar-wrap"><div class="bar" style="width:{{ (r.streets / max_cent * 100)|int }}%;background:#6A4E7A;opacity:.8;"></div></div>
+      <span class="rank-count" style="text-align:right;white-space:nowrap;">{{ "{:,.0f}".format(r.streets).replace(",", ".") }}<span style="font-size:10px;color:var(--muted);font-weight:500;"> str.</span></span>
+      <span style="font-family:var(--sans);font-size:10.5px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums;">{{ r.persons }} p.</span>
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+  <div class="panel-caption" style="margin-top:10px;font-style:italic;">
+    Secolul XIX domină masiv (generația de la 1848, marii clasici). Secolul I = Decebal și Traian. Numai personalitățile cu an de naștere cunoscut.
+  </div>
+</div>
+{% endif %}
+
+
+{# PANEL: GEOGRAFIA GLORIEI ────────────────────────────────────────────────── #}
+{% if section_geo.forgotten_at_home %}
+<div class="panel s6" id="geografia-gloriei">
+  <div class="panel-header">
+    <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-house"/></svg> Geografia gloriei · acasă vs. în țară</span>
+    <span class="panel-meta">{{ section_geo.n_known_birth }} onorați cu naștere cunoscută</span>
+  </div>
+
+  <div class="sub-section">
+    <div class="sub-eyebrow"><span class="dot" style="background:#A53A22;"></span>Profet în țara lui · puține străzi în județul natal</div>
+    {% for r in section_geo.forgotten_at_home[:8] %}
+    <div class="rank-row" style="grid-template-columns:minmax(0,1fr) 54px 70px;">
+      <span class="rank-name person">
+        {% if r.slug %}<a href="{{ base }}/persoana/{{ r.slug }}/" style="color:inherit;text-decoration:none;">{{ r.full_name }}</a>{% else %}{{ r.full_name }}{% endif %}
+        <span style="font-family:var(--sans);font-size:10px;color:var(--muted);">n. {{ r.birth_judet }}</span>
+      </span>
+      <span class="rank-count" style="text-align:right;white-space:nowrap;">{{ r.total_streets }}<span style="font-size:10px;color:var(--muted);font-weight:500;"> str.</span></span>
+      <span style="font-family:var(--sans);font-size:10.5px;color:#A53A22;text-align:right;font-variant-numeric:tabular-nums;" title="{{ r.home_streets }} străzi acasă">{{ r.home_streets }} acasă ({{ r.home_pct }}%)</span>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="sub-section">
+    <div class="sub-eyebrow"><span class="dot" style="background:#5F7A4E;"></span>Județe exportatoare · străzi naționale ale onorabililor lor</div>
+    {% set max_exp = section_geo.most_exported[0].streets %}
+    {% for r in section_geo.most_exported[:8] %}
+    <div class="rank-row" style="grid-template-columns:40px minmax(0,1fr) 60px 50px;">
+      <span style="font-family:var(--sans);font-size:12px;font-weight:700;letter-spacing:.04em;">{{ r.judet }}</span>
+      <div class="bar-wrap"><div class="bar olive" style="width:{{ (r.streets / max_exp * 100)|int }}%;"></div></div>
+      <span class="rank-count" style="text-align:right;white-space:nowrap;">{{ "{:,.0f}".format(r.streets).replace(",", ".") }}</span>
+      <span style="font-family:var(--sans);font-size:10.5px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums;">{{ r.honorees }} onor.</span>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="panel-caption" style="margin-top:10px;font-style:italic;">
+    Gloria națională diluează recunoașterea locală: Eminescu are sute de străzi în țară, dar doar o mână în Botoșani. Botoșani (BT) „exportă” ~490 de străzi prin doar 4 onorați — efectul Eminescu + Iorga.
+  </div>
+</div>
+{% endif %}
+
+
+{# PANEL: EROI LOCALI ──────────────────────────────────────────────────────── #}
+{% if section_geo.most_parochial %}
+<div class="panel s6" id="eroi-locali">
+  <div class="panel-header">
+    <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-map-pin"/></svg> Eroi locali · străzi concentrate într-un județ</span>
+    <span class="panel-meta">min. 8 străzi</span>
+  </div>
+  <div class="rank-list" style="gap:3px;">
+    {% for r in section_geo.most_parochial[:10] %}
+    <div class="rank-row" style="grid-template-columns:minmax(0,1fr) 44px 70px;">
+      <span class="rank-name person">
+        {% if r.slug %}<a href="{{ base }}/persoana/{{ r.slug }}/" style="color:inherit;text-decoration:none;">{{ r.full_name }}</a>{% else %}{{ r.full_name }}{% endif %}
+        {% if r.is_native %}<span style="font-family:var(--sans);font-size:9px;color:#5F7A4E;border:1px solid #5F7A4E;border-radius:8px;padding:0 5px;" title="onorat în județul natal">localnic</span>{% endif %}
+      </span>
+      <span style="font-family:var(--sans);font-size:12px;font-weight:700;text-align:right;letter-spacing:.04em;">{{ r.dominant_judet }}</span>
+      <span class="rank-count" style="text-align:right;white-space:nowrap;">{{ r.pct_in_dominant }}%<span style="font-size:10px;color:var(--muted);font-weight:500;"> ({{ r.streets_in_judet }}/{{ r.total_streets }})</span></span>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="panel-caption" style="margin-top:10px;font-style:italic;">
+    Onorabili cu cea mai mare parte a străzilor într-un singur județ — eroi locali. Cei marcați «localnic» sunt onorați chiar în județul în care s-au născut; ceilalți sunt revendicați de o regiune adoptivă (figuri maghiare în Harghita, voievozi în Suceava).
+  </div>
+</div>
+{% endif %}
+
+
 {# PANEL: CONTESTE TEMATICE (s12, internal 3-col × 2-row grid) #}
 {% set contest_labels = {
   'animals': 'Animale',

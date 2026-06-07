@@ -1326,6 +1326,94 @@ def section_lexical(conn: sqlite3.Connection) -> dict:
     }
 
 
+def section_geo(conn: sqlite3.Connection) -> dict:
+    """
+    Geographic-ego stats — who gets honored where vs. where they were born.
+    Built on `persons.birth_judet` (resolved for ~111 honorees via Wikidata P19),
+    deduplicated by full_name so a person's name-forms (Cuza ×4) count once.
+
+      - forgotten_at_home : many national streets, (almost) none in birth județ
+      - most_exported     : județe that birth honorees with the widest reach
+      - most_parochial    : honorees whose streets cluster in a single județ
+    """
+    per = _rows(conn, """
+        SELECT p.full_name,
+               MIN(p.birth_judet)                                          AS birth_judet,
+               MIN(p.wikidata_qid)                                         AS wikidata_qid,
+               MIN(p.profession)                                           AS profession,
+               COUNT(DISTINCT s.id)                                        AS total_streets,
+               COUNT(DISTINCT s.judet)                                     AS judete_reach,
+               SUM(CASE WHEN s.judet = p.birth_judet THEN 1 ELSE 0 END)   AS home_streets
+        FROM persons p
+        JOIN streets_dedup s ON s.core_name_norm = p.core_name_norm
+        WHERE p.birth_judet IS NOT NULL
+        GROUP BY p.full_name
+    """)
+    for r in per:
+        r["slug"]     = (r["wikidata_qid"] or "").lower() or slugify(r["full_name"] or "")
+        r["home_pct"] = round(100.0 * r["home_streets"] / r["total_streets"], 1) \
+                        if r["total_streets"] else 0.0
+
+    # "Prophet in their own land": ≥10 national streets but ≤5% (incl. 0) at home.
+    forgotten_at_home = sorted(
+        [r for r in per if r["total_streets"] >= 10 and r["home_pct"] <= 5.0],
+        key=lambda r: -r["total_streets"],
+    )[:12]
+
+    # Most-exported județ: sum of national streets of all honorees born there.
+    exp: dict[str, dict] = {}
+    for r in per:
+        j = r["birth_judet"]
+        d = exp.setdefault(j, {"judet": j, "honorees": 0, "streets": 0})
+        d["honorees"] += 1
+        d["streets"]  += r["total_streets"]
+    most_exported = sorted(exp.values(), key=lambda d: -d["streets"])[:10]
+
+    # Most parochial: streets ≥80% concentrated in one județ (local heroes).
+    parochial_rows = _rows(conn, """
+        WITH spj AS (
+            SELECT p.full_name, p.birth_judet, s.judet,
+                   MIN(p.wikidata_qid) AS wikidata_qid,
+                   COUNT(*) AS streets_in_judet
+            FROM streets_dedup s
+            JOIN persons p ON p.core_name_norm = s.core_name_norm
+            GROUP BY p.full_name, s.judet
+        ),
+        tot AS (
+            SELECT full_name, SUM(streets_in_judet) AS total_streets
+            FROM spj GROUP BY full_name
+        )
+        SELECT spj.full_name, spj.birth_judet, spj.wikidata_qid,
+               spj.judet AS dominant_judet, spj.streets_in_judet, t.total_streets,
+               ROUND(100.0 * spj.streets_in_judet / t.total_streets, 1) AS pct_in_dominant
+        FROM spj JOIN tot t ON t.full_name = spj.full_name
+        WHERE t.total_streets >= 8
+          AND spj.streets_in_judet = (
+              SELECT MAX(streets_in_judet) FROM spj s2 WHERE s2.full_name = spj.full_name
+          )
+        ORDER BY pct_in_dominant DESC, t.total_streets DESC
+        LIMIT 12
+    """)
+    # On ties the max-județ subquery emits one row per tied județ; keep the first
+    # per person so the same honoree doesn't appear twice.
+    seen_parochial: set = set()
+    most_parochial = []
+    for r in parochial_rows:
+        if r["full_name"] in seen_parochial:
+            continue
+        seen_parochial.add(r["full_name"])
+        r["slug"]      = (r["wikidata_qid"] or "").lower() or slugify(r["full_name"] or "")
+        r["is_native"] = (r["birth_judet"] == r["dominant_judet"])
+        most_parochial.append(r)
+
+    return {
+        "forgotten_at_home": forgotten_at_home,
+        "most_exported":     most_exported,
+        "most_parochial":    most_parochial,
+        "n_known_birth":     len(per),
+    }
+
+
 def section8(conn: sqlite3.Connection) -> dict:
     ciorani_row = _one(conn, """
         SELECT COUNT(*) AS total,

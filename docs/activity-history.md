@@ -1,5 +1,20 @@
 # Activity History
 
+## 2026-06-07 — Geographic-ego + lifecycle panels (quirky batch, existing data)
+
+New `site_queries.section_geo(conn)` + three landing panels, all from `persons.birth_judet`/`birth_year` already in the DB (no new Wikidata pulls). Deduplicated by `full_name` so a person's alias-forms (Cuza ×4) count once.
+
+**`section_geo()`** — one per-honoree aggregate (103 honorees with a resolved birth-județ: total national streets, județ reach, streets in birth-județ), then:
+- **forgotten_at_home** — ≥10 national streets but ≤5% in the birth județ. Reframed editorially: this is the *dilution* effect, not literal neglect. Eminescu: 300 streets nationwide, only 7 (2.3%) in Botoșani — roughly the 1/42 baseline. The genuinely under-honored: Cantemir (0.7% in AG), Mihai Viteazul (0.8% in IL), Ana Ipătescu (0 in B).
+- **most_exported** — național-street total of all honorees born in each județ. BT exports ~490 streets via just 4 honorees (Eminescu + Iorga); IS 493 via 9; B 531 via 13.
+- **most_parochial** — honorees with streets ≥concentrated in one județ (≥8 total). Local heroes: Ioan Suciu 75% in AR, Hungarian figures (Orbán Balázs, Gábor Áron) in Harghita, voievozi in Suceava. `is_native` flag marks those honored in their own birth-județ (e.g. Ion Nistor SV). Tie-on-max-județ rows deduped to one per person in Python.
+
+**Birth-century** panel surfaces the already-computed `section_quirky.century_rows` (no new query) — sec. XIX dominates massively (208 persons / 7,697 streets, the 1848 generation); sec. I = Decebal & Traian (173 streets, 1 "person"-pair).
+
+**Blocked picks (noted, not built):** literal "honored-while-alive" needs street-naming dates (not in registry); "died-in-exile" needs place-of-death (Wikidata P20, not pulled — only P19 birthplace is). A "born outside present borders" substitute is possible (25 honorees with `birth_place_label` set but `birth_judet` NULL — Babeș/Viena, Asachi/Herța, Russo/Chișinău) but P19 has visible mismatches (Vasile Lupu→Chester, Magheru→Birmingham) so it was skipped to avoid surfacing bad data. See BACKLOG.
+
+**Template** (`templates/index.html.j2`): `#secole-nastere`, `#geografia-gloriei` (two sub-sections), `#eroi-locali`. Wired `section_geo` into `build_site.py`. Build verified; all ids present with real data.
+
 ## 2026-06-07 — Lexical quirks + frequency anomalies (quirky batch, existing data only)
 
 New `site_queries.section_lexical(conn)` + four landing-page panels. Zero new data — pure SQL over `streets_dedup` (non-numeric names) plus Python post-processing. `get_connection` doesn't register a `regexp` shim, so all matching is `substr`/`LIKE` in SQL or Python `re` after the fetch.
