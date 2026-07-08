@@ -11,7 +11,7 @@ Layers in `streets`:
   core_name        - name with title/rank/saint prefixes stripped
   core_name_norm   - normalized version of core_name (the join key for `persons`)
 """
-import openpyxl, sqlite3, re
+import csv, openpyxl, sqlite3, re
 from pathlib import Path
 
 from streets_lib import (
@@ -137,7 +137,7 @@ CREATE INDEX ix_osm_corenorm  ON osm_streets(core_name_norm);
 CREATE TABLE street_osm_matches (
     street_id INTEGER NOT NULL REFERENCES streets(id),
     osm_street_id INTEGER NOT NULL REFERENCES osm_streets(id),
-    match_type TEXT NOT NULL,      -- 'exact_normalized' | 'fuzzy_core_name'
+    match_type TEXT NOT NULL,      -- 'exact_type_core' | 'fuzzy_core_name'
     confidence REAL NOT NULL,
     PRIMARY KEY (street_id, osm_street_id)
 );
@@ -182,7 +182,7 @@ CREATE INDEX ix_postal_swapped  ON postal_streets(core_name_norm_swapped);
 CREATE TABLE street_postal_matches (
     street_id INTEGER NOT NULL REFERENCES streets(id),
     postal_street_id INTEGER NOT NULL REFERENCES postal_streets(id),
-    match_type TEXT NOT NULL,      -- 'exact_normalized' | 'fuzzy_core_name' | 'reordered_core_name'
+    match_type TEXT NOT NULL,      -- 'exact_type_core' | 'fuzzy_core_name' | 'reordered_core_name'
     confidence REAL NOT NULL,
     PRIMARY KEY (street_id, postal_street_id)
 );
@@ -223,7 +223,7 @@ CREATE INDEX ix_renns_corenorm ON renns_streets(core_name_norm);
 CREATE TABLE street_renns_matches (
     street_id INTEGER NOT NULL REFERENCES streets(id),
     renns_street_id INTEGER NOT NULL REFERENCES renns_streets(id),
-    match_type TEXT NOT NULL,      -- 'exact_normalized' | 'fuzzy_core_name'
+    match_type TEXT NOT NULL,      -- 'exact_type_core' | 'fuzzy_core_name'
     confidence REAL NOT NULL,
     PRIMARY KEY (street_id, renns_street_id)
 );
@@ -242,14 +242,37 @@ CREATE INDEX ix_streets_siruta_name ON streets(siruta, name_normalized);
 CREATE INDEX ix_streets_siruta_corenorm ON streets(siruta, core_name_norm);
 CREATE INDEX ix_aliases_norm      ON street_aliases(alias_normalized);
 
+-- National SIRUTA -> (judet, uat-name) reference, used only to label
+-- all_street_names rows for UATs the registry has zero data for (the
+-- registry's own judet/uat columns are preferred wherever available).
+-- Loaded from data/gis/populatie-romania-siruta-coords.csv (3,180 UATs) plus
+-- the 6 Bucharest sectors hardcoded below (missing from that CSV; centroids
+-- for the same 6 are hardcoded the same way in tools/osm_ingest.py).
+-- Validated: resolves 2,258/2,264 (99.7%) of every SIRUTA our 4 sources
+-- actually reference; the 6 misses are exactly those Bucharest sectors.
+-- uat names here are not COMUNA/ORAȘ/MUNICIPIUL-prefixed like the registry's
+-- own (that prefix isn't derivable from the CSV) — a cosmetic gap, only
+-- affects UATs the registry itself has zero rows for.
+CREATE TABLE uat_reference (
+    siruta INTEGER PRIMARY KEY,
+    judet TEXT,
+    uat TEXT
+);
+
 -- GROUP BY siruta (not uat) is intentional: 48 UAT names are shared across
 -- multiple județe and would be incorrectly merged if grouped by name alone.
+-- street_type is part of the dedup key: a UAT can legitimately have both
+-- "Bulevardul X" and "Strada X" as two distinct real streets sharing a core
+-- name — grouping by name_normalized alone (which never included the type
+-- for registry rows, stripped upstream in parse_artery()) silently merged
+-- these. Fixed 2026-07-08 after finding 2,479 (siruta, name_normalized)
+-- groups with 2+ distinct street_types — see CODE_SPEC and activity-history.
 CREATE VIEW streets_dedup AS
 SELECT MIN(id) AS id, judet, uat, siruta, street_type, name, name_normalized,
        title, rank, is_saint, is_date, is_numeric, core_name, core_name_norm
 FROM streets
 WHERE name_normalized != ''
-GROUP BY siruta, name_normalized;
+GROUP BY siruta, name_normalized, street_type;
 
 CREATE VIEW streets_classified_pct AS
 -- One row per distinct core_name_norm (non-null).
@@ -329,14 +352,26 @@ WHERE r.uat_siruta IS NOT NULL
 -- Romania, from any of the 4 sources" — unlike streets_all_sources (which
 -- keeps one row PER SOURCE for external-only streets, so 2-3 sources
 -- agreeing on the same registry-missing street produce 2-3 rows), this view
--- collapses cross-source duplicates via (siruta, core_name_norm) and keeps
--- every contributing source's exact name/street_type in `variants` (JSON)
--- rather than silently discarding the losers. `corroboration_count` is how
--- many of the 4 sources (registry counts as one) have this street; higher
--- is a stronger signal the street genuinely exists. streets_all_sources is
--- kept as-is for its existing narrower per-source gap-analysis queries
--- (postal_only_streets, renns_only_streets, ...) — this view is the one to
--- use for "give me every Romanian street name, deduplicated."
+-- collapses cross-source duplicates and keeps every contributing source's
+-- exact name in `variants` (JSON) rather than silently discarding the losers.
+-- `corroboration_count` is how many of the 4 sources (registry counts as
+-- one) have this street; higher is a stronger signal the street genuinely
+-- exists. streets_all_sources is kept as-is for its existing narrower
+-- per-source gap-analysis queries (postal_only_streets, renns_only_streets,
+-- ...) — this view is the one to use for "give me every Romanian street
+-- name, deduplicated."
+--
+-- Dedup key: (siruta, street_type, core_name_norm) for the external layer —
+-- NOT name_normalized, which is not comparable across sources (osm_streets'
+-- includes the street-type prefix, registry/postal/RENNS's don't; see the
+-- comment on streets_all_sources above). street_type is part of the key,
+-- same invariant as streets_dedup: a UAT can have both "Bulevardul X" and
+-- "Strada X" as genuinely distinct streets, but not two "Strada X"s. No
+-- source is treated as higher-priority than another (2026-07-08 decision,
+-- reversing the earlier RENNS > OSM > postal ranking) — when sources
+-- disagree on exact spelling within an otherwise-identical group, the
+-- representative name/core_name is simply the alphabetically-first one
+-- (MIN()); `variants` retains every source's exact spelling regardless.
 CREATE VIEW all_street_names AS
 WITH reg_variant_src AS (
   SELECT sd2.id AS street_id, 'registry' AS src, sd2.name AS vname, sd2.street_type AS vtype
@@ -358,41 +393,33 @@ reg_agg AS (
     FROM reg_variant_src
    GROUP BY street_id
 ),
--- Priority (1=highest) only picks which name/street_type populate the
--- convenience columns below when 2+ external sources disagree on spelling;
--- `variants` always retains all of them. RENNS ranks highest as the
--- official cadastral street-nomenclature registry; OSM has geometry but
--- crowd-sourced spelling; postal is the oldest (2016) snapshot.
 ext_candidates AS (
-  SELECT 'renns' AS source, 1 AS prio, r.uat_siruta AS siruta, r.street_type, r.name,
-         r.name_normalized, r.core_name, r.core_name_norm, r.is_saint, r.is_date, r.is_numeric
+  SELECT 'renns' AS source, r.uat_siruta AS siruta, r.street_type, r.name,
+         r.core_name, r.core_name_norm, r.is_saint, r.is_date, r.is_numeric
     FROM renns_streets r
    WHERE r.core_name_norm IS NOT NULL
      AND NOT EXISTS (SELECT 1 FROM street_renns_matches m WHERE m.renns_street_id = r.id)
   UNION ALL
-  SELECT 'osm', 2, o.uat_siruta, o.street_type, o.name,
-         o.name_normalized, o.core_name, o.core_name_norm, o.is_saint, o.is_date, o.is_numeric
+  SELECT 'osm', o.uat_siruta, o.street_type, o.name,
+         o.core_name, o.core_name_norm, o.is_saint, o.is_date, o.is_numeric
     FROM osm_streets o
    WHERE o.core_name_norm IS NOT NULL
      AND NOT EXISTS (SELECT 1 FROM street_osm_matches m WHERE m.osm_street_id = o.id)
   UNION ALL
-  SELECT 'postal', 3, p.uat_siruta, p.street_type, p.name,
-         p.name_normalized, p.core_name, p.core_name_norm, p.is_saint, p.is_date, p.is_numeric
+  SELECT 'postal', p.uat_siruta, p.street_type, p.name,
+         p.core_name, p.core_name_norm, p.is_saint, p.is_date, p.is_numeric
     FROM postal_streets p
    WHERE p.core_name_norm IS NOT NULL AND p.uat_siruta IS NOT NULL
      AND NOT EXISTS (SELECT 1 FROM street_postal_matches m WHERE m.postal_street_id = p.id)
 ),
 ext_agg AS (
-  SELECT siruta, core_name_norm,
+  SELECT siruta, street_type, core_name_norm,
+         MIN(name) AS name, MIN(core_name) AS core_name,
          json_group_array(json_object('source', source, 'name', name, 'street_type', street_type)) AS variants,
          COUNT(DISTINCT source) AS corroboration_count,
          MAX(is_saint) AS is_saint, MAX(is_date) AS is_date, MAX(is_numeric) AS is_numeric
     FROM ext_candidates
-   GROUP BY siruta, core_name_norm
-),
-ext_ranked AS (
-  SELECT *, ROW_NUMBER() OVER (PARTITION BY siruta, core_name_norm ORDER BY prio) AS rn
-    FROM ext_candidates
+   GROUP BY siruta, street_type, core_name_norm
 )
 SELECT 'registry' AS layer, sd.judet, sd.uat, sd.siruta, sd.street_type, sd.name,
        sd.name_normalized, sd.core_name, sd.core_name_norm,
@@ -403,14 +430,16 @@ SELECT 'registry' AS layer, sd.judet, sd.uat, sd.siruta, sd.street_type, sd.name
 
 UNION ALL
 
-SELECT 'external' AS layer, su.judet, su.uat, er.siruta, er.street_type, er.name,
-       er.name_normalized, er.core_name, er.core_name_norm,
+SELECT 'external' AS layer,
+       COALESCE(su.judet, ur.judet) AS judet,
+       COALESCE(su.uat, ur.uat) AS uat,
+       ea.siruta, ea.street_type, ea.name,
+       NULL AS name_normalized, ea.core_name, ea.core_name_norm,
        ea.is_saint, ea.is_date, ea.is_numeric,
        ea.corroboration_count, ea.variants
-  FROM ext_ranked er
-  JOIN ext_agg ea ON ea.siruta = er.siruta AND ea.core_name_norm = er.core_name_norm
-  LEFT JOIN (SELECT DISTINCT siruta, judet, uat FROM streets) su ON su.siruta = er.siruta
- WHERE er.rn = 1;
+  FROM ext_agg ea
+  LEFT JOIN (SELECT DISTINCT siruta, judet, uat FROM streets) su ON su.siruta = ea.siruta
+  LEFT JOIN uat_reference ur ON ur.siruta = ea.siruta;
 """)
 
 # ---------- ingest ----------
@@ -441,6 +470,25 @@ for i, row in enumerate(ws.iter_rows(values_only=True)):
                     (sid, a, normalize_match(a)))
     inserted += 1
 
+# ---------- uat_reference (SIRUTA -> judet/uat label, for all_street_names) ----------
+GIS_SIRUTA_CSV = Path("data/gis/populatie-romania-siruta-coords.csv")
+if GIS_SIRUTA_CSV.exists():
+    with GIS_SIRUTA_CSV.open(encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            s = row["siruta"].strip()
+            if not s:
+                continue
+            con.execute(
+                "INSERT OR IGNORE INTO uat_reference (siruta, judet, uat) VALUES (?,?,?)",
+                (int(s), row["cod_judet"].strip(), fix_diacritics(row["localitate"].strip().upper())),
+            )
+# Missing from the CSV above; same 6 sectors are hardcoded in tools/osm_ingest.py.
+for _siruta, _n in [(179141,1),(179150,2),(179169,3),(179178,4),(179187,5),(179196,6)]:
+    con.execute(
+        "INSERT OR IGNORE INTO uat_reference (siruta, judet, uat) VALUES (?,?,?)",
+        (_siruta, "B", f"BUCUREȘTI SECTORUL {_n}"),
+    )
+
 con.commit()
 def n(sql): return con.execute(sql).fetchone()[0]
 print(f"Inserted     {inserted}")
@@ -451,4 +499,5 @@ print(f"Dates        {n('SELECT COUNT(*) FROM streets_dedup WHERE is_date=1')}")
 print(f"Numeric      {n('SELECT COUNT(*) FROM streets_dedup WHERE is_numeric=1')}")
 print(f"With title   {n('SELECT COUNT(*) FROM streets_dedup WHERE title IS NOT NULL')}")
 print(f"With rank    {n('SELECT COUNT(*) FROM streets_dedup WHERE rank IS NOT NULL')}")
+print(f"UAT reference {n('SELECT COUNT(*) FROM uat_reference')}")
 con.close()

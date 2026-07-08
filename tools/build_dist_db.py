@@ -76,10 +76,14 @@ def main() -> None:
         conn.execute("CREATE INDEX ix_sd_cnn ON streets_dedup(core_name_norm)")
         conn.execute("CREATE INDEX ix_sd_j   ON streets_dedup(judet)")
 
-        # Drop tables not used by the client-side filter UI.
+        # Drop tables not used by the client-side filter UI. uat_reference is
+        # only a build-time input to all_street_names' judet/uat labeling
+        # (already baked into the materialized table above) — not needed
+        # standalone in the shipped DB.
         for tbl in ("osm_streets", "street_osm_matches",
                     "postal_streets", "street_postal_matches",
-                    "renns_streets", "street_renns_matches", "street_aliases"):
+                    "renns_streets", "street_renns_matches", "street_aliases",
+                    "uat_reference"):
             conn.execute(f"DROP TABLE IF EXISTS {tbl}")
 
         conn.execute("ALTER TABLE streets_all_sources_slim RENAME TO streets_all_sources")

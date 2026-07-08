@@ -32,7 +32,7 @@ Romanian-language interactive publication.
 - Provides a named SQL query catalog covering overview, people, themes,
   regional maps, renaming history, curiosities, and cross-source coverage gaps
 
-Current coverage: **63.9% classified** (105,343 deduped streets across 1,207 UATs, 42 județe).
+Current coverage: **64.0% classified** (107,957 deduped streets across 1,207 UATs, 42 județe).
 
 ---
 
@@ -320,15 +320,23 @@ their only role is "does this street exist, and under what name."
 
 - **Postal codes** (Poșta Română, 2016 xlsx snapshot): street-level data only
   for București + localities over 50,000 population. 23,724 grouped streets;
-  83.1% matched back to OSM/registry-scope streets; 18.8% registry coverage
+  83.0% matched back to OSM/registry-scope streets; 19.1% registry coverage
   overall (expected — most of Romania is out of postal's scope by design).
 - **RENNS** (ANCPI's Registrul Electronic Național al Nomenclaturii Stradale,
   the official cadastral street registry, `renns.ancpi.ro`): crawled per
   `(county, UAT)` — the unfiltered flat endpoint looks tempting (67 requests
   for all of Romania) but has confirmed pagination drift on the live dataset,
-  so it's not used. 116,016 grouped streets from all 3,181 UATs; 53.0%/48.1%
+  so it's not used. 116,016 grouped streets from all 3,181 UATs; 52.3%/47.7%
   registry/RENNS match. București has zero RENNS roads (structural gap); only
   ~60% of Romania's UATs are digitized in RENNS so far.
+
+Match strategy across all three external sources: pass 1 (`exact_type_core`,
+confidence 1.0) compares `(street_type, core_name_norm)` directly — not raw
+`name_normalized` strings, which aren't comparable across sources (OSM's
+includes the street-type prefix, the registry's/postal's/RENNS's don't).
+Pass 2 (`fuzzy_core_name`, 0.5) is a type-blind fallback for the remainder.
+This replaced an earlier, mostly-nonfunctional `exact_normalized` pass
+(2026-07-08) — see the master-list section below for why type matters.
 
 ```bash
 # Postal (stdlib + openpyxl only; source: data/reference/coduri-postale+/)
@@ -348,12 +356,26 @@ python3 tools/renns_sanity.py
 source) is additive but **not** deduplicated across external sources — if
 OSM, postal, and RENNS all independently have the same registry-missing
 street, that view produces one row per source. `all_street_names` fixes this:
-it groups by `(uat_siruta, core_name_norm)` across all four sources into one
-row per real street, with a `variants` JSON column preserving every source's
-exact spelling (nothing is discarded to pick a "winner") and a
-`corroboration_count`. This is the list to use for "every street name in
-Romania," not `streets_all_sources`. See `docs/CODE_SPEC.md` §13.8 and
-critical rule #11 in `CLAUDE.md`.
+it groups by `(uat_siruta, street_type, core_name_norm)` across all four
+sources into one row per real street, with a `variants` JSON column
+preserving every source's exact spelling (nothing is discarded to pick a
+"winner" — no source outranks another) and a `corroboration_count`. This is
+the list to use for "every street name in Romania," not `streets_all_sources`.
+Total: **216,360** rows (107,957 registry + 108,403 external-only). See
+`docs/CODE_SPEC.md` §13.8/§14 and critical rules #1/#11 in `CLAUDE.md`.
+
+**Street type is part of a street's identity**, confirmed 2026-07-08: a UAT
+can have both `Bulevardul X` and `Strada X` as genuinely distinct real
+streets, but never two different `Strada X`s. This fixed a real bug —
+`streets_dedup` (and every count derived from it, including the headline
+number above) previously grouped only by `(siruta, name_normalized)`, and
+the registry's own `name_normalized` never included the street type to begin
+with — so e.g. Alba Iulia's real `Bulevardul 1 Decembrie 1918` and real
+`Strada 1 Decembrie 1918` were silently collapsed into one row. Fixing the
+dedup key recovered 2,614 previously-hidden registry streets (105,343 →
+107,957) and, as a side effect, fixed a matching-quality bug where the
+dominant OSM match pass was cross-wiring different street types 6.3% of the
+time. Full writeup in `docs/CODE_SPEC.md` §14.
 
 ---
 
@@ -478,29 +500,29 @@ echo 'export ANTHROPIC_API_KEY=sk-ant-...' >> ~/.zshrc
 
 | status | streets | % |
 |---|---|---|
-| unclassified | 37,800 | 35.9% |
-| nature | 29,867 | 28.4% |
-| person | 12,705 | 12.1% |
-| place | 6,227 | 5.9% |
-| abstract | 3,808 | 3.6% |
-| institutional | 3,212 | 3.0% |
-| ideological | 2,702 | 2.6% |
-| trade | 2,162 | 2.1% |
-| occupational | 1,571 | 1.5% |
-| infrastructure | 1,101 | 1.0% |
-| commemorative | 1,050 | 1.0% |
-| numeric | 860 | 0.8% |
-| date | 777 | 0.7% |
-| religious | 733 | 0.7% |
-| mythology | 451 | 0.4% |
-| saint | 317 | 0.3% |
+| unclassified | 38,622 | 35.8% |
+| nature | 30,530 | 28.3% |
+| person | 13,028 | 12.1% |
+| place | 6,447 | 6.0% |
+| abstract | 3,901 | 3.6% |
+| institutional | 3,347 | 3.1% |
+| ideological | 2,811 | 2.6% |
+| trade | 2,224 | 2.1% |
+| occupational | 1,607 | 1.5% |
+| infrastructure | 1,130 | 1.0% |
+| commemorative | 1,089 | 1.0% |
+| numeric | 867 | 0.8% |
+| date | 803 | 0.7% |
+| religious | 766 | 0.7% |
+| mythology | 455 | 0.4% |
+| saint | 330 | 0.3% |
 
-105,343 deduped streets · 1,207 UATs · 42 județe (41 + Bucharest as 6 sectors)
+107,957 deduped streets · 1,207 UATs · 42 județe (41 + Bucharest as 6 sectors)
 
 ### OSM match coverage
 
-**Overall:** 53.3% of registry streets matched to OSM; 54.6% of OSM streets matched to registry.
-105,343 registry streets, 105,905 OSM streets ≈ same scale, different compositions.
+**Overall:** 53.5% of registry streets matched to OSM; 53.7% of OSM streets matched to registry.
+107,957 registry streets, 105,905 OSM streets ≈ same scale, different compositions.
 
 **Per-reference-UAT:**
 - Cluj-Napoca (city): 75%
@@ -509,7 +531,7 @@ echo 'export ANTHROPIC_API_KEY=sk-ant-...' >> ~/.zshrc
 - Cornu (rural, PH): 65%
 - Bucharest Sector 1: ~31% (centroid imprecision for interleaved sectors)
 
-**The 46.7% unmatched registry gap:**
+**The 46.5% unmatched registry gap:**
 Three categories of unmatched registry streets:
 1. **Naming convention mismatches** — OSM omits street-type prefixes ("Mihai Eminescu" vs
    "Strada Mihai Eminescu") or uses abbreviations differently. We've fixed the "G-ral" →
@@ -519,7 +541,7 @@ Three categories of unmatched registry streets:
 3. **Rural/sparse coverage** — OSM mapping in Romania concentrates in cities. Smaller villages
    and hamlets have sparser street-level tagging.
 
-**The 45.4% unmatched OSM gap:**
+**The 46.3% unmatched OSM gap:**
 Mostly real streets with no registered voters:
 - Scenic/transit roads (Transalpina, Transfăgărășan)
 - New residential developments post-2021 (OSM updated, registry hasn't)
