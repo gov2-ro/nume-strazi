@@ -1245,7 +1245,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 {% set non_s_pct = (non_ro_s * 100.0 / total_s) %}
 {% set max_non_p = non_ro | map(attribute='persons') | max %}
 {% set max_non_s = non_ro | map(attribute='streets') | max %}
-<div class="panel s8" id="nationalities-panel">
+<div class="panel s4" id="nationalities-panel">
   <div class="panel-header">
     <span class="panel-label"><svg class="icon xl" aria-hidden="true"><use href="#icon-globe"/></svg> Naționalitatea personalităților onorate</span>
     <span class="panel-meta" id="s3nat-meta">{{ total_p }} persoane · {{ "{:,.0f}".format(total_s).replace(",",".") }} străzi</span>
@@ -1253,10 +1253,10 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
 
   {# Split bars: Români vs Străini (persoane + străzi). Body populated by JS so the
      judet/municipiu filter can swap it; Jinja seeds the national view. #}
-  <div id="s3nat-split" style="display:grid;grid-template-columns:1fr 1fr;gap:18px;padding-top:6px;margin-bottom:14px;"></div>
+  <div id="s3nat-split" style="display:grid;grid-template-columns:1fr;gap:12px;padding-top:6px;margin-bottom:14px;"></div>
 
   <div class="sub-eyebrow" style="margin-bottom:6px;"><span class="dot" style="background:#6B8E23;"></span>Defalcare pe țări · non-români</div>
-  <div id="s3nat-detail" style="display:grid;grid-template-columns:1fr 1fr;gap:18px;"></div>
+  <div id="s3nat-detail" style="display:grid;grid-template-columns:1fr;gap:12px;"></div>
 
   <div class="panel-caption" id="s3nat-caption" style="margin-top:10px;font-style:italic;"></div>
 </div>
