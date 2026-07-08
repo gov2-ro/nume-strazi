@@ -188,6 +188,47 @@ CREATE TABLE street_postal_matches (
 );
 CREATE INDEX ix_pmatch_postal ON street_postal_matches(postal_street_id);
 
+-- ===== RENNS (ANCPI cadastral street registry) scaffolds (populated by tools/renns_*.py) =====
+-- Source: https://renns.ancpi.ro (Registrul Electronic Național al Nomenclaturii
+-- Stradale) "Drumuri" endpoint. One row per (uat_siruta, name_normalized), same
+-- grain as osm_streets/postal_streets. `name` excludes the street-type prefix
+-- (RENNS separates roadType/name already), like postal_streets. uat_siruta is
+-- the RENNS uat.id verbatim — validated 3180/3181 against the registry's own
+-- SIRUTA codes, so (unlike postal) no name-matching fallback is needed; the
+-- rare miss is left NULL. See CODE_SPEC §13.
+CREATE TABLE renns_streets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_road_ids TEXT NOT NULL,        -- JSON array of contributing RENNS road ids
+    uat_siruta INTEGER,                   -- = RENNS uat.id; NULL only for the rare unresolved case
+    judet TEXT,                           -- RENNS county.shortName (fix_diacritics'd)
+    locality_raw TEXT,                    -- first-seen locality.name; debug aid only, not resolved further
+    road_type_raw TEXT,                   -- original roadType.name (messy; 90 distinct raw values)
+    street_type TEXT,                     -- cleaned via ROAD_TYPE_MAP; NULL for rural/unclassified codes
+    name TEXT NOT NULL,
+    name_normalized TEXT NOT NULL,
+    title TEXT,
+    rank TEXT,
+    is_saint INTEGER NOT NULL DEFAULT 0,
+    is_date INTEGER NOT NULL DEFAULT 0,
+    is_numeric INTEGER NOT NULL DEFAULT 0,
+    core_name TEXT,
+    core_name_norm TEXT,
+    road_status TEXT,                     -- roadStatus.name; always 'Publicat' in the full dataset today
+    UNIQUE (uat_siruta, name_normalized)
+);
+CREATE INDEX ix_renns_uat      ON renns_streets(uat_siruta);
+CREATE INDEX ix_renns_namenorm ON renns_streets(name_normalized);
+CREATE INDEX ix_renns_corenorm ON renns_streets(core_name_norm);
+
+CREATE TABLE street_renns_matches (
+    street_id INTEGER NOT NULL REFERENCES streets(id),
+    renns_street_id INTEGER NOT NULL REFERENCES renns_streets(id),
+    match_type TEXT NOT NULL,      -- 'exact_normalized' | 'fuzzy_core_name'
+    confidence REAL NOT NULL,
+    PRIMARY KEY (street_id, renns_street_id)
+);
+CREATE INDEX ix_rmatch_renns ON street_renns_matches(renns_street_id);
+
 CREATE INDEX ix_streets_judet     ON streets(judet);
 CREATE INDEX ix_streets_uat       ON streets(uat);
 CREATE INDEX ix_streets_namenorm  ON streets(name_normalized);
@@ -244,11 +285,11 @@ LEFT JOIN nature_terms    n  ON n.core_name_norm  = b.core_name_norm
 LEFT JOIN name_categories c  ON c.core_name_norm  = b.core_name_norm
 LEFT JOIN place_refs      pr ON pr.core_name_norm = b.core_name_norm;
 
--- Additive consolidation of all 3 street-name sources: registry (authoritative,
--- full attributes) + streets OSM/postal found that have no registry match.
+-- Additive consolidation of all 4 street-name sources: registry (authoritative,
+-- full attributes) + streets OSM/postal/RENNS found that have no registry match.
 -- Does not touch streets_dedup. Cross-source comparison must join on
 -- core_name_norm, never name_normalized — osm_streets.name_normalized includes
--- the street-type prefix, postal's and the registry's don't. See CODE_SPEC §12.
+-- the street-type prefix, postal's/RENNS's and the registry's don't. See CODE_SPEC §12, §13.
 CREATE VIEW streets_all_sources AS
 SELECT 'registry' AS source, sd.id, sd.judet, sd.uat, sd.siruta, sd.street_type, sd.name,
        sd.name_normalized, sd.title, sd.rank, sd.is_saint, sd.is_date, sd.is_numeric,
@@ -272,7 +313,104 @@ SELECT 'postal', NULL, su.judet, su.uat, p.uat_siruta, p.street_type, p.name, p.
 FROM postal_streets p
 LEFT JOIN (SELECT DISTINCT siruta, judet, uat FROM streets) su ON su.siruta = p.uat_siruta
 WHERE p.uat_siruta IS NOT NULL
-  AND NOT EXISTS (SELECT 1 FROM street_postal_matches m WHERE m.postal_street_id = p.id);
+  AND NOT EXISTS (SELECT 1 FROM street_postal_matches m WHERE m.postal_street_id = p.id)
+
+UNION ALL
+
+SELECT 'renns', NULL, su.judet, su.uat, r.uat_siruta, r.street_type, r.name, r.name_normalized,
+       r.title, r.rank, r.is_saint, r.is_date, r.is_numeric, r.core_name, r.core_name_norm,
+       'roadType=' || COALESCE(r.road_type_raw, '?')
+FROM renns_streets r
+LEFT JOIN (SELECT DISTINCT siruta, judet, uat FROM streets) su ON su.siruta = r.uat_siruta
+WHERE r.uat_siruta IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM street_renns_matches m WHERE m.renns_street_id = r.id);
+
+-- The true deduplicated master list of "every distinct street name in
+-- Romania, from any of the 4 sources" — unlike streets_all_sources (which
+-- keeps one row PER SOURCE for external-only streets, so 2-3 sources
+-- agreeing on the same registry-missing street produce 2-3 rows), this view
+-- collapses cross-source duplicates via (siruta, core_name_norm) and keeps
+-- every contributing source's exact name/street_type in `variants` (JSON)
+-- rather than silently discarding the losers. `corroboration_count` is how
+-- many of the 4 sources (registry counts as one) have this street; higher
+-- is a stronger signal the street genuinely exists. streets_all_sources is
+-- kept as-is for its existing narrower per-source gap-analysis queries
+-- (postal_only_streets, renns_only_streets, ...) — this view is the one to
+-- use for "give me every Romanian street name, deduplicated."
+CREATE VIEW all_street_names AS
+WITH reg_variant_src AS (
+  SELECT sd2.id AS street_id, 'registry' AS src, sd2.name AS vname, sd2.street_type AS vtype
+    FROM streets_dedup sd2
+  UNION ALL
+  SELECT mo.street_id, 'osm', o.name, o.street_type
+    FROM street_osm_matches mo JOIN osm_streets o ON o.id = mo.osm_street_id
+  UNION ALL
+  SELECT mp.street_id, 'postal', p.name, p.street_type
+    FROM street_postal_matches mp JOIN postal_streets p ON p.id = mp.postal_street_id
+  UNION ALL
+  SELECT mr.street_id, 'renns', r.name, r.street_type
+    FROM street_renns_matches mr JOIN renns_streets r ON r.id = mr.renns_street_id
+),
+reg_agg AS (
+  SELECT street_id,
+         json_group_array(json_object('source', src, 'name', vname, 'street_type', vtype)) AS variants,
+         COUNT(DISTINCT src) AS corroboration_count
+    FROM reg_variant_src
+   GROUP BY street_id
+),
+-- Priority (1=highest) only picks which name/street_type populate the
+-- convenience columns below when 2+ external sources disagree on spelling;
+-- `variants` always retains all of them. RENNS ranks highest as the
+-- official cadastral street-nomenclature registry; OSM has geometry but
+-- crowd-sourced spelling; postal is the oldest (2016) snapshot.
+ext_candidates AS (
+  SELECT 'renns' AS source, 1 AS prio, r.uat_siruta AS siruta, r.street_type, r.name,
+         r.name_normalized, r.core_name, r.core_name_norm, r.is_saint, r.is_date, r.is_numeric
+    FROM renns_streets r
+   WHERE r.core_name_norm IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM street_renns_matches m WHERE m.renns_street_id = r.id)
+  UNION ALL
+  SELECT 'osm', 2, o.uat_siruta, o.street_type, o.name,
+         o.name_normalized, o.core_name, o.core_name_norm, o.is_saint, o.is_date, o.is_numeric
+    FROM osm_streets o
+   WHERE o.core_name_norm IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM street_osm_matches m WHERE m.osm_street_id = o.id)
+  UNION ALL
+  SELECT 'postal', 3, p.uat_siruta, p.street_type, p.name,
+         p.name_normalized, p.core_name, p.core_name_norm, p.is_saint, p.is_date, p.is_numeric
+    FROM postal_streets p
+   WHERE p.core_name_norm IS NOT NULL AND p.uat_siruta IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM street_postal_matches m WHERE m.postal_street_id = p.id)
+),
+ext_agg AS (
+  SELECT siruta, core_name_norm,
+         json_group_array(json_object('source', source, 'name', name, 'street_type', street_type)) AS variants,
+         COUNT(DISTINCT source) AS corroboration_count,
+         MAX(is_saint) AS is_saint, MAX(is_date) AS is_date, MAX(is_numeric) AS is_numeric
+    FROM ext_candidates
+   GROUP BY siruta, core_name_norm
+),
+ext_ranked AS (
+  SELECT *, ROW_NUMBER() OVER (PARTITION BY siruta, core_name_norm ORDER BY prio) AS rn
+    FROM ext_candidates
+)
+SELECT 'registry' AS layer, sd.judet, sd.uat, sd.siruta, sd.street_type, sd.name,
+       sd.name_normalized, sd.core_name, sd.core_name_norm,
+       sd.is_saint, sd.is_date, sd.is_numeric,
+       ra.corroboration_count, ra.variants
+  FROM streets_dedup sd
+  JOIN reg_agg ra ON ra.street_id = sd.id
+
+UNION ALL
+
+SELECT 'external' AS layer, su.judet, su.uat, er.siruta, er.street_type, er.name,
+       er.name_normalized, er.core_name, er.core_name_norm,
+       ea.is_saint, ea.is_date, ea.is_numeric,
+       ea.corroboration_count, ea.variants
+  FROM ext_ranked er
+  JOIN ext_agg ea ON ea.siruta = er.siruta AND ea.core_name_norm = er.core_name_norm
+  LEFT JOIN (SELECT DISTINCT siruta, judet, uat FROM streets) su ON su.siruta = er.siruta
+ WHERE er.rn = 1;
 """)
 
 # ---------- ingest ----------

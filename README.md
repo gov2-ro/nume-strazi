@@ -25,22 +25,30 @@ Romanian-language interactive publication.
   **persons**, **nature_terms**, **name_categories**, **place_refs**
 - Enriches streets with OSM geometry, road class, and an importance score
   derived from highway hierarchy and length (per-UAT z-scored)
+- Cross-references three more independent sources — postal codes, and
+  ANCPI's RENNS cadastral registry — purely for name corroboration and gap-
+  filling (no geometry), then merges all four sources into one deduplicated
+  master list (`all_street_names`)
 - Provides a named SQL query catalog covering overview, people, themes,
-  regional maps, renaming history, curiosities, and OSM coverage gaps
+  regional maps, renaming history, curiosities, and cross-source coverage gaps
 
-Current coverage: **~57% classified** (105,107 deduped streets across 1,155 UATs).
+Current coverage: **63.9% classified** (105,343 deduped streets across 1,207 UATs, 42 județe).
 
 ---
 
 ## Pipeline
 
-End-to-end flow from raw registry to query catalog. OSM enrichment is an
-optional parallel branch.
+End-to-end flow from raw registry to query catalog. OSM, postal, and RENNS
+enrichment are optional parallel branches — each contributes name
+corroboration independently, then all four sources merge into one
+deduplicated master list.
 
 ```mermaid
 flowchart LR
     XLSX["AEP xlsx<br/>polling-section registry"]
     PBF["Geofabrik PBF<br/>romania-latest.osm.pbf"]
+    POSTALXLSX["Poșta Română xlsx<br/>coduri poștale 2016"]
+    RENNSAPI["ANCPI RENNS API<br/>renns.ancpi.ro"]
     BUILD["build_db.py<br/>ETL + normalisation"]
     SEED["seed_lookups.py<br/>seed_top500.py<br/>seed_batch2.py"]
     DB[("streets.db<br/>SQLite")]
@@ -49,6 +57,9 @@ flowchart LR
     CSV["curation CSVs"]
     IMP["import_csv.py<br/>upsert by core_name_norm"]
     OSM["osm_ingest.py<br/>osm_match.py<br/>osm_score.py"]
+    POSTAL["postal_ingest.py<br/>postal_match.py"]
+    RENNS["renns_ingest.py<br/>renns_match.py"]
+    ASN["all_street_names<br/>4-source dedup view"]
     Q["run_queries.py<br/>docs/queries.sql"]
     OUT["dashboard /<br/>publication"]
 
@@ -56,6 +67,9 @@ flowchart LR
     SEED --> DB
     DB --> EXP --> LLM --> CSV --> IMP --> DB
     PBF -.optional.-> OSM -.-> DB
+    POSTALXLSX -.optional.-> POSTAL -.-> DB
+    RENNSAPI -.optional.-> RENNS -.-> DB
+    DB --> ASN
     DB --> Q --> OUT
 ```
 
@@ -161,7 +175,7 @@ flowchart LR
     DB[("data/streets.db")]
     SITE["build_site.py<br/>Jinja2 → static HTML"]
     SLIM["tools/build_dist_db.py<br/>materialise streets_dedup<br/>drop unused cols + tables<br/>VACUUM, page_size=4096"]
-    DIST[("dist/streets.db<br/>~13.5 MB")]
+    DIST[("dist/streets.db<br/>~91 MB")]
   end
   subgraph dep["Deploy (rsync)"]
     HOST["shared host<br/>Apache / Nginx"]
@@ -185,9 +199,11 @@ No backend is required at runtime — `filter_server.py` exists for local Python
 testing only. Apache/Nginx serve `Accept-Ranges: bytes` natively.
 
 ```bash
-# Build the slim production DB (materialises streets_dedup as real table with
-# only client-needed columns, drops streets + unused tables, VACUUMs).
-# Run after each build_db.py rebuild. 30 MB → 13.5 MB.
+# Build the slim production DB (materialises streets_dedup + streets_all_sources +
+# all_street_names as real tables with only client-needed columns, drops source
+# tables, VACUUMs). Run after each build_db.py rebuild. ~163 MB → ~91 MB (bigger
+# than the pre-RENNS ~13.5 MB since the two consolidation tables now carry all
+# 4 sources' worth of rows).
 python3 tools/build_dist_db.py
 
 # Render the static site (landing + detail pages)
@@ -296,6 +312,51 @@ wget https://download.geofabrik.de/europe/romania-latest.osm.pbf \
 
 ---
 
+## External sources: postal codes + RENNS
+
+Two more independent sources are cross-referenced purely for name
+corroboration and gap-filling — neither carries geometry, unlike OSM, so
+their only role is "does this street exist, and under what name."
+
+- **Postal codes** (Poșta Română, 2016 xlsx snapshot): street-level data only
+  for București + localities over 50,000 population. 23,724 grouped streets;
+  83.1% matched back to OSM/registry-scope streets; 18.8% registry coverage
+  overall (expected — most of Romania is out of postal's scope by design).
+- **RENNS** (ANCPI's Registrul Electronic Național al Nomenclaturii Stradale,
+  the official cadastral street registry, `renns.ancpi.ro`): crawled per
+  `(county, UAT)` — the unfiltered flat endpoint looks tempting (67 requests
+  for all of Romania) but has confirmed pagination drift on the live dataset,
+  so it's not used. 116,016 grouped streets from all 3,181 UATs; 53.0%/48.1%
+  registry/RENNS match. București has zero RENNS roads (structural gap); only
+  ~60% of Romania's UATs are digitized in RENNS so far.
+
+```bash
+# Postal (stdlib + openpyxl only; source: data/reference/coduri-postale+/)
+python3 tools/postal_ingest.py --rebuild
+python3 tools/postal_match.py
+python3 tools/postal_sanity.py
+
+# RENNS (live API; stdlib urllib only, ~1 min for all of Romania)
+python3 tools/renns_ingest.py --rebuild
+python3 tools/renns_match.py
+python3 tools/renns_sanity.py
+```
+
+### Master deduplicated street list
+
+`streets_all_sources` (registry + unmatched OSM/postal/RENNS rows, flagged by
+source) is additive but **not** deduplicated across external sources — if
+OSM, postal, and RENNS all independently have the same registry-missing
+street, that view produces one row per source. `all_street_names` fixes this:
+it groups by `(uat_siruta, core_name_norm)` across all four sources into one
+row per real street, with a `variants` JSON column preserving every source's
+exact spelling (nothing is discarded to pick a "winner") and a
+`corroboration_count`. This is the list to use for "every street name in
+Romania," not `streets_all_sources`. See `docs/CODE_SPEC.md` §13.8 and
+critical rule #11 in `CLAUDE.md`.
+
+---
+
 ## Curation workflow
 
 Classification is stored in four lookup tables keyed on `core_name_norm`.
@@ -397,7 +458,13 @@ echo 'export ANTHROPIC_API_KEY=sk-ant-...' >> ~/.zshrc
 │   ├── osm_ingest.py           # PBF → osm_streets (osmium + shapely)
 │   ├── osm_match.py            # streets_dedup ↔ osm_streets join (pure SQL)
 │   ├── osm_score.py            # importance_v1 score + per-UAT z-score
-│   └── osm_sanity.py           # Top-10 rankings + registry coverage report
+│   ├── osm_sanity.py           # Top-10 rankings + registry coverage report
+│   ├── postal_ingest.py        # Postal xlsx → postal_streets
+│   ├── postal_match.py         # streets_dedup ↔ postal_streets join
+│   ├── postal_sanity.py        # Coverage report for reference UATs
+│   ├── renns_ingest.py         # ANCPI RENNS API → renns_streets (per-UAT crawl)
+│   ├── renns_match.py          # streets_dedup ↔ renns_streets join
+│   └── renns_sanity.py         # Coverage report for reference UATs + national %
 └── data/
     ├── reference/        # Source xlsx + OSM PBF (not committed — download separately)
     ├── curation/         # Curated classification CSVs (committed)
@@ -411,28 +478,29 @@ echo 'export ANTHROPIC_API_KEY=sk-ant-...' >> ~/.zshrc
 
 | status | streets | % |
 |---|---|---|
-| unclassified | 45,286 | 43.1% |
-| nature | 27,356 | 26.0% |
-| person | 11,297 | 10.7% |
-| place | 4,343 | 4.1% |
-| abstract | 3,483 | 3.3% |
-| institutional | 3,197 | 3.0% |
-| ideological | 2,806 | 2.7% |
-| trade | 2,099 | 2.0% |
-| occupational | 1,048 | 1.0% |
-| religious (saint) | 1,035 | 1.0% |
+| unclassified | 37,800 | 35.9% |
+| nature | 29,867 | 28.4% |
+| person | 12,705 | 12.1% |
+| place | 6,227 | 5.9% |
+| abstract | 3,808 | 3.6% |
+| institutional | 3,212 | 3.0% |
+| ideological | 2,702 | 2.6% |
+| trade | 2,162 | 2.1% |
+| occupational | 1,571 | 1.5% |
+| infrastructure | 1,101 | 1.0% |
+| commemorative | 1,050 | 1.0% |
 | numeric | 860 | 0.8% |
-| date | 775 | 0.7% |
-| commemorative | 731 | 0.7% |
-| infrastructure | 441 | 0.4% |
-| mythology | 350 | 0.3% |
+| date | 777 | 0.7% |
+| religious | 733 | 0.7% |
+| mythology | 451 | 0.4% |
+| saint | 317 | 0.3% |
 
-105,107 deduped streets · 1,155 UATs · 42 județe (41 + Bucharest as 6 sectors)
+105,343 deduped streets · 1,207 UATs · 42 județe (41 + Bucharest as 6 sectors)
 
 ### OSM match coverage
 
-**Overall:** 52.2% of registry streets matched to OSM; 53.4% of OSM streets matched to registry.
-105,104 registry streets, 105,905 OSM streets ≈ same scale, different compositions.
+**Overall:** 53.3% of registry streets matched to OSM; 54.6% of OSM streets matched to registry.
+105,343 registry streets, 105,905 OSM streets ≈ same scale, different compositions.
 
 **Per-reference-UAT:**
 - Cluj-Napoca (city): 75%
@@ -441,7 +509,7 @@ echo 'export ANTHROPIC_API_KEY=sk-ant-...' >> ~/.zshrc
 - Cornu (rural, PH): 65%
 - Bucharest Sector 1: ~31% (centroid imprecision for interleaved sectors)
 
-**The 48% unmatched registry gap:**
+**The 46.7% unmatched registry gap:**
 Three categories of unmatched registry streets:
 1. **Naming convention mismatches** — OSM omits street-type prefixes ("Mihai Eminescu" vs
    "Strada Mihai Eminescu") or uses abbreviations differently. We've fixed the "G-ral" →
@@ -451,7 +519,7 @@ Three categories of unmatched registry streets:
 3. **Rural/sparse coverage** — OSM mapping in Romania concentrates in cities. Smaller villages
    and hamlets have sparser street-level tagging.
 
-**The 47% unmatched OSM gap:**
+**The 45.4% unmatched OSM gap:**
 Mostly real streets with no registered voters:
 - Scenic/transit roads (Transalpina, Transfăgărășan)
 - New residential developments post-2021 (OSM updated, registry hasn't)

@@ -400,7 +400,76 @@ Additive consolidation, does **not** touch `streets_dedup`: `UNION ALL` of regis
 - Postal match: registry coverage 19,753/105,343 (18.8% — expected, since postal only covers Bucuresti + >50k towns); postal coverage 19,715/23,724 (83.1%).
 - `streets_all_sources`: 105,343 registry + 48,063 OSM-only + 4,009 postal-only = 157,415 rows.
 
-## 13. Pitfalls / gotchas
+## 13. RENNS enrichment pipeline
+
+Goal: a fourth street-name source — ANCPI's RENNS (Registrul Electronic Național al Nomenclaturii Stradale), the official cadastral street-nomenclature registry — for corroboration and gap-filling, same role as postal. No geometry (unlike OSM), so its value is purely "does this street exist, and under what name."
+
+### 13.1 Source
+
+- Live API at `https://renns.ancpi.ro`, "Drumuri" (roads) tab: `GET /api/public/roads?idCounty=<id>&idUAT=<id>&page=1&items=2000`. The "Nr. Administrative" tab (per-building-number addresses) was evaluated and skipped — it's address-point granularity, far more data than a street-names project needs.
+- `data/` has no source file for this — it's ingested directly from the live API each run (idempotent upsert, so re-running is safe and picks up any RENNS updates).
+
+### 13.2 Dependency exception
+
+None. `urllib.request` (stdlib) only — no `requests`, no new dependency.
+
+### 13.3 Tables
+
+| Table | Grain | Notes |
+|---|---|---|
+| `renns_streets` | one row per `(uat_siruta, name_normalized)` | Same grain as `osm_streets`/`postal_streets`. `name` **excludes** the street-type prefix (RENNS separates `roadType`/`name` already, like postal) — directly comparable to the registry's `name_normalized`, no `strip_street_type()` needed. |
+| `street_renns_matches` | one row per `(street_id, renns_street_id)` | Two pass types: `exact_normalized` (1.0), `fuzzy_core_name` (0.6) — same shape as `osm_match.py`, not postal's 3-pass (see §13.6). |
+
+### 13.4 UAT resolution — no fallback needed
+
+Unlike postal (§12.4), RENNS's `uat.id` **is** the registry's SIRUTA code directly — verified across all 3,181 UATs RENNS knows about: 3,180/3,181 exact matches against `data/gis/populatie-romania-siruta-coords.csv`. The one miss (RENNS's "Racșa", Satu Mare, id 180091) isn't a resolution failure — that commune has no entry in our own registry under any SIRUTA at all, in either judet's UAT list. Left `NULL` and surfaced via `streets_all_sources`/`all_street_names` rather than papered over with a name-matching fallback like postal needed.
+
+RENNS's `county.shortName` is likewise the registry's judet 2-letter code directly (`"AB"`, `"PH"`, ...). No name-matching axis needed anywhere in this pipeline.
+
+### 13.5 Crawl strategy — the flat endpoint has confirmed pagination drift
+
+`/api/public/roads` has two modes:
+- **Filtered** (`idCounty` + `idUAT` both given): scoped correctly to one UAT.
+- **Unfiltered** (`idCounty` alone is silently a no-op; omitting both returns the entire national dataset, paginated 67×2000 at `items=2000`): tempting — only 67 requests for all of Romania — but a full sequential crawl of it produced **3,680 duplicate ids out of 133,194 (2.8%)**. The live dataset shifts under a multi-page unfiltered crawl, so rows get skipped or duplicated non-deterministically. **Not used.**
+
+`tools/renns_ingest.py` instead loops per-`(county, UAT)`: every single UAT's road count fits in one page (max observed: Cluj-Napoca at 1,212, vs. the 2,000-item cap), so each fetch is an atomic single-page snapshot — no drift risk. Concurrency (`ThreadPoolExecutor`, default 8 workers) makes the full 3,181-UAT crawl (1 counties call + 42 UATs-list calls + up to 3,181 roads calls) take about a minute; tested at 10 workers with zero errors across 150 requests in 2.3s. Re-running `--rebuild` twice produced byte-identical row counts, confirming no drift in this mode.
+
+### 13.6 Match strategy
+
+`tools/renns_match.py`, same two-pass shape as `osm_match.py`:
+
+1. `exact_normalized` (1.0) — `(uat_siruta, name_normalized)`.
+2. `fuzzy_core_name` (0.6) — `(uat_siruta, core_name_norm)`, unmatched rows only.
+
+No third reordered-name pass: RENNS person names follow the registry's "Firstname Surname" convention (confirmed by sampling, e.g. "Mihai Eminescu" appears exactly that way, not reversed like postal's Bucuresti sheet).
+
+### 13.7 Known caveats
+
+- **București has zero roads in RENNS** — confirmed directly (`idCounty=403&idUAT=179132` → `totalCount: 0`), not a sampling artifact. A genuine structural gap, not a bug to chase.
+- **Only ~60% of Romania's 3,181 UATs have any RENNS road at all** (1,922/3,181 in the full run) — RENNS is a rolling, partial national digitization, not a finished registry. A zero result for a small/rural UAT is plausible and expected. Interestingly, RENNS's own UAT coverage (1,922) is *larger* than the number of distinct UATs our own AEP-sourced registry has street data for (1,207) — RENNS covers UATs our own primary source doesn't.
+- **`roadType.name` has 90 distinct raw values**, heavily concentrated (top 9 cover 98.6%). Long tail is cedilla variants (folded via `fix_diacritics`), rural/cadastral road-classification codes (`DC`/`DS`/`DE`/`Drum comunal`/`Nespecificat`/blank — mapped to `street_type = NULL`, not forced), and literal double-prefix data-entry glitches (`"Strada aleea"`, `"Strada FUNDATURA"`) handled by a generic strip-and-reresolve rule in `tools/renns_ingest.py`'s `clean_road_type()`.
+- **`alternativeName`/`endDate` are populated on <0.2% of rows** and look like data-entry noise (literal string `"NULL"`, corrupted placeholders, short-lived correction entries) rather than a usable "when was this street renamed" signal. Stored raw in neither table (not ingested at all) — not worth building on top of given the noise level.
+
+### 13.8 `all_street_names` — the true cross-source deduplicated master list
+
+`streets_all_sources` (§12.6) is additive but **not fully deduplicated**: for a street missing from the registry, each external source that has it contributes its own row — if OSM, postal, and RENNS all independently have "Sfântul Capistrano" in some UAT, that's 3 rows there, not 1. Verified impact: 5,857 redundant rows out of 217,576 (2.7%) in the full 4-source run.
+
+`all_street_names` fixes this by grouping on `(siruta, core_name_norm)` across **all four sources at once**:
+
+- **`registry` layer** (105,343 rows): one row per `streets_dedup` street, annotated with `corroboration_count` (1-4: registry + however many of OSM/postal/RENNS also match it) and a `variants` JSON array listing every matching source's exact `name`/`street_type` — e.g. registry's "Aleea Sfântul Capistrano" alongside OSM's identically-worded way and postal's/RENNS's un-prefixed "Sfântul Capistrano".
+- **`external` layer** (106,376 rows): OSM/postal/RENNS rows with no registry match, grouped by `(siruta, core_name_norm)` into one row per group instead of one per source. `variants` again preserves every contributing source's spelling — nothing is discarded even though only one representative `name`/`street_type` populates the convenience columns (priority RENNS > OSM > postal, since RENNS is the official cadastral registry, OSM has geometry but crowd-sourced spelling, and postal is the oldest 2016 snapshot).
+
+Total: 211,719 rows (vs. `streets_all_sources`'s 217,576 — the 5,857-row difference is exactly the cross-source duplication this view collapses). `streets_all_sources` is kept as-is for its existing narrower per-source gap-analysis queries (`postal_only_streets`, `renns_only_streets`, ...); `all_street_names` is the one to use for "every distinct street name in Romania, deduplicated."
+
+Verified corroboration distribution (full run, 2026-07-08): 1 source only — 125,689; 2 sources — 44,839; 3 sources — 33,228; all 4 — 7,963.
+
+### 13.9 Verified results (full run, 2026-07-08)
+
+- RENNS ingest: 3,181 UATs crawled (all of Romania), 1,922 with ≥1 road, 133,194 raw roads → 116,016 grouped `renns_streets` rows. Zero fetch failures.
+- RENNS match: registry coverage 55,863/105,343 (53.0% — comparable to OSM's 53.3%); RENNS coverage 55,855/116,016 (48.1%).
+- `all_street_names`: 211,719 total rows (105,343 registry + 106,376 external-only), 5,857 fewer than the naive `streets_all_sources` union thanks to cross-source dedup.
+
+## 14. Pitfalls / gotchas
 
 These are the booby traps. A senior engineer reading this should not have to discover any of them by stubbing toes.
 
@@ -414,10 +483,12 @@ These are the booby traps. A senior engineer reading this should not have to dis
 8. **Don't strip diacritics for display.** It happens naturally when bugs are introduced. Add a startup assertion that `name` columns contain non-ASCII Romanian characters.
 9. **`core_name=NULL` on numeric streets is intentional.** Queries that join curated tables on `core_name_norm` will correctly skip these. Queries that filter for "anonymous" should use `is_numeric=1`.
 10. **The `(D)` parenthetical is filtered as too short, but other admin codes might exist.** Audit the full 140k for unexpected short parentheticals (`(I)`, `(II)`, `(B)`?).
-11. **`osm_streets.name_normalized` includes the street-type prefix; `postal_streets.name_normalized` and `streets_dedup.name_normalized` don't.** Comparing across sources by `name_normalized` silently under-corroborates. Always use `core_name_norm` for cross-source comparison (see §12.6).
+11. **`osm_streets.name_normalized` includes the street-type prefix; `postal_streets.name_normalized`, `renns_streets.name_normalized`, and `streets_dedup.name_normalized` don't.** Comparing across sources by `name_normalized` silently under-corroborates. Always use `core_name_norm` for cross-source comparison (see §12.6, §13.8).
 12. **`postal_streets` covers Bucuresti + localities over 50,000 population only.** Zero postal rows for a small/rural UAT is expected, not a bug — don't read it as "this town has no streets."
+13. **RENNS's unfiltered/flat `/api/public/roads` endpoint looks tempting** (67 requests for all of Romania vs. ~3,181 per-UAT calls) **but has confirmed pagination drift on the live dataset** (3,680 duplicate ids out of 133,194 in a full sequential crawl, §13.5). Always use the per-`(county, UAT)` filtered endpoint; don't re-introduce the flat crawl without re-verifying that finding first.
+14. **`streets_all_sources` is additive but not cross-source-deduplicated** — a street missing from the registry but present in 2-3 external sources gets one row *per source* there, not one. Use `all_street_names` (§13.8) when you need a genuinely deduplicated "every street name in Romania" list.
 
-## 14. Out of scope for the data layer
+## 15. Out of scope for the data layer
 
 - Visual design, color palette, layout — see Design Brief.
 - Editorial copy in Romanian — see Design Brief.
@@ -425,7 +496,7 @@ These are the booby traps. A senior engineer reading this should not have to dis
 - Voter-data joins — different project.
 - Real-time updates — the registry updates infrequently; manual rebuild is fine.
 
-## 15. Reference: current state files
+## 16. Reference: current state files
 
 | File | Purpose |
 |---|---|

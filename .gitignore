@@ -1,7 +1,6 @@
 _obsolete
 */_obsolete*
 .playwright-mcp/*
-data
 data/*
 # Generated database — rebuild with build_db.py
 data/streets.db
@@ -12,9 +11,12 @@ data/reference/
 # GIS assets (future)
 data/gis/
 
-# Curation working files — regeneratable exports
-data/curation/unclassified.csv
-data/curation/llm_*.csv
+# Curation CSVs are the authoritative record for post-rebuild restore
+# (see CLAUDE.md Common Commands) — track all of them, including the
+# LLM-classified batches (not reliably regeneratable — LLM output varies
+# run to run) and the unclassified.csv export (cheap, useful as a snapshot).
+!data/curation/
+!data/curation/*.csv
 
 # Python
 __pycache__/

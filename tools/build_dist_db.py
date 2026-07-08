@@ -6,10 +6,13 @@ Reads  data/streets.db
 Writes dist/streets.db
 
 What it does:
-  - Materializes streets_all_sources (the registry+OSM+postal consolidation
-    view) into a real table before its source tables are dropped.
+  - Materializes streets_all_sources (the registry+OSM+postal+RENNS
+    consolidation view) and all_street_names (the cross-source-deduplicated
+    master list, see CODE_SPEC §13.8) into real tables before their source
+    tables are dropped.
   - Drops tables not used by the client-side filter UI: osm_streets,
-    street_osm_matches, postal_streets, street_postal_matches, street_aliases.
+    street_osm_matches, postal_streets, street_postal_matches, renns_streets,
+    street_renns_matches, street_aliases.
   - Sets page_size=4096 (predictable HTTP range alignment for sql.js-httpvfs).
   - Sets journal_mode=DELETE so the shipped file is self-contained.
   - VACUUMs to repack and apply the new page size.
@@ -38,14 +41,21 @@ def main() -> None:
 
     conn = sqlite3.connect(DST)
     try:
-        # streets_all_sources is a view over streets/streets_dedup/osm_streets/
-        # postal_streets (+ their match tables) — materialize it FIRST, before
-        # any of those get dropped below, or the view resolution breaks.
+        # streets_all_sources and all_street_names are views over
+        # streets/streets_dedup/osm_streets/postal_streets/renns_streets
+        # (+ their match tables) — materialize both FIRST, before any of
+        # those get dropped below, or the view resolution breaks.
         conn.execute("""
             CREATE TABLE streets_all_sources_slim AS
             SELECT * FROM streets_all_sources
         """)
         conn.execute("DROP VIEW streets_all_sources")
+
+        conn.execute("""
+            CREATE TABLE all_street_names_slim AS
+            SELECT * FROM all_street_names
+        """)
+        conn.execute("DROP VIEW all_street_names")
 
         # Materialize streets_dedup view → table with only client-needed columns.
         # Drops id/artera_raw/title/rank (ETL artefacts never read by db-client.js).
@@ -68,12 +78,17 @@ def main() -> None:
 
         # Drop tables not used by the client-side filter UI.
         for tbl in ("osm_streets", "street_osm_matches",
-                    "postal_streets", "street_postal_matches", "street_aliases"):
+                    "postal_streets", "street_postal_matches",
+                    "renns_streets", "street_renns_matches", "street_aliases"):
             conn.execute(f"DROP TABLE IF EXISTS {tbl}")
 
         conn.execute("ALTER TABLE streets_all_sources_slim RENAME TO streets_all_sources")
         conn.execute("CREATE INDEX ix_sas_siruta   ON streets_all_sources(siruta)")
         conn.execute("CREATE INDEX ix_sas_corenorm ON streets_all_sources(core_name_norm)")
+
+        conn.execute("ALTER TABLE all_street_names_slim RENAME TO all_street_names")
+        conn.execute("CREATE INDEX ix_asn_siruta   ON all_street_names(siruta)")
+        conn.execute("CREATE INDEX ix_asn_corenorm ON all_street_names(core_name_norm)")
 
         conn.execute("PRAGMA journal_mode = DELETE")
         conn.execute("PRAGMA page_size = 4096")

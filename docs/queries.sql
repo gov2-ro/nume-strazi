@@ -560,7 +560,7 @@ ORDER BY km DESC;
 -- ============= VIEW 9: POSTAL ↔ REGISTRY COVERAGE =============
 -- Requires postal_ingest + postal_match to have run first.
 -- Postal source only covers Bucuresti + localities over 50,000 population
--- (see CODE_SPEC §16) — 0% coverage for small/rural UATs is expected, not a gap.
+-- (see CODE_SPEC §12) — 0% coverage for small/rural UATs is expected, not a gap.
 
 -- Per-județ: what % of registry streets have a postal match?
 -- :name postal_judet_coverage
@@ -603,14 +603,63 @@ WHERE NOT EXISTS (
 ORDER BY sub_ranges DESC
 LIMIT 50;
 
+
+-- ============= VIEW 10: RENNS ↔ REGISTRY COVERAGE =============
+-- Requires renns_ingest + renns_match to have run first.
+-- RENNS is a rolling/partial national digitization — only ~60% of Romania's
+-- UATs have any RENNS road at all, and București has zero (see CODE_SPEC §13).
+-- 0% coverage for an uncovered UAT is expected, not necessarily a gap.
+
+-- Per-județ: what % of registry streets have a RENNS match?
+-- :name renns_judet_coverage
+SELECT sd.judet,
+       COUNT(*)                                                          AS registry_streets,
+       SUM(CASE WHEN m.street_id IS NOT NULL THEN 1 ELSE 0 END)         AS renns_matched,
+       ROUND(100.0 * SUM(CASE WHEN m.street_id IS NOT NULL THEN 1 ELSE 0 END)
+             / COUNT(*), 1)                                             AS pct_renns
+FROM streets_dedup sd
+LEFT JOIN street_renns_matches m ON m.street_id = sd.id
+GROUP BY sd.judet
+ORDER BY pct_renns DESC;
+
+-- Registry street names that are frequent (≥10 UATs) but have zero RENNS
+-- match in any UAT. Some of this is expected (RENNS coverage is partial);
+-- interesting cases are common names that ARE in RENNS-covered UATs but
+-- still miss — check registry_uncorroborated / external_corroboration_gap below.
+-- :name registry_renns_gap
+SELECT sd.name,
+       COUNT(DISTINCT sd.uat)                                            AS uats_in_registry,
+       SUM(CASE WHEN m.street_id IS NOT NULL THEN 1 ELSE 0 END)         AS uats_with_renns_match
+FROM streets_dedup sd
+LEFT JOIN street_renns_matches m ON m.street_id = sd.id
+GROUP BY sd.name_normalized
+HAVING COUNT(DISTINCT sd.uat) >= 10
+   AND SUM(CASE WHEN m.street_id IS NOT NULL THEN 1 ELSE 0 END) = 0
+ORDER BY uats_in_registry DESC
+LIMIT 30;
+
+-- RENNS streets not in the registry. No importance score here (no geometry) —
+-- ranked by source_road_ids length as a rough "how many locality instances
+-- collapsed into this UAT-level row" prominence proxy.
+-- :name renns_only_streets
+SELECT r.uat_siruta, r.name, r.road_type_raw,
+       json_array_length(r.source_road_ids) AS instances
+FROM renns_streets r
+WHERE NOT EXISTS (
+    SELECT 1 FROM street_renns_matches m WHERE m.renns_street_id = r.id
+)
+ORDER BY instances DESC
+LIMIT 50;
+
 -- The core "did we catch every street" deliverable: streets present in OSM
--- and/or postal, absent from the registry, grouped by (siruta, core_name_norm)
--- with a corroboration_level (1/2 = one/both external sources agree). Level 2
--- is the strongest signal of a genuinely missed registry street.
+-- and/or postal and/or RENNS, absent from the registry, grouped by
+-- (siruta, core_name_norm) with a corroboration_level (1-3 = how many
+-- external sources agree). Higher level is a stronger signal of a
+-- genuinely missed registry street.
 -- Written as UNION+GROUP BY rather than FULL OUTER JOIN: SQLite can't build
--- an index across two ungrounded CTEs for a FULL JOIN, so that form falls
--- back to a nested-loop scan (~48k x ~4k rows here, times out). This form
--- uses ix_streets_siruta_corenorm for the final anti-join instead.
+-- an index across ungrounded CTEs for a FULL JOIN, so that form falls back
+-- to a nested-loop scan (times out at this scale). This form uses
+-- ix_streets_siruta_corenorm for the final anti-join instead.
 -- :name external_corroboration_gap
 WITH osm_gap AS (
   SELECT o.uat_siruta AS siruta, o.core_name_norm
@@ -624,10 +673,18 @@ postal_gap AS (
    WHERE p.core_name_norm IS NOT NULL
      AND NOT EXISTS (SELECT 1 FROM street_postal_matches m WHERE m.postal_street_id = p.id)
 ),
+renns_gap AS (
+  SELECT r.uat_siruta AS siruta, r.core_name_norm
+    FROM renns_streets r
+   WHERE r.core_name_norm IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM street_renns_matches m WHERE m.renns_street_id = r.id)
+),
 combined AS (
   SELECT siruta, core_name_norm, 1 AS src FROM osm_gap
   UNION ALL
   SELECT siruta, core_name_norm, 2 AS src FROM postal_gap
+  UNION ALL
+  SELECT siruta, core_name_norm, 3 AS src FROM renns_gap
 ),
 gap_grouped AS (
   SELECT siruta, core_name_norm, COUNT(DISTINCT src) AS corroboration_level
@@ -643,17 +700,61 @@ WHERE NOT EXISTS (
 ORDER BY corroboration_level DESC
 LIMIT 100;
 
--- Reverse of the above: registry streets with zero match in either external
+-- Reverse of the above: registry streets with zero match in any external
 -- source. NOT proof of staleness/renaming — expect false positives from
--- generic names in sparsely-OSM-mapped villages (Gorj/Tulcea finding) and
--- from small UATs postal doesn't cover at all. Do not present as fact
--- without a second, independent source (see CLAUDE.md's renaming-certainty rule).
+-- generic names in sparsely-OSM-mapped villages (Gorj/Tulcea finding), from
+-- small UATs postal doesn't cover, and from UATs RENNS hasn't digitized yet.
+-- Do not present as fact without a second, independent source (see
+-- CLAUDE.md's renaming-certainty rule).
 -- :name registry_uncorroborated
 SELECT sd.judet, sd.uat, sd.name,
-       CASE WHEN po.street_id IS NULL AND pm.street_id IS NULL THEN 1 ELSE 0 END AS uncorroborated
+       CASE WHEN po.street_id IS NULL AND pm.street_id IS NULL AND rm.street_id IS NULL
+            THEN 1 ELSE 0 END AS uncorroborated
 FROM streets_dedup sd
 LEFT JOIN street_osm_matches po    ON po.street_id = sd.id
 LEFT JOIN street_postal_matches pm ON pm.street_id = sd.id
-WHERE po.street_id IS NULL AND pm.street_id IS NULL
+LEFT JOIN street_renns_matches rm  ON rm.street_id = sd.id
+WHERE po.street_id IS NULL AND pm.street_id IS NULL AND rm.street_id IS NULL
 ORDER BY sd.judet, sd.uat
+LIMIT 100;
+
+
+-- ============= VIEW 11: MASTER DEDUPLICATED STREET LIST (all 4 sources) =============
+-- Requires all 4 sources ingested + matched (see CODE_SPEC §13.8 for the
+-- all_street_names view definition). Unlike streets_all_sources (one row
+-- PER SOURCE for external-only streets — 2-3 sources agreeing on a
+-- registry-missing street produce 2-3 rows there), all_street_names
+-- collapses cross-source duplicates via (siruta, core_name_norm) into one
+-- row, with a `variants` JSON column preserving every contributing source's
+-- exact name/street_type (nothing discarded) and a `corroboration_count`
+-- (1-4) for how many sources agree. This is the one to use for "every
+-- distinct street name in Romania."
+
+-- Headline size + how much the cross-source dedup actually saved.
+-- :name all_street_names_summary
+SELECT
+  (SELECT COUNT(*) FROM all_street_names)                          AS master_list_size,
+  (SELECT COUNT(*) FROM streets_all_sources)                       AS naive_union_size,
+  (SELECT COUNT(*) FROM streets_all_sources) - (SELECT COUNT(*) FROM all_street_names)
+                                                                    AS duplicates_collapsed,
+  (SELECT COUNT(*) FROM all_street_names WHERE layer = 'registry')  AS registry_rows,
+  (SELECT COUNT(*) FROM all_street_names WHERE layer = 'external')  AS external_only_rows,
+  (SELECT COUNT(*) FROM all_street_names WHERE corroboration_count >= 2)
+                                                                    AS multi_source_corroborated;
+
+-- Distribution of how many sources agree per street — the shape of
+-- consensus across registry/OSM/postal/RENNS.
+-- :name corroboration_distribution
+SELECT corroboration_count, COUNT(*) AS n_streets
+FROM all_street_names
+GROUP BY corroboration_count
+ORDER BY corroboration_count;
+
+-- Streets found by 2+ sources but entirely absent from the registry — the
+-- strongest-confidence "the registry genuinely missed this one" list.
+-- :name high_confidence_registry_misses
+SELECT judet, uat, siruta, name, street_type, corroboration_count, variants
+FROM all_street_names
+WHERE layer = 'external' AND corroboration_count >= 2
+ORDER BY corroboration_count DESC, judet, uat
 LIMIT 100;
