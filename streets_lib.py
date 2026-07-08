@@ -87,3 +87,124 @@ def strip_street_type(name):
         if s.startswith(st + " "):
             return st, s[len(st):].strip()
     return None, s
+
+
+# ---------- title / rank / saint / date feature extraction ----------
+# Shared by build_db.py (registry) and tools/osm_ingest.py, tools/postal_ingest.py
+# (external sources) so all three produce comparable core_name/core_name_norm.
+TITLES = sorted([
+    "Profesor Universitar Doctor","Profesor Universitar",
+    "Profesor Doctor","Profesor","Prof. Univ. Dr.","Prof. Dr.","Prof.",
+    "Academician","Acad.","Doctor","Dr.","Ing.","Arh.",
+    "Învățătorul","Învățător","Înv.",
+    "Pictorul","Pictor","Sculptorul","Sculptor",
+    "Compozitorul","Compozitor","Poetul","Poet",
+    "Scriitorul","Scriitor","Dramaturgul","Dramaturg","Filozoful","Filozof",
+    "Părintele","Preotul","Preot","Episcopul","Episcop",
+    "Mitropolitul","Mitropolit","Patriarhul","Patriarh",
+], key=len, reverse=True)
+
+RANKS = sorted([
+    "Locotenent-colonel","General-locotenent","Sublocotenent",
+    "General","Colonel","Maior","Căpitan","Locotenent","Sergent","Caporal","Soldat",
+    "Mareșal","Amiral","Comandor",
+    "Voievodul","Voievod","Domnitorul","Domnitor",
+    "Regele","Regina","Împăratul","Împărăteasa","Prințul","Prinț","Prințesa",
+    "Eroii","Eroul","Erou","Martirii","Martirul","Martir",
+    "Haiducul",
+], key=len, reverse=True)
+
+SAINTS = sorted([
+    "Sfinții Apostoli","Sfinții","Sfântul","Sfânta","Sfântu","Sfânt",
+    "Sf-a","Sfta.","Sf.",
+], key=len, reverse=True)
+
+MONTHS_RO = ["ianuarie","februarie","martie","aprilie","mai","iunie",
+             "iulie","august","septembrie","octombrie","noiembrie","decembrie"]
+DATE_RE = re.compile(r"^(\d{1,2})\s+(" + "|".join(MONTHS_RO) + r")$", re.IGNORECASE)
+NUMERIC_RE = re.compile(r"^\d+[A-Za-z]?$")
+
+
+def parse_artery(raw):
+    """Split a raw 'Arteră' cell into (street_type, name, aliases).
+
+    Fixes diacritics, extracts parenthetical alias candidates, then matches
+    the remaining text against STREET_TYPES as a leading prefix.
+    """
+    if not raw:
+        return None, None, []
+    s = fix_diacritics(raw).strip()
+    aliases_raw = re.findall(r"\(([^)]+)\)", s)
+    main = re.sub(r"\s*\([^)]+\)", "", s).strip()
+    aliases = [a.strip() for a in aliases_raw if len(a.strip()) > 2]
+    for st in STREET_TYPES:
+        if main.startswith(st + " "):
+            return st, main[len(st):].strip(), aliases
+    return None, main, aliases
+
+
+def extract_features(name):
+    """Peel numeric/date/saint/title/rank prefixes off a (type-stripped) name.
+
+    Returns a dict with title, rank, is_saint, is_date, is_numeric, core_name.
+    Greedy multi-pass peeling handles chains like "Colonel Dr. Ion X".
+    """
+    f = {"title": None, "rank": None, "is_saint": 0, "is_date": 0, "is_numeric": 0, "core_name": name}
+    if not name:
+        return f
+    if NUMERIC_RE.match(name):
+        f["is_numeric"] = 1
+        f["core_name"] = None
+        return f
+    if DATE_RE.match(name):
+        f["is_date"] = 1
+        f["core_name"] = name
+        return f
+
+    remaining = name
+    progress = True
+    while progress:
+        progress = False
+        for s in SAINTS:
+            if remaining == s or remaining.startswith(s + " "):
+                f["is_saint"] = 1
+                remaining = remaining[len(s):].strip()
+                progress = True
+                break
+        if progress:
+            continue
+        for t in TITLES:
+            if remaining == t or remaining.startswith(t + " "):
+                f["title"] = (f["title"] + " " + t) if f["title"] else t
+                remaining = remaining[len(t):].strip()
+                progress = True
+                break
+        if progress:
+            continue
+        for r in RANKS:
+            if remaining == r or remaining.startswith(r + " "):
+                f["rank"] = (f["rank"] + " " + r) if f["rank"] else r
+                remaining = remaining[len(r):].strip()
+                progress = True
+                break
+    f["core_name"] = remaining if remaining else None
+    return f
+
+
+# County-name lookup for sources that give a full județ name (e.g. postal
+# registries) rather than the registry's 2-letter code. Keys are the
+# normalize_match()-ed full name; kept here (not site_queries.py, which is
+# presentation-layer) so ETL tools can use it without a heavy import.
+_JUDET_COD_TO_NAME = {
+    "AB": "Alba", "AG": "Argeș", "AR": "Arad", "B": "București", "BC": "Bacău",
+    "BH": "Bihor", "BN": "Bistrița-Năsăud", "BR": "Brăila", "BT": "Botoșani",
+    "BV": "Brașov", "BZ": "Buzău", "CJ": "Cluj", "CL": "Călărași",
+    "CS": "Caraș-Severin", "CT": "Constanța", "CV": "Covasna", "DB": "Dâmbovița",
+    "DJ": "Dolj", "GJ": "Gorj", "GL": "Galați", "GR": "Giurgiu", "HD": "Hunedoara",
+    "HR": "Harghita", "IF": "Ilfov", "IL": "Ialomița", "IS": "Iași",
+    "MH": "Mehedinți", "MM": "Maramureș", "MS": "Mureș", "NT": "Neamț",
+    "OT": "Olt", "PH": "Prahova", "SB": "Sibiu", "SJ": "Sălaj", "SM": "Satu Mare",
+    "SV": "Suceava", "TL": "Tulcea", "TM": "Timiș", "TR": "Teleorman",
+    "VL": "Vâlcea", "VN": "Vrancea", "VS": "Vaslui",
+}
+JUDET_NAME_TO_COD = {normalize_match(v): k for k, v in _JUDET_COD_TO_NAME.items()}

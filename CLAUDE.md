@@ -45,7 +45,10 @@ If asked to do something not covered by the above, ask before improvising.
 │   ├── osm_ingest.py           # PBF → osm_streets (needs osmium + shapely)
 │   ├── osm_match.py            # streets_dedup ↔ osm_streets join
 │   ├── osm_score.py            # importance_v1 = highway × log(length) + ref bonus
-│   └── osm_sanity.py           # top-10 / coverage report for reference UATs
+│   ├── osm_sanity.py           # top-10 / coverage report for reference UATs
+│   ├── postal_ingest.py        # postal xlsx → postal_streets
+│   ├── postal_match.py         # streets_dedup ↔ postal_streets join
+│   └── postal_sanity.py        # coverage report for reference UATs
 └── data/
     ├── reference/        # Raw xlsx inputs (registry exports)
     ├── curation/         # CSV inputs for incremental curation
@@ -65,6 +68,7 @@ These are the booby traps. Internalize before writing any query or transform.
 6. **Curation upserts must be idempotent.** Use `ON CONFLICT(core_name_norm) DO UPDATE`. Re-running an import with the same CSV must be a no-op.
 7. **`osm_streets` is already grouped per `(uat_siruta, name_normalized)`.** OSM splits one street into many ways at every junction; `tools/osm_ingest.py` merges them before insert. Don't `GROUP BY` again or you'll over-aggregate. To compare a registry street to its OSM counterpart, join `streets_dedup` ↔ `osm_streets` via `street_osm_matches` (don't re-derive the join in queries).
 8. **OSM scope is populated areas only.** Motorways and trunks are filtered out at ingest by design. If a query expects them, it's wrong — they belong to a future inter-city analysis, not this one.
+9. **Postal source is the 2016 xlsx only (`data/reference/coduri-postale+/infocod-cu-siruta-mai-2016.xlsx`).** The 2009 `coduri_postale.sql` dump in the same folder was evaluated and excluded — it adds zero new locality coverage over the xlsx (see CODE_SPEC §12.1), don't re-propose it without reading that section first. Postal only covers Bucuresti + localities over 50,000 population; zero `postal_streets` rows for a small/rural UAT is expected, not a bug. Cross-source comparison (`streets_all_sources`, `docs/queries.sql`'s `external_corroboration_gap`) must join on `core_name_norm`, never `name_normalized` — `osm_streets.name_normalized` includes the street-type prefix, postal's and the registry's don't.
 
 ## Common commands
 
@@ -126,6 +130,11 @@ python3 tools/osm_ingest.py                  # PBF → osm_streets (~15 min on f
 python3 tools/osm_match.py                   # populate street_osm_matches
 python3 tools/osm_score.py                   # compute importance_v1
 python3 tools/osm_sanity.py                  # eyeball top-10 + coverage
+
+# Postal-code enrichment (stdlib + openpyxl only; source: data/reference/coduri-postale+/)
+python3 tools/postal_ingest.py --rebuild     # xlsx → postal_streets
+python3 tools/postal_match.py                # populate street_postal_matches
+python3 tools/postal_sanity.py               # eyeball reference-UAT coverage
 ```
 
 ## Conventions

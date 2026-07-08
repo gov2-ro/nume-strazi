@@ -68,7 +68,7 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [x] **OSM enrichment: scaffolding** — Tables (`osm_streets`, `street_osm_matches`) added to `build_db.py`. Tools written: `tools/osm_ingest.py`, `tools/osm_match.py`, `tools/osm_score.py`, `tools/osm_sanity.py`. v1 score = `highway_weight × log(1 + length_m) + ref_bonus`, z-scored within UAT. POI counts deliberately skipped (would measure mapper density, not street importance).
 
-- [x] **OSM enrichment: download Romania PBF and run end-to-end** — Completed 2026-04-28. PBF snapshot 2026-04-28 at `data/reference/romania-latest.osm.pbf`. `osm_ingest.py` rewritten to use `osmium` + `shapely` (pyrosm cannot build on Python 3.12). 105,905 OSM street groups ingested. Match: 52.1% registry coverage, 53.3% OSM coverage. Sanity check passes for all 5 reference UATs.
+- [x] **OSM enrichment: download Romania PBF and run end-to-end** — Completed 2026-04-28. PBF snapshot 2026-04-28 at `data/reference/romania-latest.osm.pbf`. `osm_ingest.py` rewritten to use `osmium` + `shapely` (pyrosm cannot build on Python 3.12). 105,905 OSM street groups ingested. Match: 52.1% registry coverage, 53.3% OSM coverage. Sanity check passes for all 5 reference UATs. *(Superseded 2026-07-08: `osm_streets` gained honorific-stripped feature columns, coverage moved to 53.3%/54.6% — see CODE_SPEC §11.9.)*
 
 - [ ] **OSM enrichment: importance v2 (per-UAT betweenness centrality)** — After v1 is validated, add `betweenness_uat` column. For each UAT subgraph (small enough that `networkx.betweenness_centrality` is cheap), build node=intersection / edge=way-segment graph weighted by length. Combine: `score_v2 = 0.6·z(v1) + 0.4·z(betweenness)`. Worth doing only if v1 misranks visibly in `osm_sanity.py` output — inside settlements the highway hierarchy collapses to flat tertiary/residential, which is exactly where centrality discriminates.
 
@@ -98,6 +98,10 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [ ] **RoWordNet for nature/abstract classification** — After `llm_classify.py` runs, evaluate RoWordNet as a deterministic fallback for residual unclassified nature and abstract terms. Approach: lemmatize `core_name_norm` to dictionary form (genitives like `florilor` → `floare`, `trandafirului` → `trandafir`) using a Romanian morphological lemmatizer, then walk the WordNet hypernym chain to map to a `nature_type` or `category`. Useful if: (a) LLM leaves a long tail of plant/terrain/abstract names unclassified, or (b) reproducibility without API calls is a requirement. Prerequisite: find a Romanian lemmatizer that handles genitive/plural forms reliably (`ro_lemmatizer` in spaCy's `ro_core_news_lg` is a candidate). Skip RoNER — it gives entity type only, not the structured metadata (gender, era, profession) we need for persons.
 
+- [ ] **Postal source: trailing comma-suffixed titles not stripped** — Logged 2026-07-08 while building `postal_ingest.py`. The Bucuresti sheet's `Denumire artera` frequently carries abbreviated titles/ranks as a trailing suffix (`"Mincu Ion, arh."`, `"Kiseleff Pavel Dimitrievici, g-ral."`, `"Cantacuzino Ioan, prof. dr."`) — a different convention from the registry's leading-prefix style (`"Arh. Ion Mincu"`) and from `TITLES`/`RANKS` in `streets_lib.py`, which use full forms not these abbreviations. These streets survive all 3 `postal_match.py` passes unmatched. Would need a dedicated abbreviation-expansion map (`arh.`→Arhitect, `g-ral.`→General, `mr.`→Maior, `cpt.`→Căpitan, `lt.`→Locotenent, `slt.`→Sublocotenent, `serg.`→Sergent, etc.) plus comma-suffix parsing, scoped separately from the plain leading-prefix `extract_features()`.
+
+- [ ] **Postal source: `postal_street_aliases` not captured** — The 2016 xlsx has the same `(...)` parenthetical alt-name convention the registry captures via `street_aliases`; `tools/postal_ingest.py` strips and discards it rather than storing it. Add a `postal_street_aliases` table mirroring `street_aliases` if the alias data turns out to be useful later.
+
 
 ## Misc ideas
 
@@ -121,7 +125,19 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [x] street names profiles, convert it to map. shows towns that match the name. — Done 2026-06-07. Each `/strada/<slug>/` detail page now renders a d3 dot-map of Romania with one point per locality that has the name (sized by occurrence count, hover tooltip). Coordinates from `data/gis/populatie-romania-siruta-coords.csv` (99% of registry sirutas matched), attached server-side in `site_queries.street_detail` as `map_points`; the SVG + script live in `street-detail.html.j2`, reusing the existing `ro-counties.geojson` outline and `geoMercator().fitSize` pattern from the județe map. Degrades gracefully (map omitted) if a name has zero geocoded UATs or the CSV is missing.
 
+- [ ] have a toggle, show by count (as it is now), length (km), length x lanes 
+
+- [ ] judete choropleth, show side by side with the list, make 1/3 size
+
+- [ ] "Județe care își onorează localii" / "Bottom · cosmopolite" should count universal figures / events
+
+- [ ] Personalități non-române honorate pe străzi - should be non locale, so without Hungarians? or have a check button?
+
 - [ ] for people, also show link to ro.wikipedia page. maybe even fetch some info besides the image?
+
+- [ ] remove "Top personalități feminine" - duplicate
+
+- [ ] remove "Abecedar · litera inițială" - not interesting
 
 - [x] map mode. a choropleth map colored by different variables (genders, flowers, independence, universal, etc) — Done 2026-05-18. The existing `/judete/` map gained 8 new metrics: `person_pct`, `male_pct`, `foreign_pct`, `universal_pct`, `date_pct`, `flora_pct` (flori/copaci), `ideology_pct` next to the prior saint/numeric/female/nature. Scale auto-switches to min..max when the spread is tight so person/nature metrics show actual variation; 0..max stays for rare-event metrics. 11 chips total; default is now `person_pct`. Chip CSS was missing from the detail-shell — added local style block in `judete-index.html.j2`.
 
@@ -180,7 +196,7 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [ ] cel mai scurt mihai eminescu
 
-- [ ] look at where else we might find srteet names, as coduri poștale. see what's missing from which dataset (sectii vot, cod postal, osm)
+- [x] look at where else we might find srteet names, as coduri poștale. see what's missing from which dataset (sectii vot, cod postal, osm) — Done 2026-07-08. Postal source (`data/reference/coduri-postale+/infocod-cu-siruta-mai-2016.xlsx`) ingested into `postal_streets` + `street_postal_matches`, mirroring the OSM pattern (`tools/postal_ingest.py`/`postal_match.py`/`postal_sanity.py`). New additive `streets_all_sources` view (registry + OSM-only + postal-only unmatched, flagged by source) answers "what's missing from which dataset". See CODE_SPEC §12 for full details, including two empirical corrections found along the way: the postal xlsx's `SIRUTA` column is mislabeled (must use `SIRSUP` for the peste-50k sheet, `SIRUTA SECTOR` for Bucuresti), and person names in postal are frequently "Surname Firstname" reversed vs. the registry (handled by a third `reordered_core_name` match pass, 0.4 confidence, 3,724 matches). The 2009 `coduri_postale.sql` dump in the same folder was evaluated and excluded — it adds zero new locality coverage over the 2016 xlsx (see CODE_SPEC §12.1). New query-catalog block: `postal_judet_coverage`, `registry_postal_gap`, `postal_only_streets`, `external_corroboration_gap`, `registry_uncorroborated`. Bundled in: extended `osm_streets` with full feature-parity columns (title/rank/saint/date/numeric/core_name via the now-shared `extract_features()`), lifting registry/OSM coverage from 52.1%/53.3% to 53.3%/54.6%.
 
 - [ ] create presentation video. With PLaywright and a scenario, subtitles and generated voiceover. Create youtube account / channel.
 

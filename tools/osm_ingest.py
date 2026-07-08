@@ -30,7 +30,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from streets_lib import normalize_match, strip_street_type  # noqa: E402
+from streets_lib import normalize_match, strip_street_type, extract_features  # noqa: E402
 
 KEPT_HIGHWAY = {
     "primary", "secondary", "tertiary",
@@ -233,8 +233,12 @@ def main():
             name_norm = normalize_match(name)
             if not name_norm:
                 return
-            _, core_display = strip_street_type(name)
-            core_norm = normalize_match(core_display) if core_display else None
+            street_type, core_display = strip_street_type(name)
+            feats = extract_features(core_display) if core_display else {
+                "title": None, "rank": None, "is_saint": 0, "is_date": 0,
+                "is_numeric": 0, "core_name": None,
+            }
+            core_norm = normalize_match(feats["core_name"]) if feats["core_name"] else None
 
             ref = w.tags.get("ref")
             key = (siruta, name_norm)
@@ -242,6 +246,13 @@ def main():
                 "uat_siruta": siruta,
                 "name": name,
                 "name_normalized": name_norm,
+                "street_type": street_type,
+                "title": feats["title"],
+                "rank": feats["rank"],
+                "is_saint": feats["is_saint"],
+                "is_date": feats["is_date"],
+                "is_numeric": feats["is_numeric"],
+                "core_name": feats["core_name"],
                 "core_name_norm": core_norm,
                 "highway_class": hw,
                 "ref": ref,
@@ -273,6 +284,13 @@ def main():
             "uat_siruta": slot["uat_siruta"],
             "name": slot["name"],
             "name_normalized": slot["name_normalized"],
+            "street_type": slot["street_type"],
+            "title": slot["title"],
+            "rank": slot["rank"],
+            "is_saint": slot["is_saint"],
+            "is_date": slot["is_date"],
+            "is_numeric": slot["is_numeric"],
+            "core_name": slot["core_name"],
             "core_name_norm": slot["core_name_norm"],
             "highway_class": slot["highway_class"],
             "ref": slot["ref"],
@@ -287,12 +305,21 @@ def main():
 
     con.executemany(
         """INSERT INTO osm_streets
-           (uat_siruta, name, name_normalized, core_name_norm,
+           (uat_siruta, name, name_normalized, street_type, title, rank,
+            is_saint, is_date, is_numeric, core_name, core_name_norm,
             highway_class, ref, length_m, way_ids, geometry_wkt)
-           VALUES (:uat_siruta, :name, :name_normalized, :core_name_norm,
+           VALUES (:uat_siruta, :name, :name_normalized, :street_type, :title, :rank,
+                   :is_saint, :is_date, :is_numeric, :core_name, :core_name_norm,
                    :highway_class, :ref, :length_m, :way_ids, :geometry_wkt)
            ON CONFLICT(uat_siruta, name_normalized) DO UPDATE SET
              name           = excluded.name,
+             street_type    = excluded.street_type,
+             title          = excluded.title,
+             rank           = excluded.rank,
+             is_saint       = excluded.is_saint,
+             is_date        = excluded.is_date,
+             is_numeric     = excluded.is_numeric,
+             core_name      = excluded.core_name,
              core_name_norm = excluded.core_name_norm,
              highway_class  = excluded.highway_class,
              ref            = excluded.ref,

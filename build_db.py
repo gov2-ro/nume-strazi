@@ -16,6 +16,7 @@ from pathlib import Path
 
 from streets_lib import (
     DIACRITIC_FIX, fix_diacritics, normalize_match, STREET_TYPES,
+    parse_artery, extract_features,
 )
 
 import argparse
@@ -30,80 +31,9 @@ DB  = Path(_args.db)
 LIMIT = _args.limit
 if DB.exists(): DB.unlink()
 
-# normalization helpers (DIACRITIC_FIX, fix_diacritics, normalize_match) and
-# STREET_TYPES live in streets_lib so the OSM tools can reuse them.
-
-# ---------- titles / ranks / saints ----------
-TITLES = sorted([
-    "Profesor Universitar Doctor","Profesor Universitar",
-    "Profesor Doctor","Profesor","Prof. Univ. Dr.","Prof. Dr.","Prof.",
-    "Academician","Acad.","Doctor","Dr.","Ing.","Arh.",
-    "Învățătorul","Învățător","Înv.",
-    "Pictorul","Pictor","Sculptorul","Sculptor",
-    "Compozitorul","Compozitor","Poetul","Poet",
-    "Scriitorul","Scriitor","Dramaturgul","Dramaturg","Filozoful","Filozof",
-    "Părintele","Preotul","Preot","Episcopul","Episcop",
-    "Mitropolitul","Mitropolit","Patriarhul","Patriarh",
-], key=len, reverse=True)
-
-RANKS = sorted([
-    "Locotenent-colonel","General-locotenent","Sublocotenent",
-    "General","Colonel","Maior","Căpitan","Locotenent","Sergent","Caporal","Soldat",
-    "Mareșal","Amiral","Comandor",
-    "Voievodul","Voievod","Domnitorul","Domnitor",
-    "Regele","Regina","Împăratul","Împărăteasa","Prințul","Prinț","Prințesa",
-    "Eroii","Eroul","Erou","Martirii","Martirul","Martir",
-    "Haiducul",
-], key=len, reverse=True)
-
-SAINTS = sorted([
-    "Sfinții Apostoli","Sfinții","Sfântul","Sfânta","Sfântu","Sfânt",
-    "Sf-a","Sfta.","Sf.",
-], key=len, reverse=True)
-
-MONTHS_RO = ["ianuarie","februarie","martie","aprilie","mai","iunie",
-             "iulie","august","septembrie","octombrie","noiembrie","decembrie"]
-DATE_RE = re.compile(r"^(\d{1,2})\s+(" + "|".join(MONTHS_RO) + r")$", re.IGNORECASE)
-NUMERIC_RE = re.compile(r"^\d+[A-Za-z]?$")
-
-def parse_artery(raw):
-    if not raw: return None, None, []
-    s = fix_diacritics(raw).strip()
-    aliases_raw = re.findall(r"\(([^)]+)\)", s)
-    main = re.sub(r"\s*\([^)]+\)", "", s).strip()
-    aliases = [a.strip() for a in aliases_raw if len(a.strip()) > 2]
-    for st in STREET_TYPES:
-        if main.startswith(st + " "):
-            return st, main[len(st):].strip(), aliases
-    return None, main, aliases
-
-def extract_features(name):
-    f = {"title":None,"rank":None,"is_saint":0,"is_date":0,"is_numeric":0,"core_name":name}
-    if not name: return f
-    if NUMERIC_RE.match(name):
-        f["is_numeric"]=1; f["core_name"]=None; return f
-    if DATE_RE.match(name):
-        f["is_date"]=1; f["core_name"]=name; return f
-
-    remaining = name
-    progress = True
-    while progress:
-        progress = False
-        for s in SAINTS:
-            if remaining == s or remaining.startswith(s + " "):
-                f["is_saint"]=1; remaining = remaining[len(s):].strip(); progress=True; break
-        if progress: continue
-        for t in TITLES:
-            if remaining == t or remaining.startswith(t + " "):
-                f["title"] = (f["title"] + " " + t) if f["title"] else t
-                remaining = remaining[len(t):].strip(); progress=True; break
-        if progress: continue
-        for r in RANKS:
-            if remaining == r or remaining.startswith(r + " "):
-                f["rank"] = (f["rank"] + " " + r) if f["rank"] else r
-                remaining = remaining[len(r):].strip(); progress=True; break
-    f["core_name"] = remaining if remaining else None
-    return f
+# normalization helpers (DIACRITIC_FIX, fix_diacritics, normalize_match),
+# STREET_TYPES, and feature extraction (parse_artery, extract_features) live
+# in streets_lib so the OSM/postal enrichment tools can reuse them.
 
 # ---------- schema ----------
 con = sqlite3.connect(DB)
@@ -183,6 +113,13 @@ CREATE TABLE osm_streets (
     uat_siruta INTEGER NOT NULL,
     name TEXT NOT NULL,
     name_normalized TEXT NOT NULL,
+    street_type TEXT,               -- best-effort, via streets_lib.strip_street_type
+    title TEXT,
+    rank TEXT,
+    is_saint INTEGER NOT NULL DEFAULT 0,
+    is_date INTEGER NOT NULL DEFAULT 0,
+    is_numeric INTEGER NOT NULL DEFAULT 0,
+    core_name TEXT,
     core_name_norm TEXT,
     highway_class TEXT NOT NULL,
     ref TEXT,
@@ -206,6 +143,51 @@ CREATE TABLE street_osm_matches (
 );
 CREATE INDEX ix_match_osm     ON street_osm_matches(osm_street_id);
 
+-- ===== Postal registry scaffolds (populated by tools/postal_*.py) =====
+-- Source: data/reference/coduri-postale+/infocod-cu-siruta-mai-2016.xlsx
+-- (Bucuresti + Localitati peste 50.000 loc sheets only — the sub-50.000 sheet
+-- has no street-level columns, a structural gap this source can't close; see
+-- CODE_SPEC §12). One row per (uat_siruta, name_normalized), same grain as
+-- osm_streets/streets_dedup. `name` excludes the street-type prefix (the
+-- source already separates Tip artera/Denumire artera), unlike osm_streets.
+CREATE TABLE postal_streets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_sheet TEXT NOT NULL,           -- 'Bucuresti' | 'Localitati peste 50.000 loc'
+    source_row_ids TEXT NOT NULL,         -- JSON array of contributing raw row indices
+    judet_raw TEXT,
+    localitate_raw TEXT,
+    uat_siruta INTEGER,                   -- resolved & validated against streets.siruta; NULL = unresolved
+    resolution_method TEXT NOT NULL,      -- 'direct_sector' | 'direct_sirsup' | 'name_match_exact'
+                                           -- | 'name_match_fuzzy' | 'unresolved'
+    resolution_confidence REAL NOT NULL,
+    tip_artera_raw TEXT,
+    street_type TEXT,
+    name TEXT NOT NULL,
+    name_normalized TEXT NOT NULL,
+    title TEXT,
+    rank TEXT,
+    is_saint INTEGER NOT NULL DEFAULT 0,
+    is_date INTEGER NOT NULL DEFAULT 0,
+    is_numeric INTEGER NOT NULL DEFAULT 0,
+    core_name TEXT,
+    core_name_norm TEXT,
+    core_name_norm_swapped TEXT,          -- 2-token reorder of core_name_norm, else NULL
+    UNIQUE (uat_siruta, name_normalized)
+);
+CREATE INDEX ix_postal_uat      ON postal_streets(uat_siruta);
+CREATE INDEX ix_postal_namenorm ON postal_streets(name_normalized);
+CREATE INDEX ix_postal_corenorm ON postal_streets(core_name_norm);
+CREATE INDEX ix_postal_swapped  ON postal_streets(core_name_norm_swapped);
+
+CREATE TABLE street_postal_matches (
+    street_id INTEGER NOT NULL REFERENCES streets(id),
+    postal_street_id INTEGER NOT NULL REFERENCES postal_streets(id),
+    match_type TEXT NOT NULL,      -- 'exact_normalized' | 'fuzzy_core_name' | 'reordered_core_name'
+    confidence REAL NOT NULL,
+    PRIMARY KEY (street_id, postal_street_id)
+);
+CREATE INDEX ix_pmatch_postal ON street_postal_matches(postal_street_id);
+
 CREATE INDEX ix_streets_judet     ON streets(judet);
 CREATE INDEX ix_streets_uat       ON streets(uat);
 CREATE INDEX ix_streets_namenorm  ON streets(name_normalized);
@@ -214,6 +196,9 @@ CREATE INDEX ix_streets_type      ON streets(street_type);
 CREATE INDEX ix_streets_flags     ON streets(is_saint, is_date, is_numeric);
 -- Composite index allows the optimizer to push WHERE siruta=? into streets_dedup.
 CREATE INDEX ix_streets_siruta_name ON streets(siruta, name_normalized);
+-- Supports the cross-source anti-join in the external_corroboration_gap query
+-- (docs/queries.sql) — without it, that query falls back to a slow scan.
+CREATE INDEX ix_streets_siruta_corenorm ON streets(siruta, core_name_norm);
 CREATE INDEX ix_aliases_norm      ON street_aliases(alias_normalized);
 
 -- GROUP BY siruta (not uat) is intentional: 48 UAT names are shared across
@@ -258,6 +243,36 @@ LEFT JOIN persons         p  ON p.core_name_norm  = b.core_name_norm
 LEFT JOIN nature_terms    n  ON n.core_name_norm  = b.core_name_norm
 LEFT JOIN name_categories c  ON c.core_name_norm  = b.core_name_norm
 LEFT JOIN place_refs      pr ON pr.core_name_norm = b.core_name_norm;
+
+-- Additive consolidation of all 3 street-name sources: registry (authoritative,
+-- full attributes) + streets OSM/postal found that have no registry match.
+-- Does not touch streets_dedup. Cross-source comparison must join on
+-- core_name_norm, never name_normalized — osm_streets.name_normalized includes
+-- the street-type prefix, postal's and the registry's don't. See CODE_SPEC §12.
+CREATE VIEW streets_all_sources AS
+SELECT 'registry' AS source, sd.id, sd.judet, sd.uat, sd.siruta, sd.street_type, sd.name,
+       sd.name_normalized, sd.title, sd.rank, sd.is_saint, sd.is_date, sd.is_numeric,
+       sd.core_name, sd.core_name_norm, NULL AS source_note
+FROM streets_dedup sd
+
+UNION ALL
+
+SELECT 'osm', NULL, su.judet, su.uat, o.uat_siruta, o.street_type, o.name, o.name_normalized,
+       o.title, o.rank, o.is_saint, o.is_date, o.is_numeric, o.core_name, o.core_name_norm,
+       'highway=' || o.highway_class
+FROM osm_streets o
+LEFT JOIN (SELECT DISTINCT siruta, judet, uat FROM streets) su ON su.siruta = o.uat_siruta
+WHERE NOT EXISTS (SELECT 1 FROM street_osm_matches m WHERE m.osm_street_id = o.id)
+
+UNION ALL
+
+SELECT 'postal', NULL, su.judet, su.uat, p.uat_siruta, p.street_type, p.name, p.name_normalized,
+       p.title, p.rank, p.is_saint, p.is_date, p.is_numeric, p.core_name, p.core_name_norm,
+       'sheet=' || p.source_sheet
+FROM postal_streets p
+LEFT JOIN (SELECT DISTINCT siruta, judet, uat FROM streets) su ON su.siruta = p.uat_siruta
+WHERE p.uat_siruta IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM street_postal_matches m WHERE m.postal_street_id = p.id);
 """)
 
 # ---------- ingest ----------

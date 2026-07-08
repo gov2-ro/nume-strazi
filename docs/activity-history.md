@@ -1,5 +1,27 @@
 # Activity History
 
+## 2026-07-08 — Postal-code street source + streets_all_sources consolidation
+
+Added a third independent street-name source (Poșta Română's postal-code registry) and an additive `streets_all_sources` view that unions registry + OSM-only + postal-only streets, flagged by source — the "did we catch every street" deliverable requested from BACKLOG (`look at where else we might find street names, as coduri poștale...`).
+
+**Source scoping** (empirical, not assumed): three candidate postal files existed in `data/reference/coduri-postale+/` and `data/reference/`. Investigated all three before committing: the 2016 xlsx (`infocod-cu-siruta-mai-2016.xlsx`) has 3 sheets — `Bucuresti` and `Localitati peste 50.000 loc` carry street-level data with SIRUTA-equivalent codes; `Localitati sub 50.000 loc` has *no street columns at all*, just locality-wide postal codes. A 2009 MySQL dump (`coduri_postale.sql`, 51,898 rows) looked like it might fill that small-town gap — it doesn't: only 48 of its localities have any street data, and 47 are already fully covered by the 2016 xlsx (the one apparent miss, "Drobeta-Turnu S", is a truncated "Drobeta-Turnu Severin", itself present). Excluded from scope; documented in CODE_SPEC §12.1 so it isn't re-proposed blindly. A flattened CSV duplicate of the xlsx (no SIRUTA) was also excluded as redundant.
+
+**Two mislabeled-column traps found by validating against the live DB, not by reading docs**: the `Localitati peste 50.000 loc` sheet's column literally named `SIRUTA` matches 0/47 registry SIRUTAs — it's an internal postal sub-code; the actual UAT-level code is in `SIRSUP` (47/47 match). The `Bucuresti` sheet is the reverse: `SIRUTA SECTOR` is correct, `SIRSUP` isn't (always 179132, absent from the registry which splits Bucharest into 6 sector SIRUTAs). Both traps are now asserted against at ingest time (resolution falls back to județ+localitate name-matching if the direct code isn't in the live `streets.siruta` set) and documented in CODE_SPEC §12.4.
+
+**Person-name reordering**: postal person-names are frequently "Surname Firstname" (e.g. "Alecsandri Vasile" vs. registry's "Vasile Alecsandri"). Added a third match pass in `tools/postal_match.py` (`reordered_core_name`, confidence 0.4, 2-token swap) that caught 3,724 matches in the full run — spot-checked 15 at random, all correct.
+
+**Bundled fix**: extending `osm_streets` with full feature-parity columns. OSM's `core_name_norm` was only street-type-stripped, not honorific-stripped like the registry's, so e.g. `Strada Sfântul Andrei` never fuzzy-matched a registry street honoring the same saint (`Sf. Andrei`). Promoted `extract_features()`/`parse_artery()`/`TITLES`/`RANKS`/`SAINTS` from `build_db.py` into `streets_lib.py` (verified byte-identical `streets` table output before/after — pure refactor) so `tools/osm_ingest.py` could reuse it. Registry/OSM coverage moved from 52.1%/53.3% to 53.3%/54.6% after re-running the full OSM pipeline.
+
+**New tables**: `postal_streets` (grain: one row per `(uat_siruta, name_normalized)`, mirrors `osm_streets`), `street_postal_matches`. **New view**: `streets_all_sources` (additive, doesn't touch `streets_dedup`). **New query-catalog block** (`docs/queries.sql` VIEW 9): `postal_judet_coverage`, `registry_postal_gap`, `postal_only_streets`, `external_corroboration_gap`, `registry_uncorroborated`.
+
+Non-obvious implementation snag: `external_corroboration_gap`'s natural `FULL OUTER JOIN` formulation (SQLite ≥3.39) times out — SQLite can't build an index across two ungrounded CTEs for a full join, falling back to a ~48k×4k nested-loop scan. Rewrote as `UNION ALL` + `GROUP BY` + an anti-join against a new composite index (`ix_streets_siruta_corenorm`), which runs in ~0.1s.
+
+Verified end-to-end: postal ingest 41,604 raw rows → 23,724 grouped, 100% direct SIRUTA resolution (no name-match fallback needed in practice); postal coverage 83.1% within its scope (Bucuresti + >50k towns); reference-UAT sanity checks (`postal_sanity.py`) confirm the expected structural zeros for Câmpulung Moldovenesc and Cornu (both under the 50k threshold); `tools/build_dist_db.py` materializes `streets_all_sources` before dropping its source tables (105,343 registry + 48,063 OSM-only + 4,009 postal-only = 157,415 rows in the shipped DB) and drops `postal_streets`/`street_postal_matches` like the existing OSM tables.
+
+Non-blocking caveat logged in BACKLOG: postal's Bucuresti sheet also has a distinct trailing comma-suffixed title convention (`"Mincu Ion, arh."`) not handled by any of the 3 match passes — different problem from the reordering fix above, scoped out as a separate follow-up.
+
+Docs updated: `CLAUDE.md` (new critical rule #9, new command block, repo-layout entries), `docs/CODE_SPEC.md` (new §12 Postal-code enrichment pipeline, §11.9 OSM feature-parity note, 2 new pitfalls, old §12/13/14 renumbered to §13/14/15), `docs/BACKLOG.md` (line-195 item marked done, OSM coverage figure annotated, 2 new caveats logged).
+
 ## 2026-06-07 — Browser filters: live result counts in brackets
 
 The `/browser` page already covered the "stats + single filterable list" backlog idea (live `.stats-bar` + 7 filter dropdowns + compact/table views over 30k names). Added the missing piece from the "super dropdown navigator" item: **a live result count next to every filter option** (`dist/browser/index.html`, the hand-authored static page — `build_site` only regenerates `data.json`).

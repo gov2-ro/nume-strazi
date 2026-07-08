@@ -555,3 +555,105 @@ JOIN osm_streets o          ON o.id             = m.osm_street_id
 WHERE p.gender = 'F'
 GROUP BY p.full_name
 ORDER BY km DESC;
+
+
+-- ============= VIEW 9: POSTAL ↔ REGISTRY COVERAGE =============
+-- Requires postal_ingest + postal_match to have run first.
+-- Postal source only covers Bucuresti + localities over 50,000 population
+-- (see CODE_SPEC §16) — 0% coverage for small/rural UATs is expected, not a gap.
+
+-- Per-județ: what % of registry streets have a postal match?
+-- :name postal_judet_coverage
+SELECT sd.judet,
+       COUNT(*)                                                          AS registry_streets,
+       SUM(CASE WHEN m.street_id IS NOT NULL THEN 1 ELSE 0 END)         AS postal_matched,
+       ROUND(100.0 * SUM(CASE WHEN m.street_id IS NOT NULL THEN 1 ELSE 0 END)
+             / COUNT(*), 1)                                             AS pct_postal
+FROM streets_dedup sd
+LEFT JOIN street_postal_matches m ON m.street_id = sd.id
+GROUP BY sd.judet
+ORDER BY pct_postal DESC;
+
+-- Registry street names that are frequent (≥10 UATs) but have zero postal
+-- match in any UAT. Some of this is expected (postal only covers big towns);
+-- interesting cases are common names that ARE in postal-covered UATs but
+-- still miss — check registry_uncorroborated / external_corroboration_gap below.
+-- :name registry_postal_gap
+SELECT sd.name,
+       COUNT(DISTINCT sd.uat)                                            AS uats_in_registry,
+       SUM(CASE WHEN m.street_id IS NOT NULL THEN 1 ELSE 0 END)         AS uats_with_postal_match
+FROM streets_dedup sd
+LEFT JOIN street_postal_matches m ON m.street_id = sd.id
+GROUP BY sd.name_normalized
+HAVING COUNT(DISTINCT sd.uat) >= 10
+   AND SUM(CASE WHEN m.street_id IS NOT NULL THEN 1 ELSE 0 END) = 0
+ORDER BY uats_in_registry DESC
+LIMIT 30;
+
+-- Postal streets not in the registry. No importance score here (no geometry) —
+-- ranked by source_row_ids length as a rough "how many address sub-ranges"
+-- prominence proxy. Weaker signal than OSM's importance_v1; treat as illustrative.
+-- :name postal_only_streets
+SELECT p.uat_siruta, p.name, p.source_sheet,
+       json_array_length(p.source_row_ids) AS sub_ranges
+FROM postal_streets p
+WHERE NOT EXISTS (
+    SELECT 1 FROM street_postal_matches m WHERE m.postal_street_id = p.id
+)
+ORDER BY sub_ranges DESC
+LIMIT 50;
+
+-- The core "did we catch every street" deliverable: streets present in OSM
+-- and/or postal, absent from the registry, grouped by (siruta, core_name_norm)
+-- with a corroboration_level (1/2 = one/both external sources agree). Level 2
+-- is the strongest signal of a genuinely missed registry street.
+-- Written as UNION+GROUP BY rather than FULL OUTER JOIN: SQLite can't build
+-- an index across two ungrounded CTEs for a FULL JOIN, so that form falls
+-- back to a nested-loop scan (~48k x ~4k rows here, times out). This form
+-- uses ix_streets_siruta_corenorm for the final anti-join instead.
+-- :name external_corroboration_gap
+WITH osm_gap AS (
+  SELECT o.uat_siruta AS siruta, o.core_name_norm
+    FROM osm_streets o
+   WHERE o.core_name_norm IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM street_osm_matches m WHERE m.osm_street_id = o.id)
+),
+postal_gap AS (
+  SELECT p.uat_siruta AS siruta, p.core_name_norm
+    FROM postal_streets p
+   WHERE p.core_name_norm IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM street_postal_matches m WHERE m.postal_street_id = p.id)
+),
+combined AS (
+  SELECT siruta, core_name_norm, 1 AS src FROM osm_gap
+  UNION ALL
+  SELECT siruta, core_name_norm, 2 AS src FROM postal_gap
+),
+gap_grouped AS (
+  SELECT siruta, core_name_norm, COUNT(DISTINCT src) AS corroboration_level
+  FROM combined
+  GROUP BY siruta, core_name_norm
+)
+SELECT g.siruta, g.core_name_norm, g.corroboration_level
+FROM gap_grouped g
+WHERE NOT EXISTS (
+  SELECT 1 FROM streets s
+   WHERE s.siruta = g.siruta AND s.core_name_norm = g.core_name_norm AND s.name_normalized != ''
+)
+ORDER BY corroboration_level DESC
+LIMIT 100;
+
+-- Reverse of the above: registry streets with zero match in either external
+-- source. NOT proof of staleness/renaming — expect false positives from
+-- generic names in sparsely-OSM-mapped villages (Gorj/Tulcea finding) and
+-- from small UATs postal doesn't cover at all. Do not present as fact
+-- without a second, independent source (see CLAUDE.md's renaming-certainty rule).
+-- :name registry_uncorroborated
+SELECT sd.judet, sd.uat, sd.name,
+       CASE WHEN po.street_id IS NULL AND pm.street_id IS NULL THEN 1 ELSE 0 END AS uncorroborated
+FROM streets_dedup sd
+LEFT JOIN street_osm_matches po    ON po.street_id = sd.id
+LEFT JOIN street_postal_matches pm ON pm.street_id = sd.id
+WHERE po.street_id IS NULL AND pm.street_id IS NULL
+ORDER BY sd.judet, sd.uat
+LIMIT 100;

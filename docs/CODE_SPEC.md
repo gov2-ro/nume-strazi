@@ -337,7 +337,70 @@ We deliberately stop there. Levenshtein on ~100k×100k name pairs produces enoug
 
 The `geocoded_streets` table stub mentioned in §10.P3 is superseded by this pipeline. Per-street lat/lng, when needed, can be derived from `osm_streets.geometry_wkt` (centroid of the merged geometry). No need for Nominatim.
 
-## 12. Pitfalls / gotchas
+### 11.9 Feature-column extension (2026-07-08)
+
+`osm_streets` originally only carried `core_name_norm` (street-type-stripped, via `strip_street_type`), while the registry's `core_name_norm` is type-stripped *and* honorific-stripped (via `extract_features`). This meant an OSM `Strada Sfântul Andrei` (core "Sfântul Andrei") never matched a registry street honoring the same saint (core "Andrei", `is_saint=1`) — `fuzzy_core_name` compared apples to oranges.
+
+Fixed by extending `osm_streets` with `street_type`, `title`, `rank`, `is_saint`, `is_date`, `is_numeric`, `core_name` (alongside the existing `core_name_norm`), computed by `tools/osm_ingest.py` via the now-shared `extract_features()` (promoted to `streets_lib.py`, see §12.2). Registry/OSM coverage moved from 52.1%/53.3% to 53.3%/54.6% after re-running `osm_ingest.py --rebuild` + `osm_match.py` — a real, if modest, improvement, not noise.
+
+This also gives `streets_all_sources` (§12.6) genuine column parity across all three sources instead of NULL-padding the OSM arm.
+
+## 12. Postal-code enrichment pipeline
+
+Goal: a second independent street-name source (Poșta Română's postal-code registry) to cross-reference against the AEP registry and OSM, surfacing streets none of the three sources alone would catch. Unlike OSM (geometry/importance scoring), postal-code data has no independent value beyond names — its only role is completeness checking.
+
+### 12.1 Source
+
+- `data/reference/coduri-postale+/infocod-cu-siruta-mai-2016.xlsx` (May 2016 snapshot). Three sheets: `Bucuresti` (12,400 rows, street-level, direct SIRUTA per sector), `Localitati peste 50.000 loc` (29,204 rows, street-level, direct SIRUTA-equivalent), `Localitati sub 50.000 loc` (13,803 rows, **locality-level only — no street columns at all**). Only the first two sheets are ingested; the third contributes nothing to street names and is a structural coverage gap this source cannot close (small/rural towns rely on the registry and OSM instead).
+- **Evaluated and excluded**: `data/reference/coduri-postale+/coduri_postale.sql`, a 2009 MySQL dump (51,898 rows, no SIRUTA). Its apparent appeal — covering small towns the 2016 xlsx omits — does not hold up empirically: of 51,898 rows, only 48 distinct localities have any street-level data at all (the rest are locality-only codes, the same structural gap as the excluded xlsx sheet). Of those 48, 47 are already fully covered by the 2016 xlsx (the one apparent miss, "Drobeta-Turnu S", is a truncated "Drobeta-Turnu Severin", itself in the xlsx). It adds zero new locality coverage — not worth the parsing complexity (raw SQL `INSERT` statements, no SIRUTA) for a stale second witness on towns already covered.
+- **Also excluded**: `data/reference/infocod-mai-2016+.csv` — a flattened, SIRUTA-less duplicate of the xlsx's first two sheets. Strictly redundant.
+
+### 12.2 Dependency exception
+
+None. Stays stdlib + openpyxl, like the registry ETL — the xlsx needs only `openpyxl`, already a dependency.
+
+### 12.3 Tables
+
+| Table | Grain | Notes |
+|---|---|---|
+| `postal_streets` | one row per `(uat_siruta, name_normalized)` | Same grain as `osm_streets`/`streets_dedup`. `name` **excludes** the street-type prefix (unlike `osm_streets.name`) — the source already separates `Tip artera`/`Denumire artera`, so `name_normalized` is directly comparable to the registry's. |
+| `street_postal_matches` | one row per `(street_id, postal_street_id)` | Three pass types: `exact_normalized` (1.0), `fuzzy_core_name` (0.6), `reordered_core_name` (0.4) — see §12.5. |
+
+### 12.4 UAT resolution — empirical corrections
+
+Two mislabeled/untrustworthy-column traps discovered by validating against the live registry, not assumed:
+
+1. **`Localitati peste 50.000 loc` sheet: use `SIRSUP`, not the column literally named `SIRUTA`.** Verified: the `SIRUTA` column matches 0/47 registry SIRUTAs (it's a finer-grained internal postal sub-locality/zone code); `SIRSUP` ("SIRUTA superior") matches 47/47.
+2. **`Bucuresti` sheet: the reverse — use `SIRUTA SECTOR`, not `SIRSUP`.** `SIRSUP` there is always 179132 (the whole-municipality code, absent from the registry, which only has sector-level SIRUTAs for București). `SIRUTA SECTOR` matches the registry's 179141–179196 directly, verified 6/6.
+3. **Even a "direct" code isn't always trustworthy.** Example: Câmpulung Moldovenesc's postal SIRUTA (146511, on the excluded sub-50k sheet) differs from the registry's (146502) for the same town. `tools/postal_ingest.py` always validates the resolved code against the live `streets.siruta` set and falls back to județ+localitate name-matching (against `data/gis/populatie-romania-siruta-coords.csv`) when it isn't found.
+
+In practice, both ingested sheets resolved 100% via their direct column (47/47 SIRSUP, 6/6 SIRUTA SECTOR) — the name-match fallback exists as a safety net, not because it's regularly needed.
+
+### 12.5 Match strategy
+
+`tools/postal_match.py`, same two-pass shape as `osm_match.py` plus a third pass:
+
+1. `exact_normalized` (1.0) — `(siruta, name_normalized)`. Unlike OSM (where this pass is a near no-op — 490 vs 57,437 `fuzzy_core_name` matches), this is the **workhorse pass for postal** (15,986 vs 43 `fuzzy_core_name`), because postal `name` is already type-stripped like the registry's, not embedded like OSM's.
+2. `fuzzy_core_name` (0.6) — `(siruta, core_name_norm)`, unmatched rows only.
+3. `reordered_core_name` (0.4) — `(siruta, core_name_norm_swapped)`, unmatched rows only. Postal person-names are frequently **"Surname Firstname"** (reversed vs. the registry's "Firstname Surname" — e.g. "Alecsandri Vasile" vs. registry's "Vasile Alecsandri"; titles also appear as trailing comma-suffixes, `"Mincu Ion, arh."`, rather than the registry's leading-prefix convention). `core_name_norm_swapped` is a 2-token reorder computed at ingest; this pass caught 3,724 matches in the full run, spot-checked clean.
+
+We stop there, for the same reason `osm_match.py` stops at `fuzzy_core_name`: broader fuzzy matching produces false positives that poison downstream analysis — better to surface gaps in `tools/postal_sanity.py` than auto-link.
+
+**Known caveat, not yet handled**: the trailing comma-suffixed title convention (`"Mincu Ion, arh."`, `"Kiseleff Pavel Dimitrievici, g-ral."`) uses abbreviated forms not in `TITLES`/`RANKS` (which use full forms like "Arhitect"/"General"). These remain unmatched past all 3 passes. Logged in BACKLOG rather than fixed inline — would need a dedicated abbreviation-expansion map for the Bucuresti sheet's convention specifically.
+
+### 12.6 `streets_all_sources` view
+
+Additive consolidation, does **not** touch `streets_dedup`: `UNION ALL` of registry rows (full attributes) + `osm_streets` rows with no `street_osm_matches` row + `postal_streets` rows with no `street_postal_matches` row, each flagged by a `source` column (`'registry'`/`'osm'`/`'postal'`). A view in `data/streets.db`; materialized into a real table by `tools/build_dist_db.py` before its source tables (which don't ship) are dropped.
+
+**Cross-source comparison must join on `core_name_norm`, never `name_normalized`** — OSM's `name_normalized` includes the type prefix, postal's and the registry's don't. This is why `docs/queries.sql`'s `external_corroboration_gap`/`registry_uncorroborated` queries use `core_name_norm` exclusively.
+
+### 12.7 Verified results (full run, 2026-07-08)
+
+- Postal ingest: 41,604 raw rows → 23,724 grouped `postal_streets` rows. 100% direct SIRUTA resolution (no name-match fallback needed in practice).
+- Postal match: registry coverage 19,753/105,343 (18.8% — expected, since postal only covers Bucuresti + >50k towns); postal coverage 19,715/23,724 (83.1%).
+- `streets_all_sources`: 105,343 registry + 48,063 OSM-only + 4,009 postal-only = 157,415 rows.
+
+## 13. Pitfalls / gotchas
 
 These are the booby traps. A senior engineer reading this should not have to discover any of them by stubbing toes.
 
@@ -351,8 +414,10 @@ These are the booby traps. A senior engineer reading this should not have to dis
 8. **Don't strip diacritics for display.** It happens naturally when bugs are introduced. Add a startup assertion that `name` columns contain non-ASCII Romanian characters.
 9. **`core_name=NULL` on numeric streets is intentional.** Queries that join curated tables on `core_name_norm` will correctly skip these. Queries that filter for "anonymous" should use `is_numeric=1`.
 10. **The `(D)` parenthetical is filtered as too short, but other admin codes might exist.** Audit the full 140k for unexpected short parentheticals (`(I)`, `(II)`, `(B)`?).
+11. **`osm_streets.name_normalized` includes the street-type prefix; `postal_streets.name_normalized` and `streets_dedup.name_normalized` don't.** Comparing across sources by `name_normalized` silently under-corroborates. Always use `core_name_norm` for cross-source comparison (see §12.6).
+12. **`postal_streets` covers Bucuresti + localities over 50,000 population only.** Zero postal rows for a small/rural UAT is expected, not a bug — don't read it as "this town has no streets."
 
-## 13. Out of scope for the data layer
+## 14. Out of scope for the data layer
 
 - Visual design, color palette, layout — see Design Brief.
 - Editorial copy in Romanian — see Design Brief.
@@ -360,7 +425,7 @@ These are the booby traps. A senior engineer reading this should not have to dis
 - Voter-data joins — different project.
 - Real-time updates — the registry updates infrequently; manual rebuild is fine.
 
-## 14. Reference: current state files
+## 15. Reference: current state files
 
 | File | Purpose |
 |---|---|
