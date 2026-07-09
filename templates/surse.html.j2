@@ -477,8 +477,7 @@ async function showUatDetail(siruta, uatRow) {
     const streetTable = `<table style="width: 100%; border-collapse: collapse; font-size: 13px;">
       <thead style="background: var(--surface-raised); position: sticky; top: 0;">
         <tr>
-          <th style="padding: 8px; text-align: left; font-weight: 600; color: var(--muted); font-size: 11px; text-transform: uppercase;">Nume</th>
-          <th style="padding: 8px; text-align: left; font-weight: 600; color: var(--muted); font-size: 11px; text-transform: uppercase;">Tip</th>
+          <th style="padding: 8px; text-align: left; font-weight: 600; color: var(--muted); font-size: 11px; text-transform: uppercase;">Stradă</th>
           <th style="padding: 8px; text-align: center; font-weight: 600; color: var(--muted); font-size: 11px; text-transform: uppercase;">Surse</th>
         </tr>
       </thead>
@@ -493,8 +492,7 @@ async function showUatDetail(siruta, uatRow) {
             `<span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: ${sources.includes(src) ? 'var(--c-' + src + ')' : 'var(--hairline)'}; margin: 0 2px;"></span>`
           ).join('');
           return `<tr style="border-bottom: 1px solid var(--hairline);">
-            <td style="padding: 8px;">${r.core_name || r.name}</td>
-            <td style="padding: 8px; font-size: 12px; color: var(--faint);">${r.street_type || '—'}</td>
+            <td style="padding: 8px;">${r.name || r.core_name}</td>
             <td style="padding: 8px; text-align: center;">${srcDots} <span style="margin-left: 8px; font-size: 11px; color: var(--muted);">${r.corroboration_count}</span></td>
           </tr>`;
         }).join('')}
