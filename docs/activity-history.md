@@ -1,5 +1,28 @@
 # Activity History
 
+## 2026-07-09 — Fix /oras/ 404s + add live per-UAT source comparison to /surse/
+
+Two-part feature + navigation/UX fixes.
+
+**Part A — Fix 404 links on street/person detail pages:**
+The pages link to `/oras/{judet}/{uat}/` for every UAT a street or person appears in, but only ~108 UATs (41 county seats, 6 Bucharest sectors, municipii ≥50 streets) have rendered pages. Rural comuni and small towns were 404ing. Solution: added `built_uat_keys` parameter to `street_detail()` and `person_detail()` in `site_queries.py` to guard against nonexistent pages. Updated `build_site.py` to hoist `enumerate_uats()` and precompute the set once per build. Modified `street-detail.html.j2` and `person-detail.html.j2` templates to render unlinked UATs as plain text (`.uat-pill-plain` CSS class, muted styling) instead of broken anchors. Verified: Florilor street (532 UATs) now shows 76 linked UATs + 458 plain UATs.
+
+**Part B — Add live per-UAT source comparison section to /surse/:**
+New "Pe UAT" section (02) queries `all_street_names` client-side via `db-client.js` to show which of the 4 sources (registru/OSM/poștal/RENNS) have streets for each of ~3,200 UATs nationally. Button-triggered table (avoids auto-loading 224k rows) with judet filter for browsing. Click any UAT row to open drill-down detail panel showing all streets in that UAT with visual source indicators (colored dots: filled = source has it, hollow = missing) and corroboration count (1–4 sources). Reuses existing sql.js-httpvfs infrastructure; no data-layer changes needed. Architecture uses the JSON1 `variants` column in `all_street_names` to parse per-source provenance client-side.
+
+**Navigation + UX fixes:**
+— Added `/surse/` link to main navigation on landing page (index.html.j2).
+— Fixed "Pe UAT" filter dropdown to show judete codes (AB, AR, B, etc.) instead of confusing UAT names.
+— Fixed UAT row click handlers: added data-uat/data-judet attributes for direct dataset access, simplified closure scoping, added setTimeout for DOM-ready attachment.
+— Fixed street name display in drill-down to show qualified names (e.g. "Strada 9 Mai", "Aleea Alunului") by concatenating street_type + name.
+
+**Commits:**
+- `2939e86` feat(ui): fix 404s for unbuilt UATs + add live per-UAT source comparison
+- `6dc5a0c` fix(ui/surse): add nav link + fix judet filter to show codes not UAT names
+- `3d23336` fix(surse): make UAT drill-down clicks work
+- `9397030` fix(surse): show qualified street names (with type) in drill-down
+- `266775b` fix(surse): prepend street_type to name display in drill-down
+
 ## 2026-07-09 — Dedicated /surse/ page: per-source street coverage by județ
 
 Built a standalone page displaying the data-quality analysis across the 4 sources (registry, OpenStreetMap, postal codes, RENNS), aggregated per județ. Added `get_source_coverage_by_judet()` query to `site_queries.py` that groups `all_street_names` rows by judet and counts how many streets in each source are present per county. Built `templates/surse.html.j2` with a sortable HTML table, minibar visualizations per source, dark-mode CSS custom properties, and client-side JavaScript sorting by clicking column headers. Integrated into the build pipeline via `build_surse_page()` in `build_site.py`, triggered when running `build_site.py --variant all`. Page renders at `dist/surse/index.html` (~16 KB, self-contained). Verified data binding (42 judete + Bucharest, correct per-source counts, proper source color coding).
