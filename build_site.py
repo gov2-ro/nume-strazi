@@ -315,7 +315,7 @@ def build_surse_page(db_path: str = DB_PATH, base: str = "", site_url: str = DEF
     conn = site_queries.get_connection(db_path)
     judet_data = site_queries.get_source_coverage_by_judet(conn)
 
-    # Map județ codes to display names from the first UAT in each county
+    # Map județ codes to UAT display names (for "Pe județe" table row labels)
     judet_names = {}
     for row in judet_data:
         judet = row["judet"]
@@ -327,9 +327,12 @@ def build_surse_page(db_path: str = DB_PATH, base: str = "", site_url: str = DEF
         else:
             judet_names[judet] = judet
 
+    # Map judete codes for the "Pe UAT" filter (just the codes, unambiguous)
+    judet_codes = sorted([row["judet"] for row in judet_data])
+
     env = _make_env(base=base, site_url=site_url)
     tmpl = env.get_template("surse.html.j2")
-    html = tmpl.render(judet_data=judet_data, judet_names=judet_names)
+    html = tmpl.render(judet_data=judet_data, judet_names=judet_names, judet_codes=judet_codes)
 
     out = DIST / "surse" / "index.html"
     out.parent.mkdir(parents=True, exist_ok=True)

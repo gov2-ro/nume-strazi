@@ -299,6 +299,7 @@
 <script>
 const judetData = {{ judet_data | tojson }};
 const judetNames = {{ judet_names | tojson }};
+const judetCodes = {{ judet_codes | tojson }};
 
 function fmt(n) { return n.toLocaleString('ro-RO'); }
 
@@ -372,13 +373,12 @@ async function loadUatData() {
     uatData = rows;
     document.getElementById('uatTableContainer').style.display = 'block';
 
-    // Populate județ filter
+    // Populate județ filter with judete codes (not UAT names)
     const judetFilter = document.getElementById('uatJudetFilter');
-    const judete = [...new Set(rows.map(r => r.judet))].sort();
-    judete.forEach(j => {
+    judetCodes.forEach(j => {
       const opt = document.createElement('option');
       opt.value = j;
-      opt.textContent = judetNames[j] || j;
+      opt.textContent = j;  // Show just the judete code
       judetFilter.appendChild(opt);
     });
 
