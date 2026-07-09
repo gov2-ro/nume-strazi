@@ -33,6 +33,7 @@ VARIANTS = {
     "v1": ("index-v1.html.j2", "index-v1.html"),
     "v2": ("index-v2.html.j2", "index-v2.html"),
     "methodology": ("metodologie.html.j2", "metodologie.html"),
+    "surse": ("surse.html.j2", "surse/index.html"),
 }
 
 # Static-content variants don't need any of the section query data.
@@ -116,6 +117,11 @@ def build_detail_pages(db_path: str = DB_PATH,
     portraits = [p.stem for p in sorted(portraits_dir.glob("*.jpg"))] \
         if portraits_dir.exists() else []
 
+    # Precompute the set of UATs that have a rendered detail page.
+    # Hoist this before streets/persons to pass it to their detail functions.
+    uats_for_keys = site_queries.enumerate_uats(conn)
+    built_uat_keys = {(u["judet"].lower(), u["slug"]) for u in uats_for_keys}
+
     # ── Streets ─────────────────────────────────────────────────────────────
     streets = site_queries.enumerate_streets(conn)
     print(f"  Rendering {len(streets)} street detail pages…")
@@ -126,7 +132,7 @@ def build_detail_pages(db_path: str = DB_PATH,
             print(f"  WARN: street slug collision '{slug}'")
             continue
         seen[slug] = s["name_normalized"]
-        detail = site_queries.street_detail(conn, s["name_normalized"])
+        detail = site_queries.street_detail(conn, s["name_normalized"], built_uat_keys)
         if not detail:
             continue
         og = {
@@ -152,7 +158,7 @@ def build_detail_pages(db_path: str = DB_PATH,
         if slug in seen_p:
             continue  # duplicate QID — keep the first (higher street_count) rendering
         seen_p[slug] = p["core_name_norm"]
-        detail = site_queries.person_detail(conn, p["core_name_norm"])
+        detail = site_queries.person_detail(conn, p["core_name_norm"], built_uat_keys)
         if not detail:
             continue
         full_name = detail.get("full_name") or p["full_name"]
@@ -172,7 +178,7 @@ def build_detail_pages(db_path: str = DB_PATH,
     print(f"    → dist/persoana/ ({rendered_p} pages)")
 
     # ── UATs ─────────────────────────────────────────────────────────────────
-    uats = site_queries.enumerate_uats(conn)
+    uats = uats_for_keys
     print(f"  Rendering {len(uats)} UAT detail pages…")
     # Precompute globals once — avoids a full streets_dedup scan per UAT page.
     global_rarity = {
@@ -304,6 +310,34 @@ def build_detail_pages(db_path: str = DB_PATH,
     print(f"  Detail build complete — {total} files written.")
 
 
+def build_surse_page(db_path: str = DB_PATH, base: str = "", site_url: str = DEFAULT_SITE_URL) -> None:
+    """Build the /surse/ page showing per-source street coverage by județ."""
+    conn = site_queries.get_connection(db_path)
+    judet_data = site_queries.get_source_coverage_by_judet(conn)
+
+    # Map județ codes to display names from the first UAT in each county
+    judet_names = {}
+    for row in judet_data:
+        judet = row["judet"]
+        uat_name = conn.execute(
+            "SELECT DISTINCT uat FROM streets WHERE judet = ? LIMIT 1", (judet,)
+        ).fetchone()
+        if uat_name and uat_name[0]:
+            judet_names[judet] = uat_name[0]
+        else:
+            judet_names[judet] = judet
+
+    env = _make_env(base=base, site_url=site_url)
+    tmpl = env.get_template("surse.html.j2")
+    html = tmpl.render(judet_data=judet_data, judet_names=judet_names)
+
+    out = DIST / "surse" / "index.html"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(html, encoding="utf-8")
+    print(f"  → {out}  ({out.stat().st_size // 1024} KB)")
+    conn.close()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build street names static site")
     parser.add_argument("--db", default=DB_PATH)
@@ -339,6 +373,9 @@ def main() -> None:
         for v in variants:
             build(db_path=args.db, variant=v, base=base, site_url=site_url)
         build_browser_data(args.db)
+        # Build the surse page when building "all" variants
+        if args.variant == "all":
+            build_surse_page(db_path=args.db, base=base, site_url=site_url)
     if args.detail or args.detail_only:
         build_detail_pages(db_path=args.db, base=base, site_url=site_url)
     if args.serve:

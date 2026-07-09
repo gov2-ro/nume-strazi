@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Patru surse, o stradă — analiză de calitate a datelor</title>
+  <style>
+    :root {
+      --bg: #FFFFFF;
+      --surface: #F6F8FA;
+      --surface-raised: #FFFFFF;
+      --surface-blue: #DEE8F4;
+      --ink: #0B1118;
+      --muted: #5A6573;
+      --faint: #8892A0;
+      --rule: #E2E6EC;
+      --rule-strong: #BFC7D2;
+      --hairline: #EEF1F5;
+
+      --c-registry: #0E4D92;
+      --c-registry-soft: #DEE8F4;
+      --c-osm: #2F6B6B;
+      --c-osm-soft: #DEEDEC;
+      --c-postal: #A67C00;
+      --c-postal-soft: #F5EBCF;
+      --c-renns: #C04F35;
+      --c-renns-soft: #F7E2DC;
+
+      --warn: #A6510F;
+      --warn-soft: #FBEEE2;
+
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      --mono: ui-monospace, 'Menlo', 'Monaco', 'Courier New', monospace;
+      --display: 'Georgia', serif;
+
+      --shadow: 0 1px 2px rgba(11,17,24,0.04), 0 8px 24px rgba(11,17,24,0.05);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0B1118;
+        --surface: #131B24;
+        --surface-raised: #171F29;
+        --surface-blue: #16283D;
+        --ink: #EDEFF3;
+        --muted: #99A3B0;
+        --faint: #6B7683;
+        --rule: #232C38;
+        --rule-strong: #34404E;
+        --hairline: #1B222C;
+
+        --c-registry: #6FA4DE;
+        --c-registry-soft: #16283D;
+        --c-osm: #6BC2B9;
+        --c-osm-soft: #17282A;
+        --c-postal: #E3B958;
+        --c-postal-soft: #2B2415;
+        --c-renns: #E58269;
+        --c-renns-soft: #2E1D18;
+
+        --warn: #E3A15F;
+        --warn-soft: #2B2013;
+
+        --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html { background: var(--bg); }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+    ::selection { background: var(--c-renns-soft); }
+
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px 96px; }
+
+    .masthead {
+      padding: 56px 24px 40px;
+      border-bottom: 1px solid var(--rule);
+      background: linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%);
+    }
+    .masthead-inner { max-width: 1080px; margin: 0 auto; }
+    .eyebrow {
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 0 0 14px;
+    }
+    h1 {
+      font-family: var(--display);
+      font-weight: 700;
+      font-size: clamp(34px, 5vw, 52px);
+      line-height: 1.04;
+      letter-spacing: -0.01em;
+      margin: 0 0 16px;
+      text-wrap: balance;
+      max-width: 16ch;
+    }
+    .dek {
+      font-size: 17px;
+      color: var(--muted);
+      max-width: 62ch;
+      margin: 0 0 28px;
+    }
+    .source-key {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-family: var(--mono);
+      font-size: 12.5px;
+      font-weight: 600;
+      padding: 6px 12px 6px 10px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+    }
+    .chip .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+    .chip.registry { background: var(--c-registry-soft); color: var(--c-registry); }
+    .chip.registry .dot { background: var(--c-registry); }
+    .chip.osm { background: var(--c-osm-soft); color: var(--c-osm); }
+    .chip.osm .dot { background: var(--c-osm); }
+    .chip.postal { background: var(--c-postal-soft); color: var(--c-postal); }
+    .chip.postal .dot { background: var(--c-postal); }
+    .chip.renns { background: var(--c-renns-soft); color: var(--c-renns); }
+    .chip.renns .dot { background: var(--c-renns); }
+
+    section { padding: 56px 0; border-bottom: 1px solid var(--rule); }
+    section:last-of-type { border-bottom: none; }
+    .section-head { margin: 0 0 28px; max-width: 74ch; }
+    .section-num {
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--faint);
+      letter-spacing: 0.06em;
+      margin: 0 0 8px;
+    }
+    h2 {
+      font-family: var(--sans);
+      font-weight: 700;
+      font-size: 26px;
+      letter-spacing: -0.01em;
+      margin: 0 0 10px;
+      text-wrap: balance;
+    }
+    .section-dek { color: var(--muted); font-size: 15.5px; margin: 0; }
+
+    .judet-controls { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+    .judet-controls button {
+      font-family: var(--mono); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em;
+      background: none; border: 1px solid var(--rule-strong); color: var(--muted);
+      border-radius: 6px; padding: 5px 10px; cursor: pointer;
+    }
+    .judet-controls button:hover { background: var(--surface); color: var(--ink); }
+
+    .table-scroll { overflow-x: auto; border: 1px solid var(--rule); border-radius: 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { padding: 10px 14px; text-align: right; border-bottom: 1px solid var(--hairline); white-space: nowrap; }
+    th:first-child, td:first-child { text-align: left; }
+    thead th {
+      font-family: var(--mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      font-weight: 600;
+      background: var(--surface);
+      position: sticky; top: 0;
+      cursor: pointer; user-select: none;
+    }
+    thead th:hover { color: var(--ink); }
+    thead th .arrow { opacity: 0.35; margin-left: 3px; }
+    thead th.active .arrow { opacity: 1; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: var(--surface); }
+    td.num, th.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+    td.total-col { font-weight: 600; }
+
+    .minibar-cell { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+    .minibar-cell .v { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+    .minibar { width: 46px; height: 6px; border-radius: 3px; background: var(--hairline); overflow: hidden; flex: none; }
+    .minibar > span { display: block; height: 100%; }
+    .minibar.registry > span { background: var(--c-registry); }
+    .minibar.osm > span { background: var(--c-osm); }
+    .minibar.postal > span { background: var(--c-postal); }
+    .minibar.renns > span { background: var(--c-renns); }
+
+    footer {
+      padding: 40px 0 0;
+      color: var(--faint);
+      font-size: 12.5px;
+      font-family: var(--mono);
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="masthead">
+  <div class="masthead-inner">
+    <p class="eyebrow">Analiză de calitate a datelor</p>
+    <h1>Patru surse, o stradă</h1>
+    <p class="dek">Registrul secțiilor de votare, OpenStreetMap, codurile poștale și RENNS (ANCPI) descriu stradale din România. Niciuna nu e completă singură — combinate, dau peste 200.000 de intrări distincte.</p>
+    <div class="source-key">
+      <span class="chip registry"><span class="dot"></span>Registru (secții de votare)</span>
+      <span class="chip osm"><span class="dot"></span>OpenStreetMap</span>
+      <span class="chip postal"><span class="dot"></span>Coduri poștale</span>
+      <span class="chip renns"><span class="dot"></span>RENNS (ANCPI)</span>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+
+<section id="judete">
+  <div class="section-head">
+    <p class="section-num">01</p>
+    <h2>Pe județe</h2>
+    <p class="section-dek">Toate cele 42 de județe (Bucureștiul apare o singură dată). Coloanele arată câte străzi din lista consolidată conțin fiecare sursă — o stradă poate apărea în mai multe coloane deodată.</p>
+  </div>
+  <div class="judet-controls"><button id="resetSort">Resetează sortarea</button></div>
+  <div class="table-scroll">
+    <table id="judetTable">
+      <thead><tr>
+        <th class="sortable" data-key="name" data-type="str">Județ <span class="arrow">▾</span></th>
+        <th class="sortable num active" data-key="total" data-type="num">Total <span class="arrow">▾</span></th>
+        <th class="sortable num" data-key="registry" data-type="num">Registru <span class="arrow">▾</span></th>
+        <th class="sortable num" data-key="osm" data-type="num">OSM <span class="arrow">▾</span></th>
+        <th class="sortable num" data-key="postal" data-type="num">Poștal <span class="arrow">▾</span></th>
+        <th class="sortable num" data-key="renns" data-type="num">RENNS <span class="arrow">▾</span></th>
+        <th class="sortable num" data-key="uats" data-type="num">UAT-uri <span class="arrow">▾</span></th>
+      </tr></thead>
+      <tbody id="judetBody"></tbody>
+    </table>
+  </div>
+</section>
+
+<section id="uats">
+  <div class="section-head">
+    <p class="section-num">02</p>
+    <h2>Pe UAT</h2>
+    <p class="section-dek">Analiza pe fiecare dintre ~3.200 de unități administrativ-teritoriale: care surse au găsit străzi, cu cât îi diferă vederile.</p>
+  </div>
+  <div class="judet-controls">
+    <label for="uatJudetFilter" style="margin-right: 10px; font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em;">Filtrează pe județ:</label>
+    <select id="uatJudetFilter" style="font-family: var(--mono); font-size: 12px; padding: 6px 8px; border: 1px solid var(--rule-strong); border-radius: 4px; background: var(--surface); color: var(--ink); cursor: pointer;">
+      <option value="">-- Toți --</option>
+    </select>
+    <button id="loadUatTable" style="margin-left: 12px; font-family: var(--mono); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; background: none; border: 1px solid var(--rule-strong); color: var(--muted); border-radius: 6px; padding: 5px 10px; cursor: pointer;">Încarcă tabelul pe UAT</button>
+  </div>
+  <div class="table-scroll" id="uatTableContainer" style="display: none; margin-top: 12px;">
+    <table id="uatTable">
+      <thead><tr>
+        <th class="sortable" data-key="name" data-type="str">Localitate <span class="arrow">▾</span></th>
+        <th class="sortable num" data-key="judet" data-type="str">Județ <span class="arrow">▾</span></th>
+        <th class="sortable num active" data-key="total" data-type="num">Total <span class="arrow">▾</span></th>
+        <th class="sortable num" data-key="registry" data-type="num">Registru <span class="arrow">▾</span></th>
+        <th class="sortable num" data-key="osm" data-type="num">OSM <span class="arrow">▾</span></th>
+        <th class="sortable num" data-key="postal" data-type="num">Poștal <span class="arrow">▾</span></th>
+        <th class="sortable num" data-key="renns" data-type="num">RENNS <span class="arrow">▾</span></th>
+      </tr></thead>
+      <tbody id="uatBody"></tbody>
+    </table>
+  </div>
+  <div id="uatDetailPanel" style="display: none; margin-top: 24px; padding: 16px; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface);">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+      <div>
+        <h3 id="uatDetailTitle" style="margin: 0 0 8px; font-size: 16px;">Localitate</h3>
+        <div id="uatDetailStats" style="display: flex; gap: 8px; flex-wrap: wrap;"></div>
+      </div>
+      <button id="closeDetail" style="background: none; border: 1px solid var(--rule-strong); color: var(--muted); font-size: 12px; padding: 4px 8px; border-radius: 4px; cursor: pointer;">Închide</button>
+    </div>
+    <div id="uatDetailTable" style="overflow-x: auto; border: 1px solid var(--hairline); border-radius: 4px;"></div>
+  </div>
+</section>
+
+<footer>
+  <span>Generat la construcția site-ului · <a href="https://github.com/paxmiod/nume-strazi">Sursă</a></span>
+</footer>
+
+</div>
+
+<script src="../_assets/db-client.js"></script>
+<script>
+const judetData = {{ judet_data | tojson }};
+const judetNames = {{ judet_names | tojson }};
+
+function fmt(n) { return n.toLocaleString('ro-RO'); }
+
+function renderJudetTable(sortKey, sortType, dir) {
+  const rows = judetData.slice();
+  rows.sort((a, b) => {
+    let av = sortType === 'str' ? judetNames[a.judet] : a[sortKey];
+    let bv = sortType === 'str' ? judetNames[b.judet] : b[sortKey];
+    if (sortType === 'str') return dir * String(av).localeCompare(bv, 'ro');
+    return dir * (av - bv);
+  });
+  const maxTotal = Math.max(...rows.map(r => r.total));
+  const tbody = document.getElementById('judetBody');
+  tbody.innerHTML = rows.map(r => {
+    const cell = (src, val) => `<td class="num"><div class="minibar-cell"><span class="minibar ${src}"><span style="width:${Math.round(100*val/maxTotal)}%"></span></span><span class="v">${fmt(val)}</span></div></td>`;
+    return `<tr>
+      <td>${judetNames[r.judet]} <span style="color:var(--faint); font-family:var(--mono); font-size:12px;">${r.judet}</span></td>
+      <td class="num total-col">${fmt(r.total)}</td>
+      ${cell('registry', r.registry)}
+      ${cell('osm', r.osm)}
+      ${cell('postal', r.postal)}
+      ${cell('renns', r.renns)}
+      <td class="num">${fmt(r.uats)}</td>
+    </tr>`;
+  }).join('');
+}
+
+let currentSort = { key: 'total', type: 'num', dir: -1 };
+renderJudetTable(currentSort.key, currentSort.type, currentSort.dir);
+
+document.querySelectorAll('#judetTable th.sortable').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.key, type = th.dataset.type;
+    if (currentSort.key === key) currentSort.dir *= -1;
+    else currentSort = { key, type, dir: type === 'str' ? 1 : -1 };
+    document.querySelectorAll('#judetTable th.sortable').forEach(t => t.classList.remove('active'));
+    th.classList.add('active');
+    renderJudetTable(currentSort.key, currentSort.type, currentSort.dir);
+  });
+});
+document.getElementById('resetSort').addEventListener('click', () => {
+  currentSort = { key: 'total', type: 'num', dir: -1 };
+  document.querySelectorAll('#judetTable th.sortable').forEach(t => t.classList.remove('active'));
+  document.querySelector('#judetTable th[data-key="total"]').classList.add('active');
+  renderJudetTable(currentSort.key, currentSort.type, currentSort.dir);
+});
+
+// ── Per-UAT table (live-queried) ────────────────────────────────────────
+let uatData = null;
+let uatSort = { key: 'total', type: 'num', dir: -1 };
+
+async function loadUatData() {
+  const btn = document.getElementById('loadUatTable');
+  btn.disabled = true;
+  btn.textContent = 'Se încarcă...';
+
+  try {
+    const db = await DbClient.getDb();
+    const rows = await db.query(`
+      SELECT judet, uat, siruta,
+        SUM(EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='registry')) AS registry,
+        SUM(EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='osm')) AS osm,
+        SUM(EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='postal')) AS postal,
+        SUM(EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='renns')) AS renns,
+        COUNT(*) AS total
+      FROM all_street_names a
+      GROUP BY siruta
+      ORDER BY total DESC
+    `);
+
+    uatData = rows;
+    document.getElementById('uatTableContainer').style.display = 'block';
+
+    // Populate județ filter
+    const judetFilter = document.getElementById('uatJudetFilter');
+    const judete = [...new Set(rows.map(r => r.judet))].sort();
+    judete.forEach(j => {
+      const opt = document.createElement('option');
+      opt.value = j;
+      opt.textContent = judetNames[j] || j;
+      judetFilter.appendChild(opt);
+    });
+
+    renderUatTable('total', 'num', -1);
+    btn.textContent = 'Reîncarcă tabelul';
+  } catch (e) {
+    console.error('Error loading UAT data:', e);
+    btn.textContent = 'Eroare — încearcă din nou';
+  }
+  btn.disabled = false;
+}
+
+function renderUatTable(sortKey, sortType, dir) {
+  if (!uatData) return;
+
+  let rows = uatData.slice();
+  const filterJudet = document.getElementById('uatJudetFilter').value;
+  if (filterJudet) rows = rows.filter(r => r.judet === filterJudet);
+
+  rows.sort((a, b) => {
+    let av = sortType === 'str' ? (a[sortKey] || '').toString() : (a[sortKey] || 0);
+    let bv = sortType === 'str' ? (b[sortKey] || '').toString() : (b[sortKey] || 0);
+    if (sortType === 'str') return dir * String(av).localeCompare(bv, 'ro');
+    return dir * (av - bv);
+  });
+
+  const maxTotal = Math.max(...rows.map(r => r.total));
+  const tbody = document.getElementById('uatBody');
+  tbody.innerHTML = rows.map(r => {
+    const cell = (src, val) => `<td class="num"><div class="minibar-cell"><span class="minibar ${src}"><span style="width:${Math.round(100*val/maxTotal)}%"></span></span><span class="v">${fmt(val)}</span></div></td>`;
+    return `<tr style="cursor: pointer;" data-siruta="${r.siruta}">
+      <td>${r.uat}</td>
+      <td class="num">${r.judet}</td>
+      <td class="num total-col">${fmt(r.total)}</td>
+      ${cell('registry', r.registry)}
+      ${cell('osm', r.osm)}
+      ${cell('postal', r.postal)}
+      ${cell('renns', r.renns)}
+    </tr>`;
+  }).join('');
+
+  // Click rows to drill down
+  document.querySelectorAll('#uatBody tr').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const siruta = tr.dataset.siruta;
+      const uat = rows.find(r => r.siruta === siruta);
+      if (uat) showUatDetail(siruta, uat);
+    });
+  });
+}
+
+async function showUatDetail(siruta, uatRow) {
+  try {
+    const db = await DbClient.getDb();
+    const rows = await db.query(`
+      SELECT street_type, name, core_name, variants, corroboration_count, in_registry
+      FROM all_street_names
+      WHERE siruta = ?
+      ORDER BY corroboration_count DESC, core_name
+    `, [siruta]);
+
+    document.getElementById('uatDetailTitle').textContent = uatRow.uat + ' (' + uatRow.judet + ')';
+
+    // Count per-source for the header
+    const countBySource = { registry: 0, osm: 0, postal: 0, renns: 0 };
+    rows.forEach(r => {
+      try {
+        const v = JSON.parse(r.variants || '[]');
+        v.forEach(variant => {
+          if (variant.source && countBySource.hasOwnProperty(variant.source)) {
+            countBySource[variant.source]++;
+          }
+        });
+      } catch (e) { }
+    });
+
+    const sources = [
+      { key: 'registry', label: 'Registru', color: 'var(--c-registry)' },
+      { key: 'osm', label: 'OSM', color: 'var(--c-osm)' },
+      { key: 'postal', label: 'Poștal', color: 'var(--c-postal)' },
+      { key: 'renns', label: 'RENNS', color: 'var(--c-renns)' }
+    ];
+    document.getElementById('uatDetailStats').innerHTML = sources.map(s =>
+      `<span class="chip" style="background-color: var(--c-${s.key}-soft); color: var(--c-${s.key}); display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 8px; border-radius: 4px;">
+        <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--c-${s.key});"></span>
+        ${s.label}: <strong>${fmt(countBySource[s.key])}</strong>
+      </span>`
+    ).join('');
+
+    // Street table
+    const streetTable = `<table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+      <thead style="background: var(--surface-raised); position: sticky; top: 0;">
+        <tr>
+          <th style="padding: 8px; text-align: left; font-weight: 600; color: var(--muted); font-size: 11px; text-transform: uppercase;">Nume</th>
+          <th style="padding: 8px; text-align: left; font-weight: 600; color: var(--muted); font-size: 11px; text-transform: uppercase;">Tip</th>
+          <th style="padding: 8px; text-align: center; font-weight: 600; color: var(--muted); font-size: 11px; text-transform: uppercase;">Surse</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(r => {
+          let sources = [];
+          try {
+            const v = JSON.parse(r.variants || '[]');
+            sources = v.map(x => x.source);
+          } catch (e) { }
+          const srcDots = ['registry', 'osm', 'postal', 'renns'].map(src =>
+            `<span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: ${sources.includes(src) ? 'var(--c-' + src + ')' : 'var(--hairline)'}; margin: 0 2px;"></span>`
+          ).join('');
+          return `<tr style="border-bottom: 1px solid var(--hairline);">
+            <td style="padding: 8px;">${r.core_name || r.name}</td>
+            <td style="padding: 8px; font-size: 12px; color: var(--faint);">${r.street_type || '—'}</td>
+            <td style="padding: 8px; text-align: center;">${srcDots} <span style="margin-left: 8px; font-size: 11px; color: var(--muted);">${r.corroboration_count}</span></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+
+    document.getElementById('uatDetailTable').innerHTML = streetTable;
+    document.getElementById('uatDetailPanel').style.display = 'block';
+  } catch (e) {
+    console.error('Error loading UAT detail:', e);
+    alert('Eroare la încărcarea detaliilor localității');
+  }
+}
+
+document.getElementById('loadUatTable').addEventListener('click', loadUatData);
+document.getElementById('uatJudetFilter').addEventListener('change', () => {
+  if (uatData) renderUatTable(uatSort.key, uatSort.type, uatSort.dir);
+});
+document.querySelectorAll('#uatTable th.sortable').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.key, type = th.dataset.type;
+    if (uatSort.key === key) uatSort.dir *= -1;
+    else uatSort = { key, type, dir: type === 'str' ? 1 : -1 };
+    document.querySelectorAll('#uatTable th.sortable').forEach(t => t.classList.remove('active'));
+    th.classList.add('active');
+    if (uatData) renderUatTable(uatSort.key, uatSort.type, uatSort.dir);
+  });
+});
+document.getElementById('closeDetail').addEventListener('click', () => {
+  document.getElementById('uatDetailPanel').style.display = 'none';
+});
+</script>
+
+</body>
+</html>

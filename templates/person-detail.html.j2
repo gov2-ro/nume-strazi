@@ -57,7 +57,11 @@
       <div class="judet-label">{{ bucket.judet }} — {{ bucket.total }} stradă{% if bucket.total != 1 %}zi{% endif %}</div>
       <div class="uat-cluster">
         {% for u in bucket.uats %}
-          <a class="uat-pill" href="{{ base }}/oras/{{ bucket.judet | lower }}/{{ u.uat_slug }}/">{{ u.uat | title }}</a>
+          {% if u.uat_slug %}
+            <a class="uat-pill" href="{{ base }}/oras/{{ bucket.judet | lower }}/{{ u.uat_slug }}/">{{ u.uat | title }}</a>
+          {% else %}
+            <span class="uat-pill uat-pill-plain">{{ u.uat | title }}</span>
+          {% endif %}
         {% endfor %}
       </div>
     </div>

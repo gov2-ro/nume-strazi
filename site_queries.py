@@ -2003,8 +2003,13 @@ def enumerate_themes(conn: sqlite3.Connection) -> list[dict]:
     return out
 
 
-def street_detail(conn: sqlite3.Connection, name_normalized: str) -> dict:
-    """All UATs (grouped by județ) where a given street name exists."""
+def street_detail(conn: sqlite3.Connection, name_normalized: str,
+                   built_uat_keys: set[tuple[str, str]] | None = None) -> dict:
+    """All UATs (grouped by județ) where a given street name exists.
+
+    Pass precomputed built_uat_keys (from enumerate_uats) to avoid rendering links
+    to UAT pages that don't exist. If None, computes it internally.
+    """
     rows = _rows(conn, """
         SELECT sd.judet, sd.uat, sd.siruta, sd.name, sd.core_name,
                sd.is_saint, sd.is_date,
@@ -2029,17 +2034,23 @@ def street_detail(conn: sqlite3.Connection, name_normalized: str) -> dict:
     first = rows[0]
     display_name = first["core_name"] or first["name"]
 
+    # Compute built_uat_keys if not provided.
+    if built_uat_keys is None:
+        built_uat_keys = {(u["judet"].lower(), u["slug"]) for u in enumerate_uats(conn)}
+
     # Group UATs by județ, count occurrences per UAT (a street can technically appear
     # multiple times in one UAT under name variants — collapse here).
     per_uat: dict[str, dict] = {}
     for r in rows:
         key = r["siruta"]
         if key not in per_uat:
+            judet_lower = r["judet"].lower()
+            slug = slugify(fix_diacritics(r["uat"]))
             per_uat[key] = {
                 "judet": r["judet"],
                 "uat":   fix_diacritics(r["uat"]),
                 "siruta": r["siruta"],
-                "uat_slug": slugify(fix_diacritics(r["uat"])),
+                "uat_slug": slug if (judet_lower, slug) in built_uat_keys else None,
                 "count": 0,
             }
         per_uat[key]["count"] += 1
@@ -2099,8 +2110,13 @@ def street_detail(conn: sqlite3.Connection, name_normalized: str) -> dict:
     }
 
 
-def person_detail(conn: sqlite3.Connection, core_name_norm: str) -> dict:
-    """Person bio + complete street footprint."""
+def person_detail(conn: sqlite3.Connection, core_name_norm: str,
+                   built_uat_keys: set[tuple[str, str]] | None = None) -> dict:
+    """Person bio + complete street footprint.
+
+    Pass precomputed built_uat_keys (from enumerate_uats) to avoid rendering links
+    to UAT pages that don't exist. If None, computes it internally.
+    """
     person = _one(conn, "SELECT * FROM persons WHERE core_name_norm = ?", (core_name_norm,))
     if not person:
         return {}
@@ -2112,13 +2128,19 @@ def person_detail(conn: sqlite3.Connection, core_name_norm: str) -> dict:
         ORDER BY sd.judet, sd.uat
     """, (core_name_norm,))
 
+    # Compute built_uat_keys if not provided.
+    if built_uat_keys is None:
+        built_uat_keys = {(u["judet"].lower(), u["slug"]) for u in enumerate_uats(conn)}
+
     per_uat: dict[str, dict] = {}
     for r in rows:
         if r["siruta"] not in per_uat:
+            judet_lower = r["judet"].lower()
+            slug = slugify(fix_diacritics(r["uat"]))
             per_uat[r["siruta"]] = {
                 "judet": r["judet"], "uat": fix_diacritics(r["uat"]),
                 "siruta": r["siruta"],
-                "uat_slug": slugify(fix_diacritics(r["uat"])),
+                "uat_slug": slug if (judet_lower, slug) in built_uat_keys else None,
                 "count": 0,
             }
         per_uat[r["siruta"]]["count"] += 1
@@ -2670,3 +2692,20 @@ def municipii_index(conn: sqlite3.Connection) -> dict:
         "gender": gender_by_siruta,
         "themes": theme_by_siruta,
     }
+
+
+def get_source_coverage_by_judet(conn: sqlite3.Connection) -> list[dict]:
+    """Per-source street coverage by județul, sorted by total descending."""
+    rows = _rows(conn, """
+        SELECT judet,
+          SUM(EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='registry')) AS registry,
+          SUM(EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='osm')) AS osm,
+          SUM(EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='postal')) AS postal,
+          SUM(EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='renns')) AS renns,
+          COUNT(*) AS total,
+          COUNT(DISTINCT siruta) AS uats
+        FROM all_street_names a
+        GROUP BY judet
+        ORDER BY total DESC
+    """)
+    return rows

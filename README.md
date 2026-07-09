@@ -356,13 +356,16 @@ python3 tools/renns_sanity.py
 source) is additive but **not** deduplicated across external sources — if
 OSM, postal, and RENNS all independently have the same registry-missing
 street, that view produces one row per source. `all_street_names` fixes this:
-it groups by `(uat_siruta, street_type, core_name_norm)` across all four
-sources into one row per real street, with a `variants` JSON column
-preserving every source's exact spelling (nothing is discarded to pick a
-"winner" — no source outranks another) and a `corroboration_count`. This is
-the list to use for "every street name in Romania," not `streets_all_sources`.
-Total: **216,360** rows (107,957 registry + 108,403 external-only). See
-`docs/CODE_SPEC.md` §13.8/§14 and critical rules #1/#11 in `CLAUDE.md`.
+a single, fully symmetric view across all four sources — the registry is
+just one of the four, not a special anchor the others attach to — grouped by
+`(siruta, street_type, core_name_norm)` into one row per real street, with a
+`variants` JSON column preserving every source's exact spelling (nothing is
+discarded to pick a "winner" — no source outranks another) and a
+`corroboration_count`. `in_registry` (0/1) marks whether the registry is
+among the contributing sources. This is the list to use for "every street
+name in Romania," not `streets_all_sources`. Total: **224,208** rows
+(107,924 include the registry, 116,284 don't). See `docs/CODE_SPEC.md`
+§13.8/§14/§14.5 and critical rule #11 in `CLAUDE.md`.
 
 **Street type is part of a street's identity**, confirmed 2026-07-08: a UAT
 can have both `Bulevardul X` and `Strada X` as genuinely distinct real
@@ -375,7 +378,18 @@ with — so e.g. Alba Iulia's real `Bulevardul 1 Decembrie 1918` and real
 dedup key recovered 2,614 previously-hidden registry streets (105,343 →
 107,957) and, as a side effect, fixed a matching-quality bug where the
 dominant OSM match pass was cross-wiring different street types 6.3% of the
-time. Full writeup in `docs/CODE_SPEC.md` §14.
+time.
+
+The fix initially left one inconsistency: the registry still got a laxer,
+type-tolerant path to corroboration (via a 0.5-confidence match-table pass)
+that no pair of external sources got between each other — e.g. OSM's `Calea
+Moților` and postal's `Strada Moților` in the same UAT, plausibly the same
+street, stayed uncorroborated at 1 source each. Fixed by removing the
+registry/external split entirely (§14.5) rather than extending the
+tolerance — type mismatches are never auto-merged now, anywhere; a
+`type_variant_candidates` query (`docs/queries.sql`) surfaces the ambiguous
+cases for manual review instead of guessing. Full writeup in
+`docs/CODE_SPEC.md` §14 and §14.5.
 
 ---
 

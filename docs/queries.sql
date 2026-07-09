@@ -720,25 +720,39 @@ LIMIT 100;
 
 
 -- ============= VIEW 11: MASTER DEDUPLICATED STREET LIST (all 4 sources) =============
--- Requires all 4 sources ingested + matched (see CODE_SPEC §13.8 for the
+-- Requires all 4 sources ingested + matched (see CODE_SPEC §14/§15 for the
 -- all_street_names view definition). Unlike streets_all_sources (one row
 -- PER SOURCE for external-only streets — 2-3 sources agreeing on a
 -- registry-missing street produce 2-3 rows there), all_street_names
--- collapses cross-source duplicates via (siruta, core_name_norm) into one
--- row, with a `variants` JSON column preserving every contributing source's
--- exact name/street_type (nothing discarded) and a `corroboration_count`
--- (1-4) for how many sources agree. This is the one to use for "every
+-- collapses cross-source duplicates via (siruta, street_type, core_name_norm)
+-- into one row, with a `variants` JSON column preserving every contributing
+-- source's exact name (nothing discarded) and a `corroboration_count` (1-4)
+-- for how many sources agree. Fully symmetric (2026-07-08 revision) — the
+-- registry is just one of the 4 sources, not a special anchor; `in_registry`
+-- (0/1) says whether the registry is among the contributing sources, in
+-- place of the earlier `layer` column. This is the one to use for "every
 -- distinct street name in Romania."
 
--- Headline size + how much the cross-source dedup actually saved.
+-- Headline size + how much the cross-source dedup actually saved. Compares
+-- against the true raw union (every row in streets_dedup + osm_streets +
+-- postal_streets + renns_streets, before any grouping at all) rather than
+-- streets_all_sources — the two now use genuinely different inclusion logic
+-- (streets_all_sources excludes anything matched at ANY confidence tier,
+-- including the type-blind fuzzy one; all_street_names' symmetric grouping
+-- doesn't recognize that fuzzy tier at all, so it can — correctly — end up
+-- larger than streets_all_sources for the same underlying data).
 -- :name all_street_names_summary
 SELECT
   (SELECT COUNT(*) FROM all_street_names)                          AS master_list_size,
-  (SELECT COUNT(*) FROM streets_all_sources)                       AS naive_union_size,
-  (SELECT COUNT(*) FROM streets_all_sources) - (SELECT COUNT(*) FROM all_street_names)
-                                                                    AS duplicates_collapsed,
-  (SELECT COUNT(*) FROM all_street_names WHERE layer = 'registry')  AS registry_rows,
-  (SELECT COUNT(*) FROM all_street_names WHERE layer = 'external')  AS external_only_rows,
+  ((SELECT COUNT(*) FROM streets_dedup) + (SELECT COUNT(*) FROM osm_streets)
+   + (SELECT COUNT(*) FROM postal_streets WHERE uat_siruta IS NOT NULL)
+   + (SELECT COUNT(*) FROM renns_streets))                          AS raw_union_size,
+  ((SELECT COUNT(*) FROM streets_dedup) + (SELECT COUNT(*) FROM osm_streets)
+   + (SELECT COUNT(*) FROM postal_streets WHERE uat_siruta IS NOT NULL)
+   + (SELECT COUNT(*) FROM renns_streets))
+   - (SELECT COUNT(*) FROM all_street_names)                        AS duplicates_collapsed,
+  (SELECT COUNT(*) FROM all_street_names WHERE in_registry = 1)     AS registry_rows,
+  (SELECT COUNT(*) FROM all_street_names WHERE in_registry = 0)     AS external_only_rows,
   (SELECT COUNT(*) FROM all_street_names WHERE corroboration_count >= 2)
                                                                     AS multi_source_corroborated;
 
@@ -755,6 +769,37 @@ ORDER BY corroboration_count;
 -- :name high_confidence_registry_misses
 SELECT judet, uat, siruta, name, street_type, corroboration_count, variants
 FROM all_street_names
-WHERE layer = 'external' AND corroboration_count >= 2
+WHERE in_registry = 0 AND corroboration_count >= 2
 ORDER BY corroboration_count DESC, judet, uat
 LIMIT 100;
+
+-- Same core name in the same UAT, but sources disagree on street_type (e.g.
+-- OSM's "Calea Moților" vs postal's "Strada Moților") — all_street_names
+-- deliberately never auto-merges these (type is part of a street's identity,
+-- and a type mismatch could mean either "one street, two sources disagree
+-- on its type" or "two genuinely different streets that share a name" —
+-- not decidable from the data alone). Surfaces the sibling rows together
+-- for manual review instead of guessing. `n_sources_total` counts distinct
+-- sources across ALL type-variants for this core name — pairs where 2+
+-- different sources are involved (not just one source using 2 labels) are
+-- the more interesting case to check first.
+-- :name type_variant_candidates
+WITH siblings AS (
+  SELECT siruta, core_name_norm, street_type, name, corroboration_count, variants, judet, uat
+  FROM all_street_names
+  WHERE core_name_norm IS NOT NULL
+),
+groups AS (
+  SELECT siruta, core_name_norm,
+         COUNT(DISTINCT street_type) AS n_types,
+         COUNT(DISTINCT json_extract(je.value, '$.source'))          AS n_sources_total
+  FROM siblings, json_each(siblings.variants) je
+  GROUP BY siruta, core_name_norm
+  HAVING COUNT(DISTINCT street_type) > 1
+)
+SELECT s.judet, s.uat, s.siruta, s.core_name_norm, s.street_type, s.name,
+       s.corroboration_count, g.n_sources_total
+FROM siblings s
+JOIN groups g ON g.siruta = s.siruta AND g.core_name_norm = s.core_name_norm
+ORDER BY g.n_sources_total DESC, s.judet, s.uat, s.core_name_norm, s.street_type
+LIMIT 200;

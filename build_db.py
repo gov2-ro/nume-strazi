@@ -354,92 +354,79 @@ WHERE r.uat_siruta IS NOT NULL
 -- agreeing on the same registry-missing street produce 2-3 rows), this view
 -- collapses cross-source duplicates and keeps every contributing source's
 -- exact name in `variants` (JSON) rather than silently discarding the losers.
--- `corroboration_count` is how many of the 4 sources (registry counts as
--- one) have this street; higher is a stronger signal the street genuinely
--- exists. streets_all_sources is kept as-is for its existing narrower
--- per-source gap-analysis queries (postal_only_streets, renns_only_streets,
--- ...) — this view is the one to use for "give me every Romanian street
--- name, deduplicated."
+-- `corroboration_count` is how many of the 4 sources have this exact street;
+-- higher is a stronger signal the street genuinely exists. streets_all_sources
+-- is kept as-is for its existing narrower per-source gap-analysis queries
+-- (postal_only_streets, renns_only_streets, ...) — this view is the one to
+-- use for "give me every Romanian street name, deduplicated."
 --
--- Dedup key: (siruta, street_type, core_name_norm) for the external layer —
--- NOT name_normalized, which is not comparable across sources (osm_streets'
--- includes the street-type prefix, registry/postal/RENNS's don't; see the
--- comment on streets_all_sources above). street_type is part of the key,
--- same invariant as streets_dedup: a UAT can have both "Bulevardul X" and
--- "Strada X" as genuinely distinct streets, but not two "Strada X"s. No
--- source is treated as higher-priority than another (2026-07-08 decision,
--- reversing the earlier RENNS > OSM > postal ranking) — when sources
+-- Fully symmetric across all 4 sources (revised 2026-07-08, replacing an
+-- earlier registry/external "layer" split): registry is pooled into the same
+-- UNION ALL as OSM/postal/RENNS and grouped by exactly the same key,
+-- (siruta, street_type, core_name_norm) — same invariant as streets_dedup,
+-- a UAT can have both "Bulevardul X" and "Strada X" as genuinely distinct
+-- streets, but not two "Strada X"s. This is NOT the same thing as routing
+-- through street_osm_matches/street_postal_matches/street_renns_matches
+-- (those keep their own independent match tiers, including a type-blind
+-- fuzzy_core_name fallback, for their own coverage-report purposes) — here,
+-- deliberately, there's no fuzzy/type-blind fallback at all: two entries
+-- that share a core name but disagree on street_type are NEVER auto-merged,
+-- since that's exactly the ambiguity "type is identity" was meant to
+-- resolve (is it one street two sources mislabeled, or two real streets
+-- that happen to share a name? not decidable from the data alone). See the
+-- `type_variant_candidates` query in docs/queries.sql for surfacing those
+-- cases for manual review instead of guessing. `in_registry` (0/1) replaces
+-- the old layer column's practical use (filtering "not in the registry").
+-- No source is treated as higher-priority than another (2026-07-08 decision,
+-- reversing an earlier RENNS > OSM > postal ranking) — when sources
 -- disagree on exact spelling within an otherwise-identical group, the
 -- representative name/core_name is simply the alphabetically-first one
 -- (MIN()); `variants` retains every source's exact spelling regardless.
+--
+-- Numeric streets (core_name_norm IS NULL, e.g. rural cadastral "184") have
+-- no meaningful cross-source join key — grouping by (siruta, street_type,
+-- core_name_norm) would collapse every numeric street in a UAT into one
+-- fake merged row, since SQL GROUP BY treats all NULLs as equal. Falls back
+-- to grouping by exact `name` instead in that case (COALESCE below) — two
+-- sources both listing "184" of the same type in the same UAT still
+-- corroborate each other, but "184" and "185" correctly stay separate.
 CREATE VIEW all_street_names AS
-WITH reg_variant_src AS (
-  SELECT sd2.id AS street_id, 'registry' AS src, sd2.name AS vname, sd2.street_type AS vtype
-    FROM streets_dedup sd2
-  UNION ALL
-  SELECT mo.street_id, 'osm', o.name, o.street_type
-    FROM street_osm_matches mo JOIN osm_streets o ON o.id = mo.osm_street_id
-  UNION ALL
-  SELECT mp.street_id, 'postal', p.name, p.street_type
-    FROM street_postal_matches mp JOIN postal_streets p ON p.id = mp.postal_street_id
-  UNION ALL
-  SELECT mr.street_id, 'renns', r.name, r.street_type
-    FROM street_renns_matches mr JOIN renns_streets r ON r.id = mr.renns_street_id
-),
-reg_agg AS (
-  SELECT street_id,
-         json_group_array(json_object('source', src, 'name', vname, 'street_type', vtype)) AS variants,
-         COUNT(DISTINCT src) AS corroboration_count
-    FROM reg_variant_src
-   GROUP BY street_id
-),
-ext_candidates AS (
-  SELECT 'renns' AS source, r.uat_siruta AS siruta, r.street_type, r.name,
-         r.core_name, r.core_name_norm, r.is_saint, r.is_date, r.is_numeric
-    FROM renns_streets r
-   WHERE r.core_name_norm IS NOT NULL
-     AND NOT EXISTS (SELECT 1 FROM street_renns_matches m WHERE m.renns_street_id = r.id)
+WITH all_entries AS (
+  SELECT 'registry' AS source, sd.siruta, sd.street_type, sd.name,
+         sd.core_name, sd.core_name_norm, sd.is_saint, sd.is_date, sd.is_numeric
+    FROM streets_dedup sd
   UNION ALL
   SELECT 'osm', o.uat_siruta, o.street_type, o.name,
          o.core_name, o.core_name_norm, o.is_saint, o.is_date, o.is_numeric
     FROM osm_streets o
-   WHERE o.core_name_norm IS NOT NULL
-     AND NOT EXISTS (SELECT 1 FROM street_osm_matches m WHERE m.osm_street_id = o.id)
   UNION ALL
   SELECT 'postal', p.uat_siruta, p.street_type, p.name,
          p.core_name, p.core_name_norm, p.is_saint, p.is_date, p.is_numeric
     FROM postal_streets p
-   WHERE p.core_name_norm IS NOT NULL AND p.uat_siruta IS NOT NULL
-     AND NOT EXISTS (SELECT 1 FROM street_postal_matches m WHERE m.postal_street_id = p.id)
+   WHERE p.uat_siruta IS NOT NULL
+  UNION ALL
+  SELECT 'renns', r.uat_siruta, r.street_type, r.name,
+         r.core_name, r.core_name_norm, r.is_saint, r.is_date, r.is_numeric
+    FROM renns_streets r
 ),
-ext_agg AS (
-  SELECT siruta, street_type, core_name_norm,
-         MIN(name) AS name, MIN(core_name) AS core_name,
+grouped AS (
+  SELECT siruta, street_type, COALESCE(core_name_norm, name) AS group_key,
+         MIN(name) AS name, MIN(core_name) AS core_name, MIN(core_name_norm) AS core_name_norm,
          json_group_array(json_object('source', source, 'name', name, 'street_type', street_type)) AS variants,
          COUNT(DISTINCT source) AS corroboration_count,
+         MAX(CASE WHEN source = 'registry' THEN 1 ELSE 0 END) AS in_registry,
          MAX(is_saint) AS is_saint, MAX(is_date) AS is_date, MAX(is_numeric) AS is_numeric
-    FROM ext_candidates
-   GROUP BY siruta, street_type, core_name_norm
+    FROM all_entries
+   GROUP BY siruta, street_type, COALESCE(core_name_norm, name)
 )
-SELECT 'registry' AS layer, sd.judet, sd.uat, sd.siruta, sd.street_type, sd.name,
-       sd.name_normalized, sd.core_name, sd.core_name_norm,
-       sd.is_saint, sd.is_date, sd.is_numeric,
-       ra.corroboration_count, ra.variants
-  FROM streets_dedup sd
-  JOIN reg_agg ra ON ra.street_id = sd.id
-
-UNION ALL
-
-SELECT 'external' AS layer,
-       COALESCE(su.judet, ur.judet) AS judet,
+SELECT COALESCE(su.judet, ur.judet) AS judet,
        COALESCE(su.uat, ur.uat) AS uat,
-       ea.siruta, ea.street_type, ea.name,
-       NULL AS name_normalized, ea.core_name, ea.core_name_norm,
-       ea.is_saint, ea.is_date, ea.is_numeric,
-       ea.corroboration_count, ea.variants
-  FROM ext_agg ea
-  LEFT JOIN (SELECT DISTINCT siruta, judet, uat FROM streets) su ON su.siruta = ea.siruta
-  LEFT JOIN uat_reference ur ON ur.siruta = ea.siruta;
+       g.siruta, g.street_type, g.name, g.core_name, g.core_name_norm,
+       g.is_saint, g.is_date, g.is_numeric, g.in_registry,
+       g.corroboration_count, g.variants
+  FROM grouped g
+  LEFT JOIN (SELECT DISTINCT siruta, judet, uat FROM streets) su ON su.siruta = g.siruta
+  LEFT JOIN uat_reference ur ON ur.siruta = g.siruta;
 """)
 
 # ---------- ingest ----------
