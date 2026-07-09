@@ -409,7 +409,7 @@ function renderUatTable(sortKey, sortType, dir) {
   const tbody = document.getElementById('uatBody');
   tbody.innerHTML = rows.map(r => {
     const cell = (src, val) => `<td class="num"><div class="minibar-cell"><span class="minibar ${src}"><span style="width:${Math.round(100*val/maxTotal)}%"></span></span><span class="v">${fmt(val)}</span></div></td>`;
-    return `<tr style="cursor: pointer;" data-siruta="${r.siruta}">
+    return `<tr style="cursor: pointer;" data-siruta="${r.siruta}" data-uat="${r.uat}" data-judet="${r.judet}">
       <td>${r.uat}</td>
       <td class="num">${r.judet}</td>
       <td class="num total-col">${fmt(r.total)}</td>
@@ -420,14 +420,19 @@ function renderUatTable(sortKey, sortType, dir) {
     </tr>`;
   }).join('');
 
-  // Click rows to drill down
-  document.querySelectorAll('#uatBody tr').forEach(tr => {
-    tr.addEventListener('click', () => {
-      const siruta = tr.dataset.siruta;
-      const uat = rows.find(r => r.siruta === siruta);
-      if (uat) showUatDetail(siruta, uat);
+  // Click rows to drill down — attach handlers after render
+  setTimeout(() => {
+    document.querySelectorAll('#uatBody tr').forEach(tr => {
+      tr.addEventListener('click', (e) => {
+        const siruta = tr.dataset.siruta;
+        const uat = tr.dataset.uat;
+        const judet = tr.dataset.judet;
+        if (siruta) {
+          showUatDetail(siruta, { uat, judet, siruta });
+        }
+      });
     });
-  });
+  }, 0);
 }
 
 async function showUatDetail(siruta, uatRow) {
