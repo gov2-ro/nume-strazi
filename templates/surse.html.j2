@@ -197,6 +197,42 @@
     .minibar.postal > span { background: var(--c-postal); }
     .minibar.renns > span { background: var(--c-renns); }
 
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin-bottom: 0;
+    }
+    .stat-card {
+      padding: 20px;
+      border: 1px solid var(--rule);
+      border-radius: 8px;
+      background: var(--surface);
+    }
+    .stat-card-label {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--faint);
+      margin: 0 0 12px;
+    }
+    .stat-card-number {
+      font-family: var(--display);
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1.1;
+      margin: 0 0 8px;
+      color: var(--ink);
+    }
+    .stat-card-desc {
+      font-size: 12.5px;
+      color: var(--muted);
+      margin: 0;
+      line-height: 1.4;
+    }
+
     footer {
       padding: 40px 0 0;
       color: var(--faint);
@@ -227,9 +263,43 @@
 
 <div class="wrap">
 
-<section id="judete">
+<section id="overview">
   <div class="section-head">
     <p class="section-num">01</p>
+    <h2>Ce are fiecare sursă</h2>
+    <p class="section-dek">Patru liste independente, la scări diferite. Bara de sub fiecare cifră arată câte din cele 3.181 UAT-uri ale țării acoperă sursa respectivă.</p>
+  </div>
+  <div class="stat-cards">
+    <div class="stat-card" style="border-color: var(--c-registry); background: var(--c-registry-soft);">
+      <p class="stat-card-label" style="color: var(--c-registry);">Registru</p>
+      <div class="stat-card-number" style="color: var(--c-registry);">{{ '{:,}'.format(sources_overview.registry.count).replace(',', '.') }}</div>
+      <p class="stat-card-desc">străzi distincte</p>
+      <p class="stat-card-desc">{{ sources_overview.registry.uats }} / 3.181 UAT-uri ({{ '%.1f' | format(100.0 * sources_overview.registry.uats / 3181) }}%)</p>
+    </div>
+    <div class="stat-card" style="border-color: var(--c-osm); background: var(--c-osm-soft);">
+      <p class="stat-card-label" style="color: var(--c-osm);">OpenStreetMap</p>
+      <div class="stat-card-number" style="color: var(--c-osm);">{{ '{:,}'.format(sources_overview.osm.count).replace(',', '.') }}</div>
+      <p class="stat-card-desc">străzi distincte</p>
+      <p class="stat-card-desc">{{ sources_overview.osm.uats }} / 3.181 UAT-uri ({{ '%.1f' | format(100.0 * sources_overview.osm.uats / 3181) }}%)</p>
+    </div>
+    <div class="stat-card" style="border-color: var(--c-postal); background: var(--c-postal-soft);">
+      <p class="stat-card-label" style="color: var(--c-postal);">Coduri poștale</p>
+      <div class="stat-card-number" style="color: var(--c-postal);">{{ '{:,}'.format(sources_overview.postal.count).replace(',', '.') }}</div>
+      <p class="stat-card-desc">străzi distincte</p>
+      <p class="stat-card-desc">{{ sources_overview.postal.uats }} / 3.181 UAT-uri ({{ '%.1f' | format(100.0 * sources_overview.postal.uats / 3181) }}%)</p>
+    </div>
+    <div class="stat-card" style="border-color: var(--c-renns); background: var(--c-renns-soft);">
+      <p class="stat-card-label" style="color: var(--c-renns);">RENNS</p>
+      <div class="stat-card-number" style="color: var(--c-renns);">{{ '{:,}'.format(sources_overview.renns.count).replace(',', '.') }}</div>
+      <p class="stat-card-desc">străzi distincte</p>
+      <p class="stat-card-desc">{{ sources_overview.renns.uats }} / 3.181 UAT-uri ({{ '%.1f' | format(100.0 * sources_overview.renns.uats / 3181) }}%)</p>
+    </div>
+  </div>
+</section>
+
+<section id="judete">
+  <div class="section-head">
+    <p class="section-num">02</p>
     <h2>Pe județe</h2>
     <p class="section-dek">Toate cele 42 de județe (Bucureștiul apare o singură dată). Coloanele arată câte străzi din lista consolidată conțin fiecare sursă — o stradă poate apărea în mai multe coloane deodată.</p>
   </div>
@@ -252,7 +322,7 @@
 
 <section id="uats">
   <div class="section-head">
-    <p class="section-num">02</p>
+    <p class="section-num">03</p>
     <h2>Pe UAT</h2>
     <p class="section-dek">Analiza pe fiecare dintre ~3.200 de unități administrativ-teritoriale: care surse au găsit străzi, cu cât îi diferă vederile.</p>
   </div>

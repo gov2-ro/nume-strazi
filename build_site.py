@@ -313,6 +313,7 @@ def build_detail_pages(db_path: str = DB_PATH,
 def build_surse_page(db_path: str = DB_PATH, base: str = "", site_url: str = DEFAULT_SITE_URL) -> None:
     """Build the /surse/ page showing per-source street coverage by județ."""
     conn = site_queries.get_connection(db_path)
+    sources_overview = site_queries.sources_overview(conn)
     judet_data = site_queries.get_source_coverage_by_judet(conn)
 
     # Map județ codes to UAT display names (for "Pe județe" table row labels)
@@ -332,7 +333,12 @@ def build_surse_page(db_path: str = DB_PATH, base: str = "", site_url: str = DEF
 
     env = _make_env(base=base, site_url=site_url)
     tmpl = env.get_template("surse.html.j2")
-    html = tmpl.render(judet_data=judet_data, judet_names=judet_names, judet_codes=judet_codes)
+    html = tmpl.render(
+        sources_overview=sources_overview,
+        judet_data=judet_data,
+        judet_names=judet_names,
+        judet_codes=judet_codes
+    )
 
     out = DIST / "surse" / "index.html"
     out.parent.mkdir(parents=True, exist_ok=True)

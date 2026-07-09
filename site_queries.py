@@ -2709,3 +2709,49 @@ def get_source_coverage_by_judet(conn: sqlite3.Connection) -> list[dict]:
         ORDER BY total DESC
     """)
     return rows
+
+
+def sources_overview(conn: sqlite3.Connection) -> dict:
+    """Global overview: distinct streets and UAT coverage per source.
+
+    Returns {source -> {count: N, uats: M}} for registry, osm, postal, renns.
+    Also includes total combined entries.
+    """
+    stats = _one(conn, """
+        SELECT
+          COUNT(*) AS total_entries,
+          COUNT(DISTINCT siruta) AS total_uats,
+          SUM(EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='registry')) AS registry_count,
+          COUNT(DISTINCT CASE WHEN EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='registry') THEN a.siruta END) AS registry_uats,
+          SUM(EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='osm')) AS osm_count,
+          COUNT(DISTINCT CASE WHEN EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='osm') THEN a.siruta END) AS osm_uats,
+          SUM(EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='postal')) AS postal_count,
+          COUNT(DISTINCT CASE WHEN EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='postal') THEN a.siruta END) AS postal_uats,
+          SUM(EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='renns')) AS renns_count,
+          COUNT(DISTINCT CASE WHEN EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='renns') THEN a.siruta END) AS renns_uats
+        FROM all_street_names a
+    """)
+
+    total_uats = 3181  # Known total UATs in Romania
+
+    return {
+        "total_entries": stats.get("total_entries", 0),
+        "total_uats": stats.get("total_uats", 0),
+        "total_uats_romania": total_uats,
+        "registry": {
+            "count": stats.get("registry_count", 0),
+            "uats": stats.get("registry_uats", 0),
+        },
+        "osm": {
+            "count": stats.get("osm_count", 0),
+            "uats": stats.get("osm_uats", 0),
+        },
+        "postal": {
+            "count": stats.get("postal_count", 0),
+            "uats": stats.get("postal_uats", 0),
+        },
+        "renns": {
+            "count": stats.get("renns_count", 0),
+            "uats": stats.get("renns_uats", 0),
+        },
+    }
