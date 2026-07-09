@@ -491,8 +491,9 @@ async function showUatDetail(siruta, uatRow) {
           const srcDots = ['registry', 'osm', 'postal', 'renns'].map(src =>
             `<span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: ${sources.includes(src) ? 'var(--c-' + src + ')' : 'var(--hairline)'}; margin: 0 2px;"></span>`
           ).join('');
+          const displayName = r.street_type ? r.street_type + ' ' + r.name : (r.name || r.core_name);
           return `<tr style="border-bottom: 1px solid var(--hairline);">
-            <td style="padding: 8px;">${r.name || r.core_name}</td>
+            <td style="padding: 8px;">${displayName}</td>
             <td style="padding: 8px; text-align: center;">${srcDots} <span style="margin-left: 8px; font-size: 11px; color: var(--muted);">${r.corroboration_count}</span></td>
           </tr>`;
         }).join('')}
