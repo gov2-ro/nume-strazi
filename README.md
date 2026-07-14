@@ -141,14 +141,13 @@ The file is not committed to this repo (large xlsx, ~10 MB).
 # 1. Build the database from the xlsx
 python3 build_db.py
 
-# 2. Apply hand-curated starter seed
-python3 seed_lookups.py
+# 2. Restore all curation state (hand-curated seed, pre-classified batches,
+#    Wikidata QIDs/birthplaces/biostats) from the committed data/curation/ CSVs.
+#    Asserts classification coverage lands within tolerance of a known-good
+#    floor, failing loudly instead of silently building on incomplete curation.
+python3 tools/restore_curation.py
 
-# 3. Apply pre-classified batches (ships with the repo)
-python3 tools/seed_top500.py
-python3 tools/seed_batch2.py
-
-# 4. Run the full query catalog
+# 3. Run the full query catalog
 python3 run_queries.py
 ```
 
@@ -486,8 +485,11 @@ echo 'export ANTHROPIC_API_KEY=sk-ant-...' >> ~/.zshrc
 │   ├── llm_compare.py          # Compare two llm_classify CSVs for convergence
 │   ├── seed_top500.py          # Batch 1 curation (top-500 keys)
 │   ├── seed_batch2.py          # Batch 2 curation
+│   ├── restore_curation.py     # Run the full post-rebuild curation restore, asserting coverage
 │   ├── fetch_portraits.py      # Wikidata P18 → Wikimedia thumbnails → dist/portraits/
 │   ├── wikidata_persons.py     # Fetch/replay Wikidata QIDs for persons
+│   ├── wiki_birthplace.py      # Fetch/replay Wikidata P19 birthplace → birth_judet
+│   ├── wiki_biostats.py        # Fetch/replay Wikidata P509/P569/P570 (cause/dates of death)
 │   ├── wiki_scope.py           # Fetch Wikipedia sitelinks + wiki_scope per person
 │   ├── fetch_lucide_icons.py   # Fetch Lucide SVG icons → templates/_icons.html.j2 sprite
 │   ├── gen_og_image.py         # Generate Open Graph preview images

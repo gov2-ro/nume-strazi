@@ -1,5 +1,90 @@
 # Activity History
 
+## 2026-07-14 — Backlog audit + tools/restore_curation.py
+
+Started from a "what should we tackle next" request. Rather than picking from
+BACKLOG.md at face value, audited the still-unchecked items against current
+code first, since several predate later sessions that may have satisfied them
+silently.
+
+**Audit findings:**
+- Two items were already resolved and just never checked off: the duplicate
+  "Top personalități feminine" panel (only one instance exists in
+  `templates/index.html.j2` now — resolved as a side effect of the 2026-05-26
+  gender_km_gap work) and, partially, the `/surse/` per-UAT "column for each
+  source" request (the "Pe UAT" table and drill-down already show
+  Registru/OSM/Poștal/RENNS per row with counts + source dots — only the
+  "flag differing spellings across sources" nuance remains open). Both
+  updated in BACKLOG.md with verification notes instead of blindly trusting
+  the checkbox state.
+- Surfaced a live contradiction for the user's awareness rather than
+  resolving it unilaterally: BACKLOG.md still asks to remove the "Abecedar ·
+  litera inițială" panel, but a 2026-06-07 session built exactly that panel
+  as part of the lexical-quirks batch, apparently without cross-checking this
+  line. Left open — whether to remove now-real content is a product call.
+
+**Chosen next task**: consolidate the post-rebuild curation-restore sequence
+into one script (BACKLOG P3), out of a 3-way shortlist presented via
+AskUserQuestion. Picked because it closes a risk that has already caused two
+real regressions (classification coverage silently dropping 57%→16.4% after
+an incomplete manual restore, shipped in `dist/streets.db` before being
+caught both times) and matches the project's current "harden the data layer"
+phase, over a UI-label rename and a blocked-feature scoping question.
+
+**Built `tools/restore_curation.py`.** Runs the fixed 9-step sequence
+documented in CLAUDE.md's Common Commands (`seed_lookups.py` →
+`tools/seed_top500.py`/`seed_batch2.py` → 3 one-off `tools/import_csv.py`
+calls on the `llm_*.csv` files → `wikidata_persons.py`/`wiki_birthplace.py`/
+`wiki_biostats.py`, each `--replay-csv --force`), stopping loudly on the
+first failing step. Pre-flight-checks all 6 required curation CSVs exist
+before starting anything — two of the underlying tools
+(`wiki_birthplace.py`/`wiki_biostats.py`) silently no-op with exit 0 if their
+replay CSV is missing (`"No CSV at ...; nothing to replay."`), which would
+otherwise look like a clean success to an orchestrator that didn't know to
+check. Afterward, shells out to `run_queries.py --format json --name
+classification_coverage_summary` (confirmed it can't be imported in-process —
+its argparse call and DB/file I/O run at module import time) and asserts
+`pct_streets_classified` against a hardcoded known-good floor — 64.0% verified
+live today, 5-percentage-point tolerance, both overridable via `--min-pct` —
+failing (`sys.exit(1)`) instead of silently shipping a regression. This is the
+actual deliverable BACKLOG asked for, not just step automation.
+
+`wiki_scope.py` has no `--replay-csv` mode — it's always a live, rate-limited
+Wikidata call, confirmed by reading `fetch_sitelinks()`: no retry/backoff at
+all (unlike the other 3 Wikidata tools), so a bare 429 gets swallowed and
+permanently recorded as `wiki_scope='unknown'` with 0 sitelinks. Excluded from
+the default run (today's baseline has 0 persons pending anyway) but always
+reported (pending count + `unknown` count printed). New opt-in `--wiki-scope`
+flag runs it live in bounded batches and automates the exact manual
+remediation CLAUDE.md already documented (reset `unknown` rows, retry once)
+instead of leaving it as a manual recipe.
+
+**Deliberately no `--db` override.** Discovered mid-implementation that
+`tools/seed_top500.py`/`tools/seed_batch2.py` shell out to `import_csv.py`
+without ever passing a `--db` flag — they can only ever write to the
+hardcoded `data/streets.db`. Offering a `--db` override on the orchestrator
+while two of nine steps can't honor it would silently split writes across two
+different databases on the very tool meant to prevent silent data-integrity
+regressions. Hardcoded the path instead of threading a broken flag through.
+
+**Verified**: full run against the live (already fully-curated) DB completes
+clean, landing at exactly the 64.0% baseline captured during research — a
+useful cross-check that the idempotency claims about every underlying tool
+actually hold. A deliberately-missing CSV (`llm_batch.csv` renamed aside) is
+caught by the pre-flight check and fails with a clean one-line message and
+exit 1, not a raw traceback (file restored after). Did not run a real
+`build_db.py` wipe-and-restore cycle as part of verification — that's a
+destructive ~10+ minute operation out of proportion to validating this
+script, and every sub-step's idempotency was already confirmed individually;
+flagged as a possible future follow-up against a scratch DB copy, not done
+here.
+
+**Docs**: CLAUDE.md's Common Commands replaced the ~10-line manual sequence
+with the single-command path (kept the `--wiki-scope` note separate since
+it's opt-in); repo-layout tree gained the new tool; rule #12 updated to point
+at the new script instead of describing the manual steps. BACKLOG.md P3 item
+checked off with a summary of what was built.
+
 ## 2026-07-09 — Fix /oras/ 404s + add live per-UAT source comparison to /surse/
 
 Two-part feature + navigation/UX fixes.

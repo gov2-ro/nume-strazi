@@ -51,7 +51,8 @@ If asked to do something not covered by the above, ask before improvising.
 │   ├── postal_sanity.py        # coverage report for reference UATs
 │   ├── renns_ingest.py         # ANCPI RENNS API → renns_streets (per-UAT crawl)
 │   ├── renns_match.py          # streets_dedup ↔ renns_streets join
-│   └── renns_sanity.py         # coverage report for reference UATs + national rollout %
+│   ├── renns_sanity.py         # coverage report for reference UATs + national rollout %
+│   └── restore_curation.py     # run the full post-rebuild curation restore, asserting coverage
 └── data/
     ├── reference/        # Raw xlsx inputs (registry exports)
     ├── curation/         # CSV inputs for incremental curation
@@ -74,7 +75,7 @@ These are the booby traps. Internalize before writing any query or transform.
 9. **Postal source is the 2016 xlsx only (`data/reference/coduri-postale+/infocod-cu-siruta-mai-2016.xlsx`).** The 2009 `coduri_postale.sql` dump in the same folder was evaluated and excluded — it adds zero new locality coverage over the xlsx (see CODE_SPEC §12.1), don't re-propose it without reading that section first. Postal only covers Bucuresti + localities over 50,000 population; zero `postal_streets` rows for a small/rural UAT is expected, not a bug. Cross-source comparison (`streets_all_sources`, `docs/queries.sql`'s `external_corroboration_gap`) must join on `core_name_norm`, never `name_normalized` — `osm_streets.name_normalized` includes the street-type prefix, postal's/RENNS's and the registry's don't.
 10. **RENNS's `uat.id` is the registry's SIRUTA code directly** — no name-matching fallback needed (see CODE_SPEC §13.4). Only crawl it per-`(county, UAT)`; the unfiltered flat endpoint has confirmed pagination drift (see CODE_SPEC §13.5) — don't re-add it without re-verifying that first. București has zero RENNS roads (structural, not a bug) and only ~60% of Romania's UATs are digitized in RENNS yet.
 11. **`streets_all_sources` is additive but not cross-source-deduplicated** — a street missing from the registry but corroborated by 2-3 external sources gets one row *per source* there. Use `all_street_names` (CODE_SPEC §13.8/§14.5) for a genuinely deduplicated "every street name in Romania" list: one flat, fully symmetric view across all 4 sources (registry is just another source, no `layer` column, no dependency on the match tables), grouped by `(siruta, street_type, core_name_norm)` — not `core_name_norm` alone — for the same type-matters reason as rule #1, with `in_registry` (0/1) marking whether the registry is among the contributing sources. Type mismatches (e.g. OSM's `Calea X` vs postal's `Strada X`) are never auto-merged, even registry-to-external — check `type_variant_candidates` (`docs/queries.sql`) instead of assuming they've been reconciled. `variants` (JSON) preserves every source's exact spelling; `corroboration_count` counts distinct sources; no source is ranked above another, so the representative name is just the alphabetically-first one.
-12. **`build_db.py` wipes ALL curation state, not just the schema.** Rebuilding to add/change a table drops `persons`/`nature_terms`/`name_categories`/`place_refs`/QIDs/wiki_scope/birthplaces/biostats along with everything else — the full restore sequence in Common Commands below has ~10 steps across 3 different CSV-replay tools, and skipping any of them silently degrades classification coverage (observed: 57%→16.4% after a rebuild that only restored OSM/postal, not curation). Always run the *entire* restore sequence after `build_db.py`, then verify with `python3 run_queries.py --name classification_coverage_summary` before trusting the DB. For a schema-only change, prefer a targeted live migration (`DROP VIEW`/`CREATE VIEW` against the running DB) over a full rebuild — see how the street_type dedup fix (#1) was applied.
+12. **`build_db.py` wipes ALL curation state, not just the schema.** Rebuilding to add/change a table drops `persons`/`nature_terms`/`name_categories`/`place_refs`/QIDs/wiki_scope/birthplaces/biostats along with everything else (observed: 57%→16.4% classification coverage after a rebuild that only restored OSM/postal, not curation — twice). Always run `python3 tools/restore_curation.py` after `build_db.py` — it runs the full restore sequence in fixed order and asserts `classification_coverage_summary`'s `pct_streets_classified` against a known-good floor, failing loudly instead of silently shipping degraded curation. For a schema-only change, prefer a targeted live migration (`DROP VIEW`/`CREATE VIEW` against the running DB) over a full rebuild — see how the street_type dedup fix (#1) was applied.
 13. **OSM/postal/RENNS match tiers are named `exact_type_core` (1.0) / `fuzzy_core_name` (0.5) / (postal only) `reordered_core_name` (0.4)**, not `exact_normalized`. Pass 1 compares `(street_type, core_name_norm)` directly — never compare raw `name_normalized` strings across sources, since OSM's includes the street-type prefix and the registry's/postal's/RENNS's don't (rule #9).
 14. **`uat_reference` (siruta → judet/uat label) is a build-time-only table**, loaded from `data/gis/populatie-romania-siruta-coords.csv` + 6 hardcoded Bucharest sectors, used solely to label `all_street_names` rows for UATs the registry has zero data for. Dropped from the shipped `dist/streets.db` (already baked into `all_street_names`'s materialized columns) — don't expect to query it in the client-side filter UI.
 
@@ -87,33 +88,21 @@ python3 build_db.py
 # Rebuild with row limit for fast iteration
 python3 build_db.py --limit 5000
 
-# Apply starter curation (always after build_db; idempotent)
-python3 seed_lookups.py
+# Restore ALL curation state after a rebuild (seed_lookups, seed_top500,
+# seed_batch2, the 3 one-off llm_*.csv imports, wikidata_persons/wiki_birthplace/
+# wiki_biostats --replay-csv --force, in that fixed order) — asserts
+# classification_coverage_summary's pct_streets_classified against a known-good
+# floor and fails loudly instead of silently shipping degraded curation.
+# Always operates on data/streets.db (seed_top500.py/seed_batch2.py can't be
+# pointed at another path, so this script doesn't offer a --db override either).
+python3 tools/restore_curation.py
 
-# Apply batch curation
-python3 tools/seed_top500.py
-python3 tools/seed_batch2.py
-
-# Import one-off LLM-classified batches not regenerated by any seed script
-# (these are NOT idempotent-by-script — they only exist as these three CSVs)
-python3 tools/import_csv.py data/curation/llm_batch.csv
-python3 tools/import_csv.py data/curation/llm_batch2.csv
-python3 tools/import_csv.py data/curation/llm_gemini-3.1-flash-lite.csv
-
-# Restore manually curated QIDs after rebuild (authoritative: data/curation/wikidata_qids.csv)
-python3 tools/wikidata_persons.py --replay-csv --force
-
-# Restore birthplace + biostats (cause/date of death) — same replay pattern
-python3 tools/wiki_birthplace.py --replay-csv --force
-python3 tools/wiki_biostats.py --replay-csv --force
-
-# Restore wiki scope/sitelinks (run in batches of ~20-40; Wikidata rate-limits
-# (HTTP 429) hard and API failures are silently recorded as wiki_scope='unknown'
-# instead of retried — after every batch, check for suspicious all-zero-sitelink
-# runs and reset with:
-#   UPDATE persons SET wiki_scope=NULL, wiki_sitelinks=NULL WHERE wiki_scope='unknown';
-# before re-running, or you'll bake in false negatives. See wiki_scope.py.)
-python3 tools/wiki_scope.py --limit 40   # repeat until no output
+# wiki_scope/sitelinks aren't included above (no --replay-csv mode — always a
+# live, rate-limited Wikidata call). Reported by restore_curation.py either way;
+# pass --wiki-scope to also fetch pending rows live. It applies the 429→'unknown'
+# remediation automatically (reset + one bounded retry pass) — see wiki_scope.py
+# if you need to run it standalone instead.
+python3 tools/restore_curation.py --wiki-scope
 
 # Fetch/refresh portrait thumbnails (run once; idempotent; skips already-cached)
 python3 tools/fetch_portraits.py
