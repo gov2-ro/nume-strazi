@@ -16,6 +16,7 @@ When starting a new session, in this order:
 2. **`docs/CODE_SPEC.md`** — full PRD for the data layer. Schema rationale, cleaning rules, curation strategy, prioritized task list, pitfalls.
 3. **`docs/queries.sql`** — what's already built, organized by dashboard view.
 4. **`DESIGN_BRIEF.md`** — only when work touches editorial decisions or hero findings. Otherwise, skip.
+5. **`docs/INGESTION_PIPELINE.md`** — only when adding a new street-name source. Otherwise, skip.
 
 If asked to do something not covered by the above, ask before improvising.
 
@@ -31,6 +32,7 @@ If asked to do something not covered by the above, ask before improvising.
 ├── docs/
 │   ├── CODE_SPEC.md      # full data-layer PRD
 │   ├── DESIGN_BRIEF.md   # editorial direction for the dashboard
+│   ├── INGESTION_PIPELINE.md  # reference for adding a new street-name source
 │   ├── queries.sql       # Named query catalog (-- :name slug)
 │   ├── BACKLOG.md        # tracked issues and future work
 │   └── activity-history.md
