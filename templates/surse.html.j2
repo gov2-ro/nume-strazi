@@ -166,6 +166,21 @@
     .judet-controls button:hover { background: var(--surface); color: var(--ink); }
 
     .table-scroll { overflow-x: auto; border: 1px solid var(--rule); border-radius: 10px; }
+    #uatTableContainer {
+      max-height: min(50vh, 480px);
+      overflow-y: auto;
+      position: relative;
+    }
+    #uatTableContainer thead th {
+      position: sticky; top: 0; z-index: 1;
+    }
+    #uatBody tr.selected td {
+      background: var(--surface-blue) !important;
+      box-shadow: inset 4px 0 0 var(--c-registry);
+    }
+    @media (max-height: 600px) {
+      #uatTableContainer { max-height: 40vh; }
+    }
     table { width: 100%; border-collapse: collapse; font-size: 14px; }
     th, td { padding: 10px 14px; text-align: right; border-bottom: 1px solid var(--hairline); white-space: nowrap; }
     th:first-child, td:first-child { text-align: left; }
@@ -420,6 +435,7 @@ document.getElementById('resetSort').addEventListener('click', () => {
 // ── Per-UAT table (live-queried) ────────────────────────────────────────
 let uatData = null;
 let uatSort = { key: 'total', type: 'num', dir: -1 };
+let selectedSiruta = null;
 
 async function loadUatData() {
   const btn = document.getElementById('loadUatTable');
@@ -490,6 +506,12 @@ function renderUatTable(sortKey, sortType, dir) {
     </tr>`;
   }).join('');
 
+  // Re-apply selected row highlight across re-renders (sort, filter)
+  if (selectedSiruta) {
+    const selRow = tbody.querySelector(`tr[data-siruta="${selectedSiruta}"]`);
+    if (selRow) selRow.classList.add('selected');
+  }
+
   // Click rows to drill down — attach handlers after render
   setTimeout(() => {
     document.querySelectorAll('#uatBody tr').forEach(tr => {
@@ -506,6 +528,16 @@ function renderUatTable(sortKey, sortType, dir) {
 }
 
 async function showUatDetail(siruta, uatRow) {
+  selectedSiruta = siruta;
+
+  // Clear previous row highlight
+  const prevSel = document.querySelector('#uatBody tr.selected');
+  if (prevSel) prevSel.classList.remove('selected');
+
+  // Highlight the clicked row
+  const clickedRow = document.querySelector(`#uatBody tr[data-siruta="${siruta}"]`);
+  if (clickedRow) clickedRow.classList.add('selected');
+
   try {
     const db = await DbClient.getDb();
     const rows = await db.query(`
@@ -572,6 +604,7 @@ async function showUatDetail(siruta, uatRow) {
 
     document.getElementById('uatDetailTable').innerHTML = streetTable;
     document.getElementById('uatDetailPanel').style.display = 'block';
+    document.getElementById('uatDetailPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (e) {
     console.error('Error loading UAT detail:', e);
     alert('Eroare la încărcarea detaliilor localității');
@@ -580,7 +613,14 @@ async function showUatDetail(siruta, uatRow) {
 
 document.getElementById('loadUatTable').addEventListener('click', loadUatData);
 document.getElementById('uatJudetFilter').addEventListener('change', () => {
-  if (uatData) renderUatTable(uatSort.key, uatSort.type, uatSort.dir);
+  if (uatData) {
+    // Close detail panel when filter changes — highlighted row may vanish
+    document.getElementById('uatDetailPanel').style.display = 'none';
+    selectedSiruta = null;
+    const prevSel = document.querySelector('#uatBody tr.selected');
+    if (prevSel) prevSel.classList.remove('selected');
+    renderUatTable(uatSort.key, uatSort.type, uatSort.dir);
+  }
 });
 document.querySelectorAll('#uatTable th.sortable').forEach(th => {
   th.addEventListener('click', () => {
@@ -594,6 +634,9 @@ document.querySelectorAll('#uatTable th.sortable').forEach(th => {
 });
 document.getElementById('closeDetail').addEventListener('click', () => {
   document.getElementById('uatDetailPanel').style.display = 'none';
+  selectedSiruta = null;
+  const prevSel = document.querySelector('#uatBody tr.selected');
+  if (prevSel) prevSel.classList.remove('selected');
 });
 </script>
 

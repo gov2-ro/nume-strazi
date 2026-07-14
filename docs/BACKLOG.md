@@ -157,6 +157,10 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
 - [ ] remove "Abecedar · litera inițială" - not interesting
 
+- [ ] data quality browser `/surse/` - rename `Registru` to 'Secții Vot' – also in db, everywhere in the backend?
+
+- [ ] `/surse/` browser – UAT streets, also table like per UAT - column for each source, checkmark smth – also mark if different versions of the name?
+
 - [x] map mode. a choropleth map colored by different variables (genders, flowers, independence, universal, etc) — Done 2026-05-18. The existing `/judete/` map gained 8 new metrics: `person_pct`, `male_pct`, `foreign_pct`, `universal_pct`, `date_pct`, `flora_pct` (flori/copaci), `ideology_pct` next to the prior saint/numeric/female/nature. Scale auto-switches to min..max when the spread is tight so person/nature metrics show actual variation; 0..max stays for rare-event metrics. 11 chips total; default is now `person_pct`. Chip CSS was missing from the detail-shell — added local style block in `judete-index.html.j2`.
 
 - [x] choropleth: option to render per-uat (not just per-județ). Done 2026-06-07. The polygon source already existed in-repo (`data/gis/ro-uats.topojson`, 3,175 polygons with a `siruta` property) — no osmium extraction needed. Added a **Nivel: Județe / Localități** toggle to the `/judete/` map. `site_queries.section6_uat` emits the same chip metrics per UAT (≥10 streets) keyed by siruta → `dist/judete/uat-metrics.json` (357 KB, 1,179 UATs); `build_site` copies the topojson to dist. The map IIFE is now level-aware and lazy-loads `topojson-client` + the two files on first switch to Localități. 1,171/1,179 UATs join a polygon (8 Bucharest-sector/edge misses render grey). Clicking a UAT shows a compact metric card + a detail-page link where one exists.
