@@ -72,6 +72,8 @@ body {
 }
 .stats-bar .stat-val { font-weight: 600; margin-right: 3px; }
 .stats-bar .stat-sep { color: #444; }
+.stats-bar a { color: inherit; text-decoration: underline; text-decoration-color: #666; text-underline-offset: 2px; }
+.stats-bar a:hover { text-decoration-color: #FAF8F3; }
 
 /* Panel grid */
 .dash-grid {
@@ -216,7 +218,9 @@ body {
 {% set male_pct = (section1.total_persons_m / total_gendered * 100) | round | int if total_gendered else 0 %}
 {% set wikidata_total = section4.tier_counts.universal + section4.tier_counts.national + section4.tier_counts.local %}
 <div class="stats-bar">
-  <span><span class="stat-val">{{ "{:,.0f}".format(section1.total_streets).replace(",", ".") }}</span> adrese</span>
+  <span><span class="stat-val">{{ "{:,.0f}".format(section1.total_streets).replace(",", ".") }}</span> străzi (Registru)</span>
+  <span class="stat-sep">·</span>
+  <span><a href="{{ base }}/surse/">{{ "{:,.0f}".format(section1.all_sources_total).replace(",", ".") }} combinând 4 surse ↗</a></span>
   <span class="stat-sep">·</span>
   <span><span class="stat-val">{{ section6.by_judet | length }}</span> județe</span>
   <span class="stat-sep">·</span>
@@ -642,7 +646,7 @@ body {
     </div>
   </div>
   <div style="max-width:1200px;margin:28px auto 0;border-top:1px solid #2A2C30;padding-top:16px;font-family:var(--sans);font-size:11px;color:var(--muted);">
-    Cum ne numim străzile · {{ section1.total_streets | default(0) | int | string }} adrese · ultima actualizare 14.05.2025
+    Cum ne numim străzile · {{ section1.total_streets | default(0) | int | string }} străzi · ultima actualizare 14.05.2025
   </div>
 </footer>
 

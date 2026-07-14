@@ -49,6 +49,12 @@ def _one(conn: sqlite3.Connection, sql: str, params: tuple = ()) -> dict:
 def section1(conn: sqlite3.Connection) -> dict:
     total = _one(conn, "SELECT COUNT(*) AS n FROM streets_dedup")["n"]
 
+    # Cross-source union (registry + OSM + postal + RENNS, deduplicated by
+    # (siruta, street_type, core_name_norm) — see all_street_names in build_db.py).
+    # Shown alongside the registry-only `total` above so the landing page doesn't
+    # silently imply the registry count is a consolidated cross-source figure.
+    all_sources_total = _one(conn, "SELECT COUNT(*) AS n FROM all_street_names")["n"]
+
     top_men = _rows(conn, """
         SELECT p.full_name, COUNT(*) AS street_count
         FROM streets_dedup sd
@@ -82,6 +88,7 @@ def section1(conn: sqlite3.Connection) -> dict:
 
     return {
         "total_streets": total,
+        "all_sources_total": all_sources_total,
         "top_men": top_men,
         "top_women": top_women,
         "total_persons_m": counts.get("m", 0) or 0,

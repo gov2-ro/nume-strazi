@@ -79,11 +79,14 @@ def main() -> None:
         # Drop tables not used by the client-side filter UI. uat_reference is
         # only a build-time input to all_street_names' judet/uat labeling
         # (already baked into the materialized table above) — not needed
-        # standalone in the shipped DB.
+        # standalone in the shipped DB. all_street_names_cache (from
+        # tools/materialize_all_street_names.py) is a dev-only fast-path
+        # duplicate of the table just materialized above — drop it too, or
+        # it ships as dead-weight duplicate data.
         for tbl in ("osm_streets", "street_osm_matches",
                     "postal_streets", "street_postal_matches",
                     "renns_streets", "street_renns_matches", "street_aliases",
-                    "uat_reference"):
+                    "uat_reference", "all_street_names_cache"):
             conn.execute(f"DROP TABLE IF EXISTS {tbl}")
 
         conn.execute("ALTER TABLE streets_all_sources_slim RENAME TO streets_all_sources")

@@ -213,6 +213,9 @@ body {
 .statbar .scale-stack .item { display: flex; align-items: baseline; gap: 12px; }
 .statbar .scale-stack .item .v { font-size: 28px; }
 .statbar .scale-stack .item .l { margin-top: 0; }
+.statbar .scale-note { margin-top: 10px; font-family: var(--sans); font-size: 11px; color: var(--muted); }
+.statbar .scale-note a { color: var(--muted); text-decoration: underline; text-decoration-color: var(--rule); text-underline-offset: 2px; }
+.statbar .scale-note a:hover { color: var(--accent); text-decoration-color: var(--accent); }
 
 .statbar .tema-row, .statbar .gen-row { display: flex; align-items: baseline; gap: 8px; }
 .statbar .gen-row .frac {
@@ -697,13 +700,14 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
     <div class="scale-stack">
       <div class="item">
         <div class="v">{{ "{:,.0f}".format(section1.total_streets).replace(",", ".") }}</div>
-        <div class="l">Adrese</div>
+        <div class="l">Străzi (Registru)</div>
       </div>
       <div class="item">
         <div class="v">{{ total_persons }}</div>
         <div class="l">Persoane onorate</div>
       </div>
     </div>
+    <div class="scale-note">Doar Registrul Secțiilor de Vot. <a href="{{ base }}/surse/">{{ "{:,.0f}".format(section1.all_sources_total).replace(",", ".") }} combinând 4 surse (+ OSM, poștal, RENNS) ↗</a></div>
   </div>
 
   <div class="group">
@@ -1247,7 +1251,7 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
     </div>
   </div>
   <div style="max-width:1640px;margin:18px auto 0;border-top:1px solid rgba(255,255,255,.10);padding-top:12px;font-family:var(--sans);font-size:11px;color:rgba(255,255,255,.5);letter-spacing:.04em;">
-    Cum ne numim străzile · variantă densă · {{ section1.total_streets | default(0) | int | string }} adrese · ultima actualizare 14.05.2025
+    Cum ne numim străzile · variantă densă · {{ section1.total_streets | default(0) | int | string }} străzi · ultima actualizare 14.05.2025
   </div>
 </footer>
 

@@ -1,5 +1,115 @@
 # Activity History
 
+## 2026-07-14 — Landing-page corpus labeling fixes + Phase 0 of the union-as-main-corpus initiative
+
+Started from the user spotting a mislabeled stat on the landing page
+(screenshot review) and ended in a real architecture decision about what the
+project's "main corpus" of streets should be.
+
+**Mislabel fix.** The landing page's headline stat card and footer said
+"107.957 Adrese" — wrong word (addresses, not streets) in all three landing
+variants (`index.html.j2`, `index-v1.html.j2`, `index-v2.html.j2`). Fixed to
+"Străzi" in all 4 occurrences across the 3 templates; left the one legitimate
+"adrese" usage alone (`metodologie.html.j2`'s source-description sentence,
+correctly describing the raw AEP registry's row grain).
+
+**"Shouldn't the total be the union across all sources?" investigation.**
+The user asked why the landing page's 107,957 wasn't at least as large as
+RENNS's own 115,996-116,016 (raised across several follow-ups as the
+apparent inconsistency sank in). Answered with real numbers, not assertions:
+`streets_dedup` (107,957) and `renns_streets` (116,016) are two
+**independently-collected, single-source counts** — `streets_dedup` is
+purely `GROUP BY siruta, name_normalized, street_type FROM streets`, zero
+RENNS involvement anywhere in that path. Their UAT coverage isn't nested
+(only 865 of 2,264 combined UATs are covered by both; 1,057 UATs have RENNS
+street data the registry has zero rows for, and 342 the reverse) — that's
+why RENNS's raw total can exceed the registry's despite the registry never
+being a subset. The only number that's actually guaranteed ≥ every single
+source is `all_street_names` (224,208, the real 4-source union,
+deduplicated by `(siruta, street_type, core_name_norm)`), confirmed it does
+satisfy that property (224,208 ≥ 116,016 ≥ 107,957).
+
+**Landing page changes, iterated twice based on user feedback:**
+1. Added `section1.all_sources_total` (`site_queries.py`) sourcing
+   `COUNT(*) FROM all_street_names`, surfaced as a linked caption next to the
+   registry headline on all 3 variants ("Doar Registrul Secțiilor de Vot.
+   224.208 combinând 4 surse ↗", linking to `/surse/`).
+2. User pointed out the *primary* number still just said "Străzi" with no
+   scope qualifier, relying on a reader connecting it back to the caption
+   below — the actual root cause of two consecutive rounds of "why is this
+   number smaller than X" questions. Fixed by labeling the primary stat
+   itself "Străzi (Registru)" directly (default + v2 variants; v1's ticker
+   layout already had a "(Registru)" suffix from the first pass).
+   Verified live via a `npx playwright`/Python-playwright headless check
+   (not just `curl` text-scraping) after discovering the dev server on
+   :8000 — the one the user's browser tab pointed at — had silently died at
+   some point; restarted it and confirmed screenshots matched.
+
+**The real decision.** After walking through the corroboration-count
+breakdown (139,043 streets confirmed by only 1 source; of those, 81% come
+from OSM/RENNS/postal, only 26,358 from the registry), the user made an
+explicit call: **the registry is not the primary/authoritative source — all
+4 sources are equal, and the dashboard's main corpus should be the union.**
+This reverses a deliberate scope decision from 2026-07-08 (see that entry:
+"the dashboard has always been, and remains, scoped to the AEP registry
+only, by design").
+
+**Scoping survey (Explore agent, read-only) before committing to an
+implementation** found this is a real multi-phase project: 25 of 32
+`site_queries.py` functions (2,764 lines) reference `streets_dedup`
+directly, including all 11 dashboard-panel functions; 46 of 50 named
+queries in `docs/queries.sql` do too. Two structural blockers: (1) several
+panels (km-leaderboards, self-honor-index, gender-km-gap) join
+`streets_dedup.id` to the OSM/postal/RENNS match tables — a
+registry-street-to-external-segment linkage with no equivalent against a
+merged union row, since OSM length data is inherently OSM-specific, not a
+"which corpus" question; (2) `all_street_names` has no `name_normalized`
+column (the diacritic-folded routing/slug key used 96× in
+`site_queries.py`), and is a live, unindexed 4-way `UNION ALL` view,
+measured ~5-8x slower per query than `streets_dedup`. Also quantified the
+real cost of switching: the union introduces 26,013 brand-new
+`core_name_norm` keys that exist only in OSM/postal/RENNS (29,302 → 55,315
+total distinct keys) — a 500-key sample found **zero** already classified.
+Switching visible classification percentages today would roughly halve
+every coverage number on the site.
+
+**User's decisions (via AskUserQuestion, presented as genuine trade-offs):**
+(1) run a classification pass on the 26,013 new keys *before* switching any
+visible percentage panel, so coverage never visibly craters; (2) scope this
+session's implementation to foundational work only.
+
+**Built (Phase 0): `tools/materialize_all_street_names.py`.** Materializes
+the `all_street_names` view into a sibling table, `all_street_names_cache`,
+with a computed `name_normalized` column (`streets_lib.normalize_match`) and
+4 indexes (`siruta`, `core_name_norm`, `name_normalized`,
+`(siruta, name_normalized)`). Deliberately a sibling, not a replacement —
+`build_db.py`'s `all_street_names` view is untouched and stays the source of
+truth; the cache is an opt-in fast path for future per-entity-loop callers.
+Can't live inside `build_db.py` itself: the view reads from
+`osm_streets`/`postal_streets`/`renns_streets`, populated by separate tools
+run *after* `build_db.py` — materializing too early would snapshot a
+registry-only "union". `tools/build_dist_db.py` updated to drop
+`all_street_names_cache` from its existing drop-list, so it doesn't leak
+into the shipped `dist/streets.db` as duplicate dead weight.
+
+**Verified**: row count matches the live view exactly (224,208, 0 NULL
+`name_normalized`); diacritic folding spot-checked (î→â chain, e.g.
+"Sînzienelor"→"sanzienelor") and cross-checked identical to
+`streets_dedup`'s folding for the same name ("Mihai Eminescu" →
+"mihai eminescu" in both); `EXPLAIN QUERY PLAN` confirms both new indexes
+are used; timing improved from ~0.32s/1.26s (view, single lookup/COUNT) to
+~0.0002s/0.001s (cache) — faster than `streets_dedup` itself (~0.21s
+COUNT), not just comparable; re-run twice for idempotency (identical
+result); full `tools/build_dist_db.py` run afterward confirmed clean
+(89.7MB shipped, cache table absent from the output).
+
+**Docs**: `CLAUDE.md` gained a new Common Commands entry (after the RENNS
+pipeline block, since it depends on all 3 external sources being ingested
+first) and a repo-layout entry. `docs/BACKLOG.md` gained a new P1 item
+capturing the full decision and all 4 phases (0 done, 1-3 scoped but not
+started) so the multi-turn context survives to whichever session picks up
+Phase 1.
+
 ## 2026-07-14 — Backlog audit + tools/restore_curation.py
 
 Started from a "what should we tackle next" request. Rather than picking from

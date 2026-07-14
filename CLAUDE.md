@@ -52,7 +52,8 @@ If asked to do something not covered by the above, ask before improvising.
 │   ├── renns_ingest.py         # ANCPI RENNS API → renns_streets (per-UAT crawl)
 │   ├── renns_match.py          # streets_dedup ↔ renns_streets join
 │   ├── renns_sanity.py         # coverage report for reference UATs + national rollout %
-│   └── restore_curation.py     # run the full post-rebuild curation restore, asserting coverage
+│   ├── restore_curation.py     # run the full post-rebuild curation restore, asserting coverage
+│   └── materialize_all_street_names.py  # all_street_names view → fast indexed cache table
 └── data/
     ├── reference/        # Raw xlsx inputs (registry exports)
     ├── curation/         # CSV inputs for incremental curation
@@ -156,6 +157,13 @@ python3 tools/renns_ingest.py --rebuild      # per-(county,UAT) crawl → renns_
 python3 tools/renns_ingest.py --uat-siruta 1017  # single UAT, fast iteration
 python3 tools/renns_match.py                 # populate street_renns_matches
 python3 tools/renns_sanity.py                # eyeball reference-UAT + national coverage %
+
+# Materialize all_street_names (the cross-source union view) into a fast,
+# indexed all_street_names_cache table with a name_normalized column, for any
+# future per-entity-loop querying against the union. Run after the full
+# 4-source pipeline above (needs osm_streets/postal_streets/renns_streets
+# populated); re-run any time one of those sources is re-ingested. Idempotent.
+python3 tools/materialize_all_street_names.py
 ```
 
 ## Conventions
