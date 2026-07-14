@@ -95,19 +95,20 @@ def strip_street_type(name):
 TITLES = sorted([
     "Profesor Universitar Doctor","Profesor Universitar",
     "Profesor Doctor","Profesor","Prof. Univ. Dr.","Prof. Dr.","Prof.",
-    "Academician","Acad.","Doctor","Dr.","Ing.","Arh.",
+    "Academician","Acad.","Doctor","Dr.","Ing.","Inginer","Arh.","Arhitect",
     "Învățătorul","Învățător","Înv.",
     "Pictorul","Pictor","Sculptorul","Sculptor",
-    "Compozitorul","Compozitor","Poetul","Poet",
+    "Compozitorul","Compozitor","Poetul","Poet","Poetă",
     "Scriitorul","Scriitor","Dramaturgul","Dramaturg","Filozoful","Filozof",
     "Părintele","Preotul","Preot","Episcopul","Episcop",
-    "Mitropolitul","Mitropolit","Patriarhul","Patriarh",
+    "Mitropolitul","Mitropolit","Patriarhul","Patriarh","Protopop",
+    "Ziarist","Actor","Avocat","Medic","Regizor","Fizician",
 ], key=len, reverse=True)
 
 RANKS = sorted([
     "Locotenent-colonel","General-locotenent","Sublocotenent",
-    "General","Colonel","Maior","Căpitan","Locotenent","Sergent","Caporal","Soldat",
-    "Mareșal","Amiral","Comandor",
+    "General","Colonel","Maior","Major","Căpitan","Locotenent","Sergent","Caporal","Soldat",
+    "Mareșal","Amiral","Comandor","Aviator","Plutonier","Spătar",
     "Voievodul","Voievod","Domnitorul","Domnitor",
     "Regele","Regina","Împăratul","Împărăteasa","Prințul","Prinț","Prințesa",
     "Eroii","Eroul","Erou","Martirii","Martirul","Martir",

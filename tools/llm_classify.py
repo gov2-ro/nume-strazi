@@ -73,6 +73,10 @@ table values and required fields:
 
 Return ONLY the JSON array, no prose."""
 
+# Sources from all_street_names_cache (all 4 sources: registry, OSM, postal,
+# RENNS), not streets_dedup (registry-only) -- see tools/materialize_all_street_names.py
+# and docs/BACKLOG.md's "Make all_street_names the dashboard's main corpus"
+# entry. Registry-only classification is a strict subset of this.
 UNCLASSIFIED_SQL = """
 WITH curated AS (
   SELECT core_name_norm FROM persons         UNION
@@ -87,7 +91,7 @@ SELECT
   COUNT(DISTINCT s.uat)           AS uats_n,
   MIN(s.name)                     AS sample_name,
   GROUP_CONCAT(DISTINCT s.judet)  AS judete_list
-FROM streets_dedup s
+FROM all_street_names_cache s
 WHERE s.core_name_norm IS NOT NULL
   AND s.is_numeric = 0
   AND s.is_date    = 0

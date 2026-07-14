@@ -1,5 +1,118 @@
 # Activity History
 
+## 2026-07-14 — Cleanup pass before classifying the union's new keys (Phase 1 prep)
+
+Direct continuation of the union-as-main-corpus work (previous entry). User's
+prior decision was to run a classification pass on the 26,013 new
+external-only `core_name_norm` keys before touching any visible dashboard
+panel. Before spending LLM budget, asked "what could we do next" and got
+directed to run a cleanup pass first — some of those 26,013 aren't
+genuinely new, they're parsing/matching artifacts.
+
+**Investigated before building anything.** Sampled the 26,013 new keys:
+1,515 (5.8%) had the already-logged postal "comma-suffixed title" pattern
+(`"Mincu Ion, arh."`); of 11,841 two-token new keys, 1,995 (16.8%) had their
+reversed form already sitting in the registry's key set — strong signal of
+duplicate identity under a different spelling, not a genuinely new entity.
+
+**Fixed the postal comma-suffix parsing (`tools/postal_ingest.py`).** Pulled
+the full frequency distribution of all 1,499 distinct comma-suffixed names
+(not guessed) — confirmed zero multi-comma names, so a single split is
+safe. Built `TRAILING_ABBR` (abbreviation → canonical word already in
+`streets_lib.py`'s `TITLES`/`RANKS`, e.g. `g-ral.`→General, `mr.`→Maior,
+`serg.`→Sergent) and `expand_trailing_title()`, which strips+expands the
+suffix and feeds the result through the existing `extract_features()` for
+feature extraction only — the displayed `name` field is untouched. Added
+`Aviator`/`Plutonier`/`Major`/`Spătar` to `RANKS` and 9 more words
+(`Inginer`, `Arhitect`, `Poetă`, `Protopop`, `Ziarist`, `Actor`, `Avocat`,
+`Medic`, `Regizor`, `Fizician`) to `TITLES` to cover the full-word suffix
+forms actually observed (`extract_features()`'s existing greedy multi-pass
+peeling handles compounds like "Maior Aviator" or "Prof. Dr." automatically
+once each word is individually recognized — no compound-specific code
+needed).
+
+**Caught a real bug in a first draft, by testing before shipping.** The
+first version of `expand_trailing_title()` also reordered the 2-token name
+part ("Mincu Ion" → "Ion Mincu"), on the assumption postal names are always
+reversed "Surname Firstname". Unit-testing against real rows falsified
+this immediately: "Gala Galaction" is a pen name, not Surname-Firstname,
+and got wrongly flipped to "Galaction Gala"; "Petöfi Șándor" is Hungarian
+family-name-first order — already correct — and got wrongly flipped to
+"Șándor Petöfi". Removed the reordering entirely; the function now only
+strips+expands the title (unambiguous, safe) and leaves token order alone.
+Reordering was moved to a separate, evidence-gated tool instead of a blind
+heuristic (see below) — consistent with the project's standing "surface
+gaps, don't auto-link" philosophy already applied elsewhere (`all_street_names`
+never auto-merges type mismatches either).
+
+**Re-ran the postal pipeline**: `postal_ingest.py --rebuild` (23,724 rows,
+unchanged — this was a parsing fix, not a resolution/coverage change) →
+`postal_match.py` (registry/postal coverage 19.1%/83.0% → 19.8%/85.9%,
+improved as a side effect of cleaner core_name_norm values) →
+`tools/materialize_all_street_names.py` (224,208 → 223,961 total rows —
+previously-fragmented "same street, garbled differently" entries now
+correctly consolidate). New-key count: 26,013 → 25,498; remaining
+comma-containing new keys 1,515 → 32 (long tail below the mapped
+vocabulary, left unmapped per the project's established "don't chase the
+long tail" pattern).
+
+**Built `tools/resolve_reversed_person_duplicates.py`** for the reordering
+case, done safely: for 2-token new keys not yet classified anywhere, checks
+whether the *reversed* token order already exists as a curated `persons`
+entry — only acts on confirmed existing identities, mirroring the precedent
+already established for Cuza's 4 name-form aliases (`a. i. cuza`/`cuza
+voda`/`al. i. cuza`/`alexandru ioan cuza`, one QID). Dry-run found 229
+candidates; **manually reviewed every one** before writing (the Gala
+Galaction/Petöfi near-miss above raised the bar for trusting this
+mechanism) — all correct, including subtle cases the review specifically
+checked for: `bethlen gabor`/`gabriel bethlen` correctly left as two
+separate persons entries (a genuine name-variant question, out of scope for
+a token-reversal tool, per CLAUDE.md's standing "don't auto-merge person
+identities without explicit instruction"), and Hungarian names
+(`janos arany`→`arany janos` alias, `endre ady`→`ady endre` alias)
+correctly reversed *toward* the already-verified existing entry — preserving
+native family-name-first order — rather than corrupted. Ran for real:
+`persons` 397→626. New-key count: 25,498 → 25,269 unclassified.
+
+**Repointed `tools/export_unclassified.py` and `tools/llm_classify.py`** —
+both previously queried `FROM streets_dedup` (registry-only), which would
+have silently continued to miss every one of the new external-only keys
+even after all the cleanup above. Swapped to `FROM all_street_names_cache`
+(all columns used — `core_name_norm`, `judet`, `uat`, `name`, `is_numeric`/
+`is_date`/`is_saint` — already present on the cache table from Phase 0, a
+pure `FROM`-clause swap). Verified both via dry-run against the live DB:
+`export_unclassified.py` now reports 54,663 total classifiable keys (was
+~29,302 registry-only), 2,021 already classified; `llm_classify.py
+--dry-run` correctly surfaces genuinely new union-only keys
+(`i.c. bratianu`, `caragiale ion luca`, ...) without any API call.
+
+**Total resolved without LLM spend: 744 of 26,013 (2.9%)** — modest in
+volume, but the postal parsing fix is a real, permanent data-quality
+improvement independent of the classification question (title/rank columns
+were previously just wrong for ~1,500 postal rows), and the 229 aliases
+prevent 229 potential duplicate-identity classifications down the line.
+
+**Next**: run classification against the full remaining backlog (52,642
+keys — the 25,269 new ones plus the pre-existing registry-only unclassified
+set, since `llm_classify.py`'s query is now union-wide and there's no
+reason to split the run):
+
+```bash
+python3 tools/llm_classify.py --limit 0 --import
+```
+
+Not run in this session — needs `ANTHROPIC_API_KEY` and costs real money
+(~$3.50-4 at Haiku pricing, roughly double the earlier "~$2 for 28k keys"
+estimate since the union-wide set is ~2x the old registry-only one).
+Suggested a smaller sanity-check batch first
+(`--limit 300 --out data/curation/llm_union_test.csv`), since sampling
+during this session turned up non-registry-source noise the registry-only
+runs never saw — placeholder junk (`"denumire necompletata"` = "name not
+filled in") and bare road codes (`"dj 797"`) — worth confirming the
+existing "skip" classification option handles those sensibly before
+committing to the full run. Once classification lands, Phase 1's dashboard
+rewiring (`docs/BACKLOG.md`) becomes safe to start.
+
 ## 2026-07-14 — Landing-page corpus labeling fixes + Phase 0 of the union-as-main-corpus initiative
 
 Started from the user spotting a mislabeled stat on the landing page

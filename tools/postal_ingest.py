@@ -129,6 +129,50 @@ def clean_name(denumire_raw: str) -> str | None:
     return s or None
 
 
+# Trailing title/rank abbreviations seen in the Bucuresti sheet's comma-suffix
+# convention ("Surname Firstname, <abbr>.", e.g. "Mincu Ion, arh.") -- distinct
+# from the registry's leading-prefix TITLES/RANKS in streets_lib.py, which use
+# full/differently-abbreviated forms these don't match (logged in BACKLOG.md
+# "Postal source: trailing comma-suffixed titles not stripped"). Full-word
+# suffixes already spelled out (doctor, general, pictor, ...) don't need an
+# entry here -- expand_trailing_title() capitalizes anything not in this map.
+TRAILING_ABBR = {
+    "sold.": "Soldat", "serg.": "Sergent", "slt.": "Sublocotenent",
+    "lt.": "Locotenent", "cap.": "Caporal", "cpt.": "Căpitan",
+    "g-ral.": "General", "g-ral": "General", "mr.": "Maior",
+    "col.": "Colonel", "maj.": "Major", "av.": "Aviator",
+    "plt.": "Plutonier", "prof.": "Prof.", "dr.": "Dr.", "comp.": "Compozitor",
+}
+
+
+def expand_trailing_title(name: str) -> str:
+    """'Mincu Ion, arh.' -> 'Arh. Mincu Ion', for feature extraction only --
+    never for display (see build_row(), which calls this on a copy, not on
+    the stored `name` field). No-op if there's no comma.
+
+    Deliberately does NOT reorder the name part, unlike swap_two_tokens()
+    above. A first pass here did ("Mincu Ion" -> "Ion Mincu") on the
+    assumption postal names are always reversed "Surname Firstname" -- but
+    spot-checking against real rows falsified that: "Gala Galaction" (a pen
+    name, not Surname-Firstname) and "Petöfi Șándor" (Hungarian
+    family-name-first order, already correct) both got silently corrupted by
+    a blind swap. Reordering needs actual evidence, not a heuristic guess --
+    see tools/resolve_reversed_person_duplicates.py, which only reorders a
+    name when its reversed form already exists as a curated person. This
+    function's job is just the unambiguous part: strip the trailing title/
+    rank so it doesn't stay glued onto core_name.
+    """
+    if "," not in name:
+        return name
+    name_part, _, suffix = name.rpartition(",")
+    name_part = name_part.strip()
+    suffix_tokens = suffix.strip().split()
+    if not suffix_tokens:
+        return name
+    expanded = " ".join(TRAILING_ABBR.get(t.lower(), t.capitalize()) for t in suffix_tokens)
+    return f"{expanded} {name_part}".strip()
+
+
 def swap_two_tokens(core_name_norm: str | None) -> str | None:
     if not core_name_norm:
         return None
@@ -147,7 +191,7 @@ def build_row(source_sheet, row_id, judet_raw, localitate_raw, uat_siruta,
     name_norm = normalize_match(name)
     if not name_norm:
         return None
-    feats = extract_features(name)
+    feats = extract_features(expand_trailing_title(name))
     core_norm = normalize_match(feats["core_name"]) if feats["core_name"] else None
     return {
         "source_sheet": source_sheet,
