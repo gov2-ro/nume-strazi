@@ -6,7 +6,7 @@ Reads  data/streets.db
 Writes dist/streets.db
 
 What it does:
-  - Materializes streets_all_sources (the registry+OSM+postal+RENNS
+  - Materializes streets_all_sources (the electoral+OSM+postal+RENNS
     consolidation view) and all_street_names (the cross-source-deduplicated
     master list, see CODE_SPEC §13.8) into real tables before their source
     tables are dropped.
@@ -42,7 +42,7 @@ def main() -> None:
     conn = sqlite3.connect(DST)
     try:
         # streets_all_sources and all_street_names are views over
-        # streets/streets_dedup/osm_streets/postal_streets/renns_streets
+        # streets/electoral_dedup/osm_streets/postal_streets/renns_streets
         # (+ their match tables) — materialize both FIRST, before any of
         # those get dropped below, or the view resolution breaks.
         conn.execute("""
@@ -57,24 +57,24 @@ def main() -> None:
         """)
         conn.execute("DROP VIEW all_street_names")
 
-        # Materialize streets_dedup view → table with only client-needed columns.
+        # Materialize electoral_dedup view → table with only client-needed columns.
         # Drops id/artera_raw/title/rank (ETL artefacts never read by db-client.js).
         conn.execute("""
-            CREATE TABLE streets_dedup_slim AS
+            CREATE TABLE electoral_dedup_slim AS
             SELECT judet, uat, siruta, street_type, name,
                    name_normalized, core_name, core_name_norm,
                    is_numeric, is_date, is_saint
-            FROM streets_dedup
+            FROM electoral_dedup
         """)
-        conn.execute("DROP VIEW streets_dedup")
+        conn.execute("DROP VIEW electoral_dedup")
         conn.execute("DROP TABLE streets")
         conn.execute("DROP VIEW IF EXISTS streets_classified_pct")
-        conn.execute("ALTER TABLE streets_dedup_slim RENAME TO streets_dedup")
+        conn.execute("ALTER TABLE electoral_dedup_slim RENAME TO electoral_dedup")
 
         # Indexes lost when the view was dropped; re-add on the real table.
-        conn.execute("CREATE INDEX ix_sd_nn  ON streets_dedup(name_normalized)")
-        conn.execute("CREATE INDEX ix_sd_cnn ON streets_dedup(core_name_norm)")
-        conn.execute("CREATE INDEX ix_sd_j   ON streets_dedup(judet)")
+        conn.execute("CREATE INDEX ix_ed_nn  ON electoral_dedup(name_normalized)")
+        conn.execute("CREATE INDEX ix_ed_cnn ON electoral_dedup(core_name_norm)")
+        conn.execute("CREATE INDEX ix_ed_j   ON electoral_dedup(judet)")
 
         # Drop tables not used by the client-side filter UI. uat_reference is
         # only a build-time input to all_street_names' judet/uat labeling
@@ -82,11 +82,13 @@ def main() -> None:
         # standalone in the shipped DB. all_street_names_cache (from
         # tools/materialize_all_street_names.py) is a dev-only fast-path
         # duplicate of the table just materialized above — drop it too, or
-        # it ships as dead-weight duplicate data.
+        # it ships as dead-weight duplicate data. uat_boundaries is the OSM
+        # admin_level=8 polygon index used only at ingest time to assign ways to
+        # UATs; its full-detail geometry is ~33 MB on its own.
         for tbl in ("osm_streets", "street_osm_matches",
                     "postal_streets", "street_postal_matches",
                     "renns_streets", "street_renns_matches", "street_aliases",
-                    "uat_reference", "all_street_names_cache"):
+                    "uat_reference", "uat_boundaries", "all_street_names_cache"):
             conn.execute(f"DROP TABLE IF EXISTS {tbl}")
 
         conn.execute("ALTER TABLE streets_all_sources_slim RENAME TO streets_all_sources")

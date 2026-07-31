@@ -1,6 +1,6 @@
 {
   "title": "Romanian Street Names Analysis",
-  "description": "Electoral registry + OSM enrichment + curated classification",
+  "description": "Electoral source + OSM enrichment + curated classification",
   "plugins": {
     "datasette-dashboards": {
       "overview": {
@@ -188,13 +188,13 @@
       },
       "osm": {
         "title": "OSM Integration: Coverage Gaps & Real Streets",
-        "description": "Electoral registry vs OpenStreetMap mapping",
+        "description": "Electoral source vs OpenStreetMap mapping",
         "layout": [
           ["osm-gaps", "osm-gaps"]
         ],
         "charts": {
           "osm-gaps": {
-            "title": "Registry Streets NOT in OSM (Gaps)",
+            "title": "Electoral Streets NOT in OSM (Gaps)",
             "db": "streets",
             "query": "SELECT name, uats FROM dashboard_osm_gaps ORDER BY uats DESC LIMIT 15",
             "library": "vega-lite",

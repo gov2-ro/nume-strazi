@@ -1,14 +1,14 @@
-"""Populate `street_renns_matches` by joining streets_dedup ↔ renns_streets.
+"""Populate `street_renns_matches` by joining electoral_dedup ↔ renns_streets.
 
 Two-pass shape, same as tools/osm_match.py (not postal_match.py's 3-pass) —
-RENNS person names follow the registry's "Firstname Surname" convention
+RENNS person names follow the electoral source's "Firstname Surname" convention
 (verified by sampling, e.g. "Mihai Eminescu"), unlike postal's frequently
 reversed "Surname Firstname", so no reordered-name pass is needed here.
 
 Pass 1: exact match on (siruta, street_type, core_name_norm) — confidence 1.0.
 Pass 2: fallback on (siruta, core_name_norm) only            — confidence 0.5.
 
-Each pass only considers registry rows still unmatched after the previous one.
+Each pass only considers electoral-source rows still unmatched after the previous one.
 
 Pass 1 compares (street_type, core_name_norm) rather than the raw
 name_normalized string (2026-07-08) — same fix as osm_match.py: a type-blind
@@ -62,7 +62,7 @@ def main():
     con.execute(f"""
         INSERT OR IGNORE INTO {target} (street_id, renns_street_id, match_type, confidence)
         SELECT sd.id, r.id, 'exact_type_core', 1.0
-          FROM streets_dedup sd
+          FROM electoral_dedup sd
           JOIN renns_streets r
             ON r.uat_siruta = sd.siruta
            AND r.core_name_norm = sd.core_name_norm
@@ -76,7 +76,7 @@ def main():
     con.execute(f"""
         INSERT OR IGNORE INTO {target} (street_id, renns_street_id, match_type, confidence)
         SELECT sd.id, r.id, 'fuzzy_core_name', 0.5
-          FROM streets_dedup sd
+          FROM electoral_dedup sd
           JOIN renns_streets r
             ON r.uat_siruta = sd.siruta
            AND r.core_name_norm = sd.core_name_norm
@@ -85,13 +85,13 @@ def main():
     """)
     fuzzy = con.execute(f"SELECT COUNT(*) FROM {target} WHERE match_type='fuzzy_core_name'").fetchone()[0]
 
-    total_streets = con.execute("SELECT COUNT(*) FROM streets_dedup").fetchone()[0]
+    total_streets = con.execute("SELECT COUNT(*) FROM electoral_dedup").fetchone()[0]
     matched_streets = con.execute(f"SELECT COUNT(DISTINCT street_id) FROM {target}").fetchone()[0]
     matched_renns = con.execute(f"SELECT COUNT(DISTINCT renns_street_id) FROM {target}").fetchone()[0]
 
     print(f"Pass 1 (exact_type_core): {exact}")
     print(f"Pass 2 (fuzzy_core_name): {fuzzy}")
-    print(f"Registry coverage:        {matched_streets}/{total_streets} "
+    print(f"Electoral coverage:       {matched_streets}/{total_streets} "
           f"({100*matched_streets/total_streets:.1f}%)")
     print(f"RENNS coverage:            {matched_renns}/{renns_count} "
           f"({100*matched_renns/renns_count:.1f}%)")

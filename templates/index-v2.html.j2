@@ -700,14 +700,15 @@ footer.site-footer { background: var(--ink-band); color: #FFFFFF; padding: 22px 
     <div class="scale-stack">
       <div class="item">
         <div class="v">{{ "{:,.0f}".format(section1.total_streets).replace(",", ".") }}</div>
-        <div class="l">Străzi (Registru)</div>
+        <div class="l">Străzi (4 surse)</div>
       </div>
       <div class="item">
         <div class="v">{{ total_persons }}</div>
         <div class="l">Persoane onorate</div>
       </div>
     </div>
-    <div class="scale-note">Doar Registrul Secțiilor de Vot. <a href="{{ base }}/surse/">{{ "{:,.0f}".format(section1.all_sources_total).replace(",", ".") }} combinând 4 surse (+ OSM, poștal, RENNS) ↗</a></div>
+    {# [needs RO editorial review] — see index.html.j2 #}
+    <div class="scale-note">{{ "{:,.0f}".format(section1.total_uats).replace(",", ".") }} UAT-uri, 4 surse combinate. <a href="{{ base }}/surse/">Registrul Secțiilor de Vot: {{ "{:,.0f}".format(section1.electoral_total).replace(",", ".") }} ↗</a></div>
   </div>
 
   <div class="group">

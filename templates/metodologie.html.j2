@@ -487,7 +487,7 @@ body {
   <p>
     O singură stradă poate apărea de mai multe ori în registru pentru că este împărțită
     între secții de votare. Tabela brută <code>streets</code> reflectă această repetiție.
-    Pentru orice analiză folosim <code>streets_dedup</code> — o vedere care unifică
+    Pentru orice analiză folosim <code>electoral_dedup</code> — o vedere care unifică
     aceeași stradă în același UAT într-un singur rând.
   </p>
   <div class="callout">
@@ -590,7 +590,7 @@ body {
   <p>Pipeline-ul OSM:</p>
   <ol>
     <li><strong>Ingest</strong> — grupăm căile OSM cu <code>highway=*</code> pe perechi <code>(UAT, nume normalizat)</code>. Rezultă ~106.000 de „străzi OSM".</li>
-    <li><strong>Match</strong> — join cu <code>streets_dedup</code> în două treceri: <em>exact</em> pe <code>name_normalized</code>, apoi <em>fuzzy</em> pe <code>core_name_norm</code>.</li>
+    <li><strong>Match</strong> — join cu <code>electoral_dedup</code> în două treceri: <em>exact</em> pe <code>name_normalized</code>, apoi <em>fuzzy</em> pe <code>core_name_norm</code>.</li>
     <li><strong>Scor de importanță</strong> — <code>highway_weight × log(1 + length_m) + ref_bonus</code>, apoi z-score în interiorul UAT-ului. Bucureștiul nu mai zdrobeşte ierarhia.</li>
   </ol>
 

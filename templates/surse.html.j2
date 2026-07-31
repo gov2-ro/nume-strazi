@@ -17,8 +17,8 @@
       --rule-strong: #BFC7D2;
       --hairline: #EEF1F5;
 
-      --c-registry: #0E4D92;
-      --c-registry-soft: #DEE8F4;
+      --c-electoral: #0E4D92;
+      --c-electoral-soft: #DEE8F4;
       --c-osm: #2F6B6B;
       --c-osm-soft: #DEEDEC;
       --c-postal: #A67C00;
@@ -49,8 +49,8 @@
         --rule-strong: #34404E;
         --hairline: #1B222C;
 
-        --c-registry: #6FA4DE;
-        --c-registry-soft: #16283D;
+        --c-electoral: #6FA4DE;
+        --c-electoral-soft: #16283D;
         --c-osm: #6BC2B9;
         --c-osm-soft: #17282A;
         --c-postal: #E3B958;
@@ -127,8 +127,8 @@
       border: 1px solid transparent;
     }
     .chip .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-    .chip.registry { background: var(--c-registry-soft); color: var(--c-registry); }
-    .chip.registry .dot { background: var(--c-registry); }
+    .chip.electoral { background: var(--c-electoral-soft); color: var(--c-electoral); }
+    .chip.electoral .dot { background: var(--c-electoral); }
     .chip.osm { background: var(--c-osm-soft); color: var(--c-osm); }
     .chip.osm .dot { background: var(--c-osm); }
     .chip.postal { background: var(--c-postal-soft); color: var(--c-postal); }
@@ -176,7 +176,7 @@
     }
     #uatBody tr.selected td {
       background: var(--surface-blue) !important;
-      box-shadow: inset 4px 0 0 var(--c-registry);
+      box-shadow: inset 4px 0 0 var(--c-electoral);
     }
     @media (max-height: 600px) {
       #uatTableContainer { max-height: 40vh; }
@@ -207,7 +207,7 @@
     .minibar-cell .v { font-family: var(--mono); font-variant-numeric: tabular-nums; }
     .minibar { width: 46px; height: 6px; border-radius: 3px; background: var(--hairline); overflow: hidden; flex: none; }
     .minibar > span { display: block; height: 100%; }
-    .minibar.registry > span { background: var(--c-registry); }
+    .minibar.electoral > span { background: var(--c-electoral); }
     .minibar.osm > span { background: var(--c-osm); }
     .minibar.postal > span { background: var(--c-postal); }
     .minibar.renns > span { background: var(--c-renns); }
@@ -268,7 +268,7 @@
     <h1>Patru surse, o stradă</h1>
     <p class="dek">Registrul secțiilor de votare, OpenStreetMap, codurile poștale și RENNS (ANCPI) descriu stradale din România. Niciuna nu e completă singură — combinate, dau peste 200.000 de intrări distincte.</p>
     <div class="source-key">
-      <span class="chip registry"><span class="dot"></span>Registru (secții de votare)</span>
+      <span class="chip electoral"><span class="dot"></span>Electoral (secții de votare)</span>
       <span class="chip osm"><span class="dot"></span>OpenStreetMap</span>
       <span class="chip postal"><span class="dot"></span>Coduri poștale</span>
       <span class="chip renns"><span class="dot"></span>RENNS (ANCPI)</span>
@@ -285,11 +285,11 @@
     <p class="section-dek">Patru liste independente, la scări diferite. Bara de sub fiecare cifră arată câte din cele 3.181 UAT-uri ale țării acoperă sursa respectivă.</p>
   </div>
   <div class="stat-cards">
-    <div class="stat-card" style="border-color: var(--c-registry); background: var(--c-registry-soft);">
-      <p class="stat-card-label" style="color: var(--c-registry);">Registru</p>
-      <div class="stat-card-number" style="color: var(--c-registry);">{{ '{:,}'.format(sources_overview.registry.count).replace(',', '.') }}</div>
+    <div class="stat-card" style="border-color: var(--c-electoral); background: var(--c-electoral-soft);">
+      <p class="stat-card-label" style="color: var(--c-electoral);">Electoral</p>
+      <div class="stat-card-number" style="color: var(--c-electoral);">{{ '{:,}'.format(sources_overview.electoral.count).replace(',', '.') }}</div>
       <p class="stat-card-desc">străzi distincte</p>
-      <p class="stat-card-desc">{{ sources_overview.registry.uats }} / 3.181 UAT-uri ({{ '%.1f' | format(100.0 * sources_overview.registry.uats / 3181) }}%)</p>
+      <p class="stat-card-desc">{{ sources_overview.electoral.uats }} / 3.181 UAT-uri ({{ '%.1f' | format(100.0 * sources_overview.electoral.uats / 3181) }}%)</p>
     </div>
     <div class="stat-card" style="border-color: var(--c-osm); background: var(--c-osm-soft);">
       <p class="stat-card-label" style="color: var(--c-osm);">OpenStreetMap</p>
@@ -324,7 +324,7 @@
       <thead><tr>
         <th class="sortable" data-key="name" data-type="str">Județ <span class="arrow">▾</span></th>
         <th class="sortable num active" data-key="total" data-type="num">Total <span class="arrow">▾</span></th>
-        <th class="sortable num" data-key="registry" data-type="num">Registru <span class="arrow">▾</span></th>
+        <th class="sortable num" data-key="electoral" data-type="num">Electoral <span class="arrow">▾</span></th>
         <th class="sortable num" data-key="osm" data-type="num">OSM <span class="arrow">▾</span></th>
         <th class="sortable num" data-key="postal" data-type="num">Poștal <span class="arrow">▾</span></th>
         <th class="sortable num" data-key="renns" data-type="num">RENNS <span class="arrow">▾</span></th>
@@ -354,7 +354,7 @@
         <th class="sortable" data-key="name" data-type="str">Localitate <span class="arrow">▾</span></th>
         <th class="sortable num" data-key="judet" data-type="str">Județ <span class="arrow">▾</span></th>
         <th class="sortable num active" data-key="total" data-type="num">Total <span class="arrow">▾</span></th>
-        <th class="sortable num" data-key="registry" data-type="num">Registru <span class="arrow">▾</span></th>
+        <th class="sortable num" data-key="electoral" data-type="num">Electoral <span class="arrow">▾</span></th>
         <th class="sortable num" data-key="osm" data-type="num">OSM <span class="arrow">▾</span></th>
         <th class="sortable num" data-key="postal" data-type="num">Poștal <span class="arrow">▾</span></th>
         <th class="sortable num" data-key="renns" data-type="num">RENNS <span class="arrow">▾</span></th>
@@ -403,7 +403,7 @@ function renderJudetTable(sortKey, sortType, dir) {
     return `<tr>
       <td>${judetNames[r.judet]} <span style="color:var(--faint); font-family:var(--mono); font-size:12px;">${r.judet}</span></td>
       <td class="num total-col">${fmt(r.total)}</td>
-      ${cell('registry', r.registry)}
+      ${cell('electoral', r.electoral)}
       ${cell('osm', r.osm)}
       ${cell('postal', r.postal)}
       ${cell('renns', r.renns)}
@@ -446,7 +446,7 @@ async function loadUatData() {
     const db = await DbClient.getDb();
     const rows = await db.query(`
       SELECT judet, uat, siruta,
-        SUM(EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='registry')) AS registry,
+        SUM(EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='electoral')) AS electoral,
         SUM(EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='osm')) AS osm,
         SUM(EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='postal')) AS postal,
         SUM(EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='renns')) AS renns,
@@ -499,7 +499,7 @@ function renderUatTable(sortKey, sortType, dir) {
       <td>${r.uat}</td>
       <td class="num">${r.judet}</td>
       <td class="num total-col">${fmt(r.total)}</td>
-      ${cell('registry', r.registry)}
+      ${cell('electoral', r.electoral)}
       ${cell('osm', r.osm)}
       ${cell('postal', r.postal)}
       ${cell('renns', r.renns)}
@@ -541,7 +541,7 @@ async function showUatDetail(siruta, uatRow) {
   try {
     const db = await DbClient.getDb();
     const rows = await db.query(`
-      SELECT street_type, name, core_name, variants, corroboration_count, in_registry
+      SELECT street_type, name, core_name, variants, corroboration_count, in_electoral
       FROM all_street_names
       WHERE siruta = ?
       ORDER BY corroboration_count DESC, core_name
@@ -550,7 +550,7 @@ async function showUatDetail(siruta, uatRow) {
     document.getElementById('uatDetailTitle').textContent = uatRow.uat + ' (' + uatRow.judet + ')';
 
     // Count per-source for the header
-    const countBySource = { registry: 0, osm: 0, postal: 0, renns: 0 };
+    const countBySource = { electoral: 0, osm: 0, postal: 0, renns: 0 };
     rows.forEach(r => {
       try {
         const v = JSON.parse(r.variants || '[]');
@@ -563,7 +563,7 @@ async function showUatDetail(siruta, uatRow) {
     });
 
     const sources = [
-      { key: 'registry', label: 'Registru', color: 'var(--c-registry)' },
+      { key: 'electoral', label: 'Electoral', color: 'var(--c-electoral)' },
       { key: 'osm', label: 'OSM', color: 'var(--c-osm)' },
       { key: 'postal', label: 'Poștal', color: 'var(--c-postal)' },
       { key: 'renns', label: 'RENNS', color: 'var(--c-renns)' }
@@ -590,7 +590,7 @@ async function showUatDetail(siruta, uatRow) {
             const v = JSON.parse(r.variants || '[]');
             sources = v.map(x => x.source);
           } catch (e) { }
-          const srcDots = ['registry', 'osm', 'postal', 'renns'].map(src =>
+          const srcDots = ['electoral', 'osm', 'postal', 'renns'].map(src =>
             `<span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: ${sources.includes(src) ? 'var(--c-' + src + ')' : 'var(--hairline)'}; margin: 0 2px;"></span>`
           ).join('');
           const displayName = r.street_type ? r.street_type + ' ' + r.name : (r.name || r.core_name);

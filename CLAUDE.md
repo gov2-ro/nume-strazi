@@ -4,7 +4,7 @@ Operational instructions for Claude Code working on this project. Loaded into ev
 
 ## What this is
 
-An analytical project on Romanian street names. Source: the Permanent Electoral Authority's polling-section registry (~140k rows, 41 județe + Bucharest sectors). Output: a SQLite database with a query catalog, eventually feeding a Romanian-language interactive publication.
+An analytical project on Romanian street names, combining 4 sources with equal standing — no single one is authoritative: the Permanent Electoral Authority's polling-section export (~140k rows, 41 județe + Bucharest sectors), OpenStreetMap, postal codes, and ANCPI's RENNS cadastral registry. Output: a SQLite database with a query catalog, eventually feeding a Romanian-language interactive publication.
 
 Currently in **prototype phase**. The data layer is being hardened; dashboard runtime is deferred. Solo project.
 
@@ -43,21 +43,23 @@ If asked to do something not covered by the above, ask before improvising.
 │   ├── seed_batch2.py          # batch 2 curation
 │   ├── llm_classify.py         # LLM batch classifier (Anthropic/Google/OpenRouter)
 │   ├── llm_compare.py          # compare two llm_classify CSVs for convergence
+│   ├── audit_person_qids.py    # verify persons.wikidata_qid against P31=Q5; clear/re-resolve
 │   ├── fetch_portraits.py      # Wikidata P18 → Wikimedia thumbnails → dist/portraits/
+│   ├── osm_boundaries.py       # PBF admin_level=8 → uat_boundaries (SIRUTA polygons)
 │   ├── osm_ingest.py           # PBF → osm_streets (needs osmium + shapely)
-│   ├── osm_match.py            # streets_dedup ↔ osm_streets join
+│   ├── osm_match.py            # electoral_dedup ↔ osm_streets join
 │   ├── osm_score.py            # importance_v1 = highway × log(length) + ref bonus
 │   ├── osm_sanity.py           # top-10 / coverage report for reference UATs
 │   ├── postal_ingest.py        # postal xlsx → postal_streets
-│   ├── postal_match.py         # streets_dedup ↔ postal_streets join
+│   ├── postal_match.py         # electoral_dedup ↔ postal_streets join
 │   ├── postal_sanity.py        # coverage report for reference UATs
 │   ├── renns_ingest.py         # ANCPI RENNS API → renns_streets (per-UAT crawl)
-│   ├── renns_match.py          # streets_dedup ↔ renns_streets join
+│   ├── renns_match.py          # electoral_dedup ↔ renns_streets join
 │   ├── renns_sanity.py         # coverage report for reference UATs + national rollout %
 │   ├── restore_curation.py     # run the full post-rebuild curation restore, asserting coverage
 │   └── materialize_all_street_names.py  # all_street_names view → fast indexed cache table
 └── data/
-    ├── reference/        # Raw xlsx inputs (registry exports)
+    ├── reference/        # Raw xlsx inputs (electoral-source exports)
     ├── curation/         # CSV inputs for incremental curation
     ├── gis/              # GIS / geometry assets (future)
     └── streets.db        # Generated artifact. Not the source of truth.
@@ -67,20 +69,22 @@ If asked to do something not covered by the above, ask before improvising.
 
 These are the booby traps. Internalize before writing any query or transform.
 
-1. **Never count on `streets` directly.** Use the `streets_dedup` view. Section-rows duplicate streets that span polling sections. Counting raw `streets` overcounts by section repetition. Its dedup key is `(siruta, name_normalized, street_type)` — street type is part of a street's identity (a UAT can have both `Bulevardul X` and `Strada X` as genuinely distinct streets, fixed 2026-07-08, see CODE_SPEC §14); the count is currently **107,957**, not the older 105,343.
+1. **Never count on `streets` directly.** Use the `electoral_dedup` view (renamed from `streets_dedup` 2026-07-15 — it's the AEP electoral source's own deduplicated street list, one of 4 equal sources; see rule #11 for `all_street_names`, the cross-source union). Section-rows duplicate streets that span polling sections. Counting raw `streets` overcounts by section repetition. Its dedup key is `(siruta, name_normalized, street_type)` — street type is part of a street's identity (a UAT can have both `Bulevardul X` and `Strada X` as genuinely distinct streets, fixed 2026-07-08, see CODE_SPEC §14); the count is currently **107,957**, not the older 105,343.
 2. **Two normalization keys, two purposes.** `name_normalized` for grouping streets by canonical name. `core_name_norm` for joining to curated lookup tables (`persons`, `nature_terms`, `name_categories`, `place_refs`). Never mix them.
 3. **`î ≡ â` only in match keys.** The display column `name` preserves the original orthography. The `_normalized` columns collapse them. Don't normalize for display.
 4. **Aliases require DISTINCT.** Section-rows duplicate the same alias multiple times. Any query joining `street_aliases` should use `SELECT DISTINCT` or aggregate.
 5. **`core_name = NULL` on numeric streets is intentional.** Don't "fix" it.
 6. **Curation upserts must be idempotent.** Use `ON CONFLICT(core_name_norm) DO UPDATE`. Re-running an import with the same CSV must be a no-op.
-7. **`osm_streets` is already grouped per `(uat_siruta, name_normalized)`.** OSM splits one street into many ways at every junction; `tools/osm_ingest.py` merges them before insert. Don't `GROUP BY` again or you'll over-aggregate. To compare a registry street to its OSM counterpart, join `streets_dedup` ↔ `osm_streets` via `street_osm_matches` (don't re-derive the join in queries).
+7. **`osm_streets` is already grouped per `(uat_siruta, name_normalized)`.** OSM splits one street into many ways at every junction; `tools/osm_ingest.py` merges them before insert. Don't `GROUP BY` again or you'll over-aggregate. To compare an electoral-source street to its OSM counterpart, join `electoral_dedup` ↔ `osm_streets` via `street_osm_matches` (don't re-derive the join in queries).
 8. **OSM scope is populated areas only.** Motorways and trunks are filtered out at ingest by design. If a query expects them, it's wrong — they belong to a future inter-city analysis, not this one.
-9. **Postal source is the 2016 xlsx only (`data/reference/coduri-postale+/infocod-cu-siruta-mai-2016.xlsx`).** The 2009 `coduri_postale.sql` dump in the same folder was evaluated and excluded — it adds zero new locality coverage over the xlsx (see CODE_SPEC §12.1), don't re-propose it without reading that section first. Postal only covers Bucuresti + localities over 50,000 population; zero `postal_streets` rows for a small/rural UAT is expected, not a bug. Cross-source comparison (`streets_all_sources`, `docs/queries.sql`'s `external_corroboration_gap`) must join on `core_name_norm`, never `name_normalized` — `osm_streets.name_normalized` includes the street-type prefix, postal's/RENNS's and the registry's don't.
-10. **RENNS's `uat.id` is the registry's SIRUTA code directly** — no name-matching fallback needed (see CODE_SPEC §13.4). Only crawl it per-`(county, UAT)`; the unfiltered flat endpoint has confirmed pagination drift (see CODE_SPEC §13.5) — don't re-add it without re-verifying that first. București has zero RENNS roads (structural, not a bug) and only ~60% of Romania's UATs are digitized in RENNS yet.
-11. **`streets_all_sources` is additive but not cross-source-deduplicated** — a street missing from the registry but corroborated by 2-3 external sources gets one row *per source* there. Use `all_street_names` (CODE_SPEC §13.8/§14.5) for a genuinely deduplicated "every street name in Romania" list: one flat, fully symmetric view across all 4 sources (registry is just another source, no `layer` column, no dependency on the match tables), grouped by `(siruta, street_type, core_name_norm)` — not `core_name_norm` alone — for the same type-matters reason as rule #1, with `in_registry` (0/1) marking whether the registry is among the contributing sources. Type mismatches (e.g. OSM's `Calea X` vs postal's `Strada X`) are never auto-merged, even registry-to-external — check `type_variant_candidates` (`docs/queries.sql`) instead of assuming they've been reconciled. `variants` (JSON) preserves every source's exact spelling; `corroboration_count` counts distinct sources; no source is ranked above another, so the representative name is just the alphabetically-first one.
+9. **Postal source is the 2016 xlsx only (`data/reference/coduri-postale+/infocod-cu-siruta-mai-2016.xlsx`).** The 2009 `coduri_postale.sql` dump in the same folder was evaluated and excluded — it adds zero new locality coverage over the xlsx (see CODE_SPEC §12.1), don't re-propose it without reading that section first. Postal only covers Bucuresti + localities over 50,000 population; zero `postal_streets` rows for a small/rural UAT is expected, not a bug. Cross-source comparison (`streets_all_sources`, `docs/queries.sql`'s `external_corroboration_gap`) must join on `core_name_norm`, never `name_normalized` — `osm_streets.name_normalized` includes the street-type prefix, postal's/RENNS's and the electoral source's don't.
+10. **RENNS's `uat.id` is the electoral source's SIRUTA code directly** — no name-matching fallback needed (see CODE_SPEC §13.4). Only crawl it per-`(county, UAT)`; the unfiltered flat endpoint has confirmed pagination drift (see CODE_SPEC §13.5) — don't re-add it without re-verifying that first. București has zero RENNS roads (structural, not a bug) and only ~60% of Romania's UATs are digitized in RENNS yet.
+11. **`streets_all_sources` is additive but not cross-source-deduplicated** — a street missing from the electoral source but corroborated by 2-3 external sources gets one row *per source* there. Use `all_street_names` (CODE_SPEC §13.8/§14.5) for a genuinely deduplicated "every street name in Romania" list — **this is the project's canonical corpus, materialized as `all_street_names_cache`**: one flat, fully symmetric view across all 4 sources (the electoral source is just another source, no `layer` column, no dependency on the match tables), grouped by `(siruta, street_type, core_name_norm)` — not `core_name_norm` alone — for the same type-matters reason as rule #1, with `in_electoral` (0/1) marking whether the electoral source is among the contributing sources. Type mismatches (e.g. OSM's `Calea X` vs postal's `Strada X`) are never auto-merged, even electoral-to-external — check `type_variant_candidates` (`docs/queries.sql`) instead of assuming they've been reconciled. `variants` (JSON) preserves every source's exact spelling; `corroboration_count` counts distinct sources; no source is ranked above another, so the representative name is just the alphabetically-first one.
 12. **`build_db.py` wipes ALL curation state, not just the schema.** Rebuilding to add/change a table drops `persons`/`nature_terms`/`name_categories`/`place_refs`/QIDs/wiki_scope/birthplaces/biostats along with everything else (observed: 57%→16.4% classification coverage after a rebuild that only restored OSM/postal, not curation — twice). Always run `python3 tools/restore_curation.py` after `build_db.py` — it runs the full restore sequence in fixed order and asserts `classification_coverage_summary`'s `pct_streets_classified` against a known-good floor, failing loudly instead of silently shipping degraded curation. For a schema-only change, prefer a targeted live migration (`DROP VIEW`/`CREATE VIEW` against the running DB) over a full rebuild — see how the street_type dedup fix (#1) was applied.
-13. **OSM/postal/RENNS match tiers are named `exact_type_core` (1.0) / `fuzzy_core_name` (0.5) / (postal only) `reordered_core_name` (0.4)**, not `exact_normalized`. Pass 1 compares `(street_type, core_name_norm)` directly — never compare raw `name_normalized` strings across sources, since OSM's includes the street-type prefix and the registry's/postal's/RENNS's don't (rule #9).
-14. **`uat_reference` (siruta → judet/uat label) is a build-time-only table**, loaded from `data/gis/populatie-romania-siruta-coords.csv` + 6 hardcoded Bucharest sectors, used solely to label `all_street_names` rows for UATs the registry has zero data for. Dropped from the shipped `dist/streets.db` (already baked into `all_street_names`'s materialized columns) — don't expect to query it in the client-side filter UI.
+13. **OSM/postal/RENNS match tiers are named `exact_type_core` (1.0) / `fuzzy_core_name` (0.5) / (postal only) `reordered_core_name` (0.4)**, not `exact_normalized`. Pass 1 compares `(street_type, core_name_norm)` directly — never compare raw `name_normalized` strings across sources, since OSM's includes the street-type prefix and the electoral source's/postal's/RENNS's don't (rule #9).
+14. **`uat_reference` (siruta → judet/uat label) is a build-time-only table**, loaded from `data/gis/populatie-romania-siruta-coords.csv` + 6 hardcoded Bucharest sectors, used solely to label `all_street_names` rows for UATs the electoral source has zero data for. Dropped from the shipped `dist/streets.db` (already baked into `all_street_names`'s materialized columns) — don't expect to query it in the client-side filter UI.
+15. **OSM ways are assigned to UATs by polygon containment, never by proximity.** `tools/osm_boundaries.py` builds `uat_boundaries` (3,183 of 3,185 SIRUTAs) from OSM `admin_level=8` relations plus Bucharest's six `admin_level=9` "Sector N" relations, and `tools/osm_ingest.py` point-in-polygons each way's midpoint against it. Run the boundaries tool **before** the ingest — the ingest exits if `uat_boundaries` is empty. OSM tags no SIRUTA on boundaries (`siruta:code` on 6 of 3,379), so the polygon→SIRUTA mapping is geometric: a boundary owns the SIRUTA whose reference centroid it contains. Do **not** reintroduce a nearest-centroid fallback: until 2026-07-31 the ingest snapped ways to the nearest centroid *drawn from a list filtered to electoral SIRUTAs*, which both capped OSM at ~1,207 UATs and silently attributed out-of-scope streets to a neighbour up to ~55 km away. Fixing it took OSM from 1,185 to 2,630 UATs covered. A way outside every boundary is dropped, by design.
+16. **`persons.wikidata_qid` needs `P31 = Q5` verification.** Romania names communes after national figures, so a bare label search returns the *place*, not the person — the commune "Nicolae Bălcescu" (Q940856) outranked the man (Q513394). A 2026-07-31 audit found 84 of 297 curated QIDs wrong (17 communes, 6 taxa, 5 disambiguation pages, 4 villages; `mihail eminescu` pointed at Q169930, "Extended play"). `tools/wikidata_persons.py` now gates every candidate on P31; re-audit with `tools/audit_person_qids.py` after any bulk QID work. Multiple `core_name_norm` rows sharing one `full_name`/`wikidata_qid` is the project's alias mechanism, not a duplicate — don't dedupe them.
 
 ## Common commands
 
@@ -140,10 +144,21 @@ python3 tools/export_unclassified.py --limit 500
 # Import a classified CSV back into the DB
 python3 tools/import_csv.py data/curation/my_batch.csv
 
+# Verify curated Wikidata QIDs really point at humans (P31=Q5), not the commune
+# named after them. --fix-not-human clears bad QIDs + their derived columns;
+# --reresolve then re-searches those keys with the P31-gated resolver.
+python3 tools/audit_person_qids.py --csv data/curation/qid_audit.csv
+python3 tools/audit_person_qids.py --fix-not-human --reresolve
+
 # Quick interactive exploration
 sqlite3 data/streets.db
 
 # OSM enrichment (requires osmium + shapely; PBF at data/reference/romania-latest.osm.pbf)
+# Refresh the PBF first if it's stale — OSM mapping moves fast:
+#   curl -L -o data/reference/romania-latest.osm.pbf \
+#        https://download.geofabrik.de/europe/romania-latest.osm.pbf
+# (keep the .osm.pbf suffix — pyosmium detects format by filename, not content)
+python3 tools/osm_boundaries.py --rebuild    # admin_level=8 → uat_boundaries (~15 s). REQUIRED FIRST.
 python3 tools/osm_ingest.py                  # PBF → osm_streets (~15 min on full Romania)
 python3 tools/osm_match.py                   # populate street_osm_matches
 python3 tools/osm_score.py                   # compute importance_v1
@@ -180,9 +195,9 @@ python3 tools/materialize_all_street_names.py
 
 ## When the data confuses you
 
-The full registry has properties that surprise people. If a query returns weird results, check these first:
+The full electoral dataset has properties that surprise people. If a query returns weird results, check these first:
 
-- **Did you dedup?** Always `streets_dedup`, not `streets`.
+- **Did you dedup?** Always `electoral_dedup`, not `streets`.
 - **Are you joining on the right key?** `core_name_norm` for curated tables, `name_normalized` for street-level grouping.
 - **Is the sample biased?** During prototype phase, the 4-județ sample is 75% Prahova-rural. Frequencies skew nature-heavy. Don't generalize to "Romanian streets" from sample data.
 - **Are Bucharest sectors throwing you off?** Six sectors register as separate UATs (`BUCUREȘTI SECTORUL N`). Treat as separate UATs for dedup; aggregate as `B` for county comparisons.

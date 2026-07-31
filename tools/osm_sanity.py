@@ -4,7 +4,7 @@ Two reports:
 1. Top-10 streets by importance_v1 in 5 reference UATs (Bucharest Sector 1,
    Cluj-Napoca, Sibiu, a small town, a rural commune). Eyeball check that
    obvious main streets surface at the top.
-2. Per-UAT registry coverage for those same UATs (% of streets_dedup rows
+2. Per-UAT electoral coverage for those same UATs (% of electoral_dedup rows
    with at least one OSM match). Flag <50%.
 
 Read-only. No deps beyond sqlite3.
@@ -67,16 +67,16 @@ def main():
             print(f"  {imp:>6.1f}  z={z:>+5.2f}  {hc:<13} {int(lm):>5}m  {name}{ref_str}")
 
     print("\n" + "=" * 72)
-    print("REGISTRY COVERAGE PER REFERENCE UAT")
+    print("ELECTORAL COVERAGE PER REFERENCE UAT")
     print("=" * 72)
     print(f"{'UAT':<30} {'reg streets':>12} {'matched':>10} {'coverage':>10}")
     for label, siruta in REFERENCE_UATS:
         total = con.execute(
-            "SELECT COUNT(*) FROM streets_dedup WHERE siruta = ?", (siruta,)
+            "SELECT COUNT(*) FROM electoral_dedup WHERE siruta = ?", (siruta,)
         ).fetchone()[0]
         matched = con.execute("""
             SELECT COUNT(DISTINCT sd.id)
-              FROM streets_dedup sd
+              FROM electoral_dedup sd
               JOIN street_osm_matches m ON m.street_id = sd.id
              WHERE sd.siruta = ?
         """, (siruta,)).fetchone()[0]
@@ -88,7 +88,7 @@ def main():
         print(f"{label:<30} {total:>12} {matched:>10} {pct:>9.1f}%{flag}")
 
     print("\n" + "=" * 72)
-    print("OSM STREETS WITH NO REGISTRY MATCH (sample of 20)")
+    print("OSM STREETS WITH NO ELECTORAL MATCH (sample of 20)")
     print("=" * 72)
     print("(real coverage gaps OR OSM noise — eyeball before trusting)\n")
     rows = con.execute("""

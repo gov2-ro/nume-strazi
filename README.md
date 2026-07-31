@@ -2,11 +2,15 @@
 
 [strazi.gov2.ro](https://strazi.gov2.ro/)
 
-Analysis of Romanian street names from the Permanent Electoral Authority's
-polling-section registry (~141,000 rows, 41 județe + Bucharest sectors).
+Analysis of Romanian street names, combining 4 sources with equal standing —
+no single one is authoritative: the Permanent Electoral Authority's
+polling-section export (~141,000 rows, 41 județe + Bucharest sectors),
+OpenStreetMap, postal codes, and ANCPI's RENNS cadastral registry.
 
 The output is a SQLite database with a query catalog, eventually feeding a
 Romanian-language interactive publication.
+
+vezi și: [numele-strazilor.mariuscomper.uk](https://numele-strazilor.mariuscomper.uk/)
 
 ---
 
@@ -18,7 +22,7 @@ Romanian-language interactive publication.
 
 ## What it does
 
-- Ingests the registry xlsx into a normalised SQLite schema
+- Ingests the electoral-source xlsx into a normalised SQLite schema
 - Deduplicates streets that span multiple polling sections
 - Extracts street type, rank prefix, core name, and saint/numeric/date flags
 - Classifies street names against four curated lookup tables:
@@ -38,14 +42,14 @@ Current coverage: **64.0% classified** (107,957 deduped streets across 1,207 UAT
 
 ## Pipeline
 
-End-to-end flow from raw registry to query catalog. OSM, postal, and RENNS
+End-to-end flow from raw electoral-source export to query catalog. OSM, postal, and RENNS
 enrichment are optional parallel branches — each contributes name
 corroboration independently, then all four sources merge into one
 deduplicated master list.
 
 ```mermaid
 flowchart LR
-    XLSX["AEP xlsx<br/>polling-section registry"]
+    XLSX["AEP xlsx<br/>polling-section export"]
     PBF["Geofabrik PBF<br/>romania-latest.osm.pbf"]
     POSTALXLSX["Poșta Română xlsx<br/>coduri poștale 2016"]
     RENNSAPI["ANCPI RENNS API<br/>renns.ancpi.ro"]
@@ -85,7 +89,7 @@ flowchart TB
     CORE[core_name]
     NK["core_name_norm<br/>(join key for curation)"]
     NN["name_normalized<br/>(dedup / group key)"]
-    DV[(streets_dedup view)]
+    DV[(electoral_dedup view)]
     P[persons]
     NT[nature_terms]
     NC[name_categories]
@@ -100,7 +104,7 @@ flowchart TB
 ```
 
 Never count on `streets` directly — section-rows duplicate streets that span
-multiple polling sections. Always use the `streets_dedup` view.
+multiple polling sections. Always use the `electoral_dedup` view.
 
 ---
 
@@ -173,7 +177,7 @@ flowchart LR
   subgraph build["Build (Python)"]
     DB[("data/streets.db")]
     SITE["build_site.py<br/>Jinja2 → static HTML"]
-    SLIM["tools/build_dist_db.py<br/>materialise streets_dedup<br/>drop unused cols + tables<br/>VACUUM, page_size=4096"]
+    SLIM["tools/build_dist_db.py<br/>materialise electoral_dedup<br/>drop unused cols + tables<br/>VACUUM, page_size=4096"]
     DIST[("dist/streets.db<br/>~91 MB")]
   end
   subgraph dep["Deploy (rsync)"]
@@ -198,7 +202,7 @@ No backend is required at runtime — `filter_server.py` exists for local Python
 testing only. Apache/Nginx serve `Accept-Ranges: bytes` natively.
 
 ```bash
-# Build the slim production DB (materialises streets_dedup + streets_all_sources +
+# Build the slim production DB (materialises electoral_dedup + streets_all_sources +
 # all_street_names as real tables with only client-needed columns, drops source
 # tables, VACUUMs). Run after each build_db.py rebuild. ~163 MB → ~91 MB (bigger
 # than the pre-RENNS ~13.5 MB since the two consolidation tables now carry all
@@ -255,7 +259,7 @@ point without a rebuild flag.
 ## OSM enrichment
 
 Streets can be enriched with OpenStreetMap geometry, road class, and an
-importance score. This step is optional — the core registry analysis works
+importance score. This step is optional — the core electoral-source analysis works
 without it.
 
 ```mermaid
@@ -263,7 +267,7 @@ flowchart LR
     PBF["romania-latest.osm.pbf<br/>~300 MB"]
     ING["osm_ingest.py<br/>osmium + shapely"]
     OS[("osm_streets<br/>grouped per (uat × name)")]
-    SD[("streets_dedup")]
+    SD[("electoral_dedup")]
     MAT[osm_match.py]
     LINK[("street_osm_matches<br/>(link table)")]
     SC[osm_score.py]
@@ -279,7 +283,7 @@ flowchart LR
 ```
 
 Motorways and trunks are filtered at ingest — OSM scope is populated areas only.
-Registry ↔ OSM is a link table, not a merge: a registry street can have 0, 1,
+Electoral ↔ OSM is a link table, not a merge: an electoral-source street can have 0, 1,
 or many OSM matches.
 
 ```bash
@@ -289,13 +293,13 @@ or many OSM matches.
 # 1. Ingest OSM ways into osm_streets (~15 min on full Romania PBF)
 python3 tools/osm_ingest.py
 
-# 2. Join registry streets to OSM streets (pure SQL, fast)
+# 2. Join electoral-source streets to OSM streets (pure SQL, fast)
 python3 tools/osm_match.py
 
 # 3. Compute importance_v1 score per OSM street
 python3 tools/osm_score.py
 
-# 4. Eyeball top-10 rankings and registry coverage for reference UATs
+# 4. Eyeball top-10 rankings and electoral coverage for reference UATs
 python3 tools/osm_sanity.py
 ```
 
@@ -319,20 +323,20 @@ their only role is "does this street exist, and under what name."
 
 - **Postal codes** (Poșta Română, 2016 xlsx snapshot): street-level data only
   for București + localities over 50,000 population. 23,724 grouped streets;
-  83.0% matched back to OSM/registry-scope streets; 19.1% registry coverage
+  83.0% matched back to OSM/electoral-scope streets; 19.1% electoral coverage
   overall (expected — most of Romania is out of postal's scope by design).
 - **RENNS** (ANCPI's Registrul Electronic Național al Nomenclaturii Stradale,
   the official cadastral street registry, `renns.ancpi.ro`): crawled per
   `(county, UAT)` — the unfiltered flat endpoint looks tempting (67 requests
   for all of Romania) but has confirmed pagination drift on the live dataset,
   so it's not used. 116,016 grouped streets from all 3,181 UATs; 52.3%/47.7%
-  registry/RENNS match. București has zero RENNS roads (structural gap); only
+  electoral/RENNS match. București has zero RENNS roads (structural gap); only
   ~60% of Romania's UATs are digitized in RENNS so far.
 
 Match strategy across all three external sources: pass 1 (`exact_type_core`,
 confidence 1.0) compares `(street_type, core_name_norm)` directly — not raw
 `name_normalized` strings, which aren't comparable across sources (OSM's
-includes the street-type prefix, the registry's/postal's/RENNS's don't).
+includes the street-type prefix, the electoral source's/postal's/RENNS's don't).
 Pass 2 (`fuzzy_core_name`, 0.5) is a type-blind fallback for the remainder.
 This replaced an earlier, mostly-nonfunctional `exact_normalized` pass
 (2026-07-08) — see the master-list section below for why type matters.
@@ -351,40 +355,40 @@ python3 tools/renns_sanity.py
 
 ### Master deduplicated street list
 
-`streets_all_sources` (registry + unmatched OSM/postal/RENNS rows, flagged by
+`streets_all_sources` (electoral + unmatched OSM/postal/RENNS rows, flagged by
 source) is additive but **not** deduplicated across external sources — if
-OSM, postal, and RENNS all independently have the same registry-missing
+OSM, postal, and RENNS all independently have the same electoral-missing
 street, that view produces one row per source. `all_street_names` fixes this:
-a single, fully symmetric view across all four sources — the registry is
-just one of the four, not a special anchor the others attach to — grouped by
-`(siruta, street_type, core_name_norm)` into one row per real street, with a
-`variants` JSON column preserving every source's exact spelling (nothing is
-discarded to pick a "winner" — no source outranks another) and a
-`corroboration_count`. `in_registry` (0/1) marks whether the registry is
-among the contributing sources. This is the list to use for "every street
-name in Romania," not `streets_all_sources`. Total: **224,208** rows
-(107,924 include the registry, 116,284 don't). See `docs/CODE_SPEC.md`
+a single, fully symmetric view across all four sources — the electoral
+source is just one of the four, not a special anchor the others attach to —
+grouped by `(siruta, street_type, core_name_norm)` into one row per real
+street, with a `variants` JSON column preserving every source's exact
+spelling (nothing is discarded to pick a "winner" — no source outranks
+another) and a `corroboration_count`. `in_electoral` (0/1) marks whether the
+electoral source is among the contributing sources. This is the list to use
+for "every street name in Romania," not `streets_all_sources`. Total:
+**224,208** rows (107,924 include the electoral source, 116,284 don't). See `docs/CODE_SPEC.md`
 §13.8/§14/§14.5 and critical rule #11 in `CLAUDE.md`.
 
 **Street type is part of a street's identity**, confirmed 2026-07-08: a UAT
 can have both `Bulevardul X` and `Strada X` as genuinely distinct real
 streets, but never two different `Strada X`s. This fixed a real bug —
-`streets_dedup` (and every count derived from it, including the headline
+`electoral_dedup` (and every count derived from it, including the headline
 number above) previously grouped only by `(siruta, name_normalized)`, and
-the registry's own `name_normalized` never included the street type to begin
+the electoral source's own `name_normalized` never included the street type to begin
 with — so e.g. Alba Iulia's real `Bulevardul 1 Decembrie 1918` and real
 `Strada 1 Decembrie 1918` were silently collapsed into one row. Fixing the
-dedup key recovered 2,614 previously-hidden registry streets (105,343 →
+dedup key recovered 2,614 previously-hidden electoral-source streets (105,343 →
 107,957) and, as a side effect, fixed a matching-quality bug where the
 dominant OSM match pass was cross-wiring different street types 6.3% of the
 time.
 
-The fix initially left one inconsistency: the registry still got a laxer,
+The fix initially left one inconsistency: the electoral source still got a laxer,
 type-tolerant path to corroboration (via a 0.5-confidence match-table pass)
 that no pair of external sources got between each other — e.g. OSM's `Calea
 Moților` and postal's `Strada Moților` in the same UAT, plausibly the same
 street, stayed uncorroborated at 1 source each. Fixed by removing the
-registry/external split entirely (§14.5) rather than extending the
+electoral/external split entirely (§14.5) rather than extending the
 tolerance — type mismatches are never auto-merged now, anywhere; a
 `type_variant_candidates` query (`docs/queries.sql`) surfaces the ambiguous
 cases for manual review instead of guessing. Full writeup in
@@ -494,14 +498,14 @@ echo 'export ANTHROPIC_API_KEY=sk-ant-...' >> ~/.zshrc
 │   ├── fetch_lucide_icons.py   # Fetch Lucide SVG icons → templates/_icons.html.j2 sprite
 │   ├── gen_og_image.py         # Generate Open Graph preview images
 │   ├── osm_ingest.py           # PBF → osm_streets (osmium + shapely)
-│   ├── osm_match.py            # streets_dedup ↔ osm_streets join (pure SQL)
+│   ├── osm_match.py            # electoral_dedup ↔ osm_streets join (pure SQL)
 │   ├── osm_score.py            # importance_v1 score + per-UAT z-score
-│   ├── osm_sanity.py           # Top-10 rankings + registry coverage report
+│   ├── osm_sanity.py           # Top-10 rankings + electoral coverage report
 │   ├── postal_ingest.py        # Postal xlsx → postal_streets
-│   ├── postal_match.py         # streets_dedup ↔ postal_streets join
+│   ├── postal_match.py         # electoral_dedup ↔ postal_streets join
 │   ├── postal_sanity.py        # Coverage report for reference UATs
 │   ├── renns_ingest.py         # ANCPI RENNS API → renns_streets (per-UAT crawl)
-│   ├── renns_match.py          # streets_dedup ↔ renns_streets join
+│   ├── renns_match.py          # electoral_dedup ↔ renns_streets join
 │   └── renns_sanity.py         # Coverage report for reference UATs + national %
 └── data/
     ├── reference/        # Source xlsx + OSM PBF (not committed — download separately)
@@ -537,8 +541,8 @@ echo 'export ANTHROPIC_API_KEY=sk-ant-...' >> ~/.zshrc
 
 ### OSM match coverage
 
-**Overall:** 53.5% of registry streets matched to OSM; 53.7% of OSM streets matched to registry.
-107,957 registry streets, 105,905 OSM streets ≈ same scale, different compositions.
+**Overall:** 53.5% of electoral-source streets matched to OSM; 53.7% of OSM streets matched to electoral.
+107,957 electoral-source streets, 105,905 OSM streets ≈ same scale, different compositions.
 
 **Per-reference-UAT:**
 - Cluj-Napoca (city): 75%
@@ -547,8 +551,8 @@ echo 'export ANTHROPIC_API_KEY=sk-ant-...' >> ~/.zshrc
 - Cornu (rural, PH): 65%
 - Bucharest Sector 1: ~31% (centroid imprecision for interleaved sectors)
 
-**The 46.5% unmatched registry gap:**
-Three categories of unmatched registry streets:
+**The 46.5% unmatched electoral gap:**
+Three categories of unmatched electoral-source streets:
 1. **Naming convention mismatches** — OSM omits street-type prefixes ("Mihai Eminescu" vs
    "Strada Mihai Eminescu") or uses abbreviations differently. We've fixed the "G-ral" →
    "General" expansion; others remain (e.g., `prof.dr.` prefix cases).
@@ -560,18 +564,18 @@ Three categories of unmatched registry streets:
 **The 46.3% unmatched OSM gap:**
 Mostly real streets with no registered voters:
 - Scenic/transit roads (Transalpina, Transfăgărășan)
-- New residential developments post-2021 (OSM updated, registry hasn't)
+- New residential developments post-2021 (OSM updated, electoral source hasn't)
 - Industrial/private access roads, park paths
 - Roads in very low-density areas
 
 **Why not merge the datasets?**
-The registry and OSM serve different purposes: electoral authority (ground truth for voters) vs
+The electoral source and OSM serve different purposes: electoral authority (ground truth for voters) vs
 community mapping (geometry + road hierarchy). Forcing a 1:1 merge would either:
-- Drop ~47k useful registry streets for which no OSM exists
+- Drop ~47k useful electoral-source streets for which no OSM exists
 - Invent fake OSM entries from electoral data (unreliable for road classification)
 - Create conflicting canonical names
 
-Instead, use `street_osm_matches` as a **link table**: registry streets can have 0, 1, or many
+Instead, use `street_osm_matches` as a **link table**: electoral-source streets can have 0, 1, or many
 OSM matches (rare). Query it to combine signals (e.g. electoral presence × road importance).
 
 **Key finding:** OSM coverage is regionally stratified. Gorj (17.7%), Dâmbovita (27.5%), Sibiu (30.8%)
@@ -582,17 +586,17 @@ likely holds for other datasets that depend on community volunteers (Wikipedia, 
 
 **To investigate further:**
 ```sql
--- Frequent registry streets with zero OSM matches
--- (query: registry_osm_gap)
+-- Frequent electoral-source streets with zero OSM matches
+-- (query: electoral_osm_gap)
 SELECT name, COUNT(DISTINCT uat) AS uats
-FROM streets_dedup
-WHERE NOT EXISTS (SELECT 1 FROM street_osm_matches m WHERE m.street_id = streets_dedup.id)
+FROM electoral_dedup
+WHERE NOT EXISTS (SELECT 1 FROM street_osm_matches m WHERE m.street_id = electoral_dedup.id)
 GROUP BY name_normalized HAVING COUNT(*) > 10
 ORDER BY uats DESC;
 
 -- Per-judet breakdown (high variance: Gorj 17.7%, Tulcea 87.3%)
 -- (query: osm_judet_coverage)
-SELECT judet, COUNT(*) AS registry_streets,
+SELECT judet, COUNT(*) AS electoral_streets,
        SUM(CASE WHEN osm_matched THEN 1 ELSE 0 END) AS matched
-FROM streets_dedup ...
+FROM electoral_dedup ...
 ```

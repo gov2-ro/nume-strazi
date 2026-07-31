@@ -180,12 +180,12 @@ def build_detail_pages(db_path: str = DB_PATH,
     # ── UATs ─────────────────────────────────────────────────────────────────
     uats = uats_for_keys
     print(f"  Rendering {len(uats)} UAT detail pages…")
-    # Precompute globals once — avoids a full streets_dedup scan per UAT page.
+    # Precompute globals once — avoids a full all_street_names_cache scan per UAT page.
     global_rarity = {
         r["name_normalized"]: r["uat_n"]
         for r in site_queries._rows(conn, """
             SELECT name_normalized, COUNT(DISTINCT siruta) AS uat_n
-            FROM streets_dedup
+            FROM all_street_names_cache
             WHERE is_numeric = 0 AND core_name IS NOT NULL
             GROUP BY name_normalized
         """)
@@ -193,7 +193,7 @@ def build_detail_pages(db_path: str = DB_PATH,
     nat = site_queries._one(conn, """
         SELECT ROUND(100.0 * SUM(is_saint)   / COUNT(*), 2) AS saint_pct,
                ROUND(100.0 * SUM(is_numeric) / COUNT(*), 2) AS numeric_pct
-        FROM streets_dedup
+        FROM all_street_names_cache
     """)
     for u in uats:
         detail = site_queries.uat_detail(

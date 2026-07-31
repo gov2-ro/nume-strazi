@@ -392,7 +392,7 @@ function escapeHtml(s) {
     if (!row) {
       fp.innerHTML = `<div class="kicker"><svg class="icon lg" aria-hidden="true"><use href="#icon-building-2"/></svg> Localitate</div>
         <div style="font-family:var(--sans);font-weight:700;font-size:18px;margin:2px 0 4px;">${escapeHtml(feature.properties?.nume || sir)}</div>
-        <p style="font-family:var(--sans);font-size:12px;color:var(--muted);padding-top:8px;">Fără date de străzi în registru (sub 10 străzi sau neacoperită de registru).</p>`;
+        <p style="font-family:var(--sans);font-size:12px;color:var(--muted);padding-top:8px;">Fără date de străzi electorale (sub 10 străzi sau neacoperită de sursa electorală).</p>`;
       return;
     }
     const rows = [

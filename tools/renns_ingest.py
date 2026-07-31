@@ -18,12 +18,12 @@ Crawl strategy — per-(county, UAT), NOT the flat/unfiltered endpoint:
   no pagination-drift risk. This is the only path implemented here — do not
   re-add the flat crawl without re-checking that finding.
 
-UAT resolution: RENNS's `uat.id` IS the registry's SIRUTA code, verified
+UAT resolution: RENNS's `uat.id` IS the electoral source's SIRUTA code, verified
 directly (3,180/3,181 exact matches against every UAT in
 data/gis/populatie-romania-siruta-coords.csv). No name-matching fallback,
 unlike tools/postal_ingest.py. Rows are kept even when uat_siruta has no
 counterpart in our own `streets` table (e.g. RENNS's "Racșa", SM, id
-180091) — that's a genuine registry gap worth surfacing via
+180091) — that's a genuine electoral-source gap worth surfacing via
 streets_all_sources, not something to silently drop.
 
 Coverage caveats (see CODE_SPEC §13 for the full picture):
@@ -237,7 +237,7 @@ def main():
             "SELECT DISTINCT judet FROM streets WHERE siruta = ?", (args.uat_siruta,)
         ).fetchone()
         if not row:
-            sys.exit(f"SIRUTA {args.uat_siruta} not found in the registry — "
+            sys.exit(f"SIRUTA {args.uat_siruta} not found in the electoral source — "
                       "can't derive its RENNS county id. Pass a known SIRUTA.")
         county_id = county_id_by_short.get(row[0])
         if county_id is None:

@@ -38,7 +38,7 @@ BUCURESTI_SECTOR_SIRUTAS = [179141, 179150, 179169, 179178, 179187, 179196]
 # Romania's total UAT count, per RENNS's own /api/uats enumeration across all
 # 42 counties (verified 2026-07-08: 3,181 UATs). This is a stable national
 # administrative fact, not derived from our own `streets` table — the
-# registry only has entries for ~1,207 distinct SIRUTAs (a known gap in the
+# electoral source only has entries for ~1,207 distinct SIRUTAs (a known gap in the
 # AEP polling-section source, unrelated to RENNS), so using COUNT(DISTINCT
 # siruta) FROM streets as the denominator would understate RENNS's real
 # national coverage.
@@ -65,7 +65,7 @@ def main():
     print("=" * 72)
     print("NATIONAL RENNS COVERAGE")
     print("=" * 72)
-    registry_uats = con.execute(
+    electoral_uats = con.execute(
         "SELECT COUNT(DISTINCT siruta) FROM streets WHERE siruta IS NOT NULL"
     ).fetchone()[0]
     uats_with_renns = con.execute(
@@ -73,8 +73,8 @@ def main():
     ).fetchone()[0]
     print(f"UATs with ≥1 RENNS road: {uats_with_renns:,}/{TOTAL_ROMANIA_UATS:,} "
           f"({100*uats_with_renns/TOTAL_ROMANIA_UATS:.1f}%) — partial national rollout, expected.")
-    print(f"(Our own registry only has street data for {registry_uats:,} distinct UATs — "
-          f"RENNS actually covers more UATs than the AEP registry does.)")
+    print(f"(Our own electoral source only has street data for {electoral_uats:,} distinct UATs — "
+          f"RENNS actually covers more UATs than the AEP electoral source does.)")
 
     print("\n" + "=" * 72)
     print("BUCUREȘTI (all 6 sectors) — expect ZERO")
@@ -103,16 +103,16 @@ def main():
         print(f"— {label} (SIRUTA {siruta}): {total} rows{flag}")
 
     print("\n" + "=" * 72)
-    print("REGISTRY COVERAGE PER REFERENCE UAT (RENNS)")
+    print("ELECTORAL COVERAGE PER REFERENCE UAT (RENNS)")
     print("=" * 72)
     print(f"{'UAT':<30} {'reg streets':>12} {'matched':>10} {'coverage':>10}")
     for label, siruta, _ in REFERENCE_UATS:
         total = con.execute(
-            "SELECT COUNT(*) FROM streets_dedup WHERE siruta = ?", (siruta,)
+            "SELECT COUNT(*) FROM electoral_dedup WHERE siruta = ?", (siruta,)
         ).fetchone()[0]
         matched = con.execute("""
             SELECT COUNT(DISTINCT sd.id)
-              FROM streets_dedup sd
+              FROM electoral_dedup sd
               JOIN street_renns_matches m ON m.street_id = sd.id
              WHERE sd.siruta = ?
         """, (siruta,)).fetchone()[0]
@@ -123,7 +123,7 @@ def main():
         print(f"{label:<30} {total:>12} {matched:>10} {pct:>9.1f}%")
 
     print("\n" + "=" * 72)
-    print(f"RENNS STREETS WITH NO REGISTRY MATCH (sample of {args.limit})")
+    print(f"RENNS STREETS WITH NO ELECTORAL MATCH (sample of {args.limit})")
     print("=" * 72)
     print("(real coverage gaps OR RENNS noise — eyeball before trusting)\n")
     rows = con.execute("""

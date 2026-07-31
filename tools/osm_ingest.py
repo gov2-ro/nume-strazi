@@ -4,16 +4,27 @@ Scope: named highway ways. Motorways and trunk roads are excluded by design
 (see CODE_SPEC §11). Service roads kept only when named.
 
 OSM splits a single street into many `way` rows at every junction. We group by
-(uat_siruta, name_normalized) so the table mirrors the grain of streets_dedup.
+(uat_siruta, name_normalized) so the table mirrors the grain of electoral_dedup.
 
-UAT assignment: each way's midpoint is matched to the nearest UAT centroid from
-the SIRUTA coordinates reference file, filtered to SIRUTAs present in the
-registry DB. This replaces the original pyrosm/geopandas polygon-containment
-approach, which cannot be built on Python 3.12.
+UAT assignment: each way's midpoint is tested for containment in the OSM
+admin_level=8 boundary polygons held in `uat_boundaries` — run
+`tools/osm_boundaries.py` first. Ways landing outside every boundary are dropped,
+not snapped.
+
+This replaces an earlier nearest-centroid scheme whose centroid list was filtered
+to SIRUTAs present in the electoral source. That capped OSM at the ~1,207 UATs
+the electoral export covers (of 3,181) and, worse, snapped out-of-scope ways up
+to ~55 km to the nearest in-scope centroid, silently attributing one UAT's
+streets to a neighbour. The electoral source is a starter list with no special
+standing (CLAUDE.md: "4 sources with equal standing"), so nothing else should
+inherit its coverage. The original pyrosm/geopandas containment approach was
+abandoned because geopandas will not build on Python 3.12; pyosmium's own
+AreaManager plus shapely's STRtree needs neither.
 
 Idempotent: --rebuild drops `osm_streets` rows before inserting.
 
 Usage:
+  python3 tools/osm_boundaries.py --rebuild        # prerequisite, ~15 s
   python3 tools/osm_ingest.py
   python3 tools/osm_ingest.py --pbf data/reference/romania-latest.osm.pbf
   python3 tools/osm_ingest.py --rebuild
@@ -22,7 +33,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import csv
 import json
 import math
 import sqlite3
@@ -38,17 +48,10 @@ KEPT_HIGHWAY = {
     "pedestrian", "service",
 }
 
-# Romania bounding box for the spatial grid
-_GRID_LAT_MIN, _GRID_LON_MIN = 43.0, 19.0
-_GRID_STEP = 0.5  # degrees per cell
-
-
 def parse_args():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--db", default="data/streets.db")
     ap.add_argument("--pbf", default="data/reference/romania-latest.osm.pbf")
-    ap.add_argument("--siruta-coords",
-                    default="data/gis/populatie-romania-siruta-coords.csv")
     ap.add_argument("--rebuild", action="store_true",
                     help="Truncate osm_streets before inserting.")
     ap.add_argument("--uat-siruta", type=int, default=None,
@@ -58,76 +61,48 @@ def parse_args():
     return ap.parse_args()
 
 
-# The SIRUTA coords CSV uses the Bucharest municipality code (179132) but the
-# registry splits Bucharest into 6 sectors with separate SIRUTAs. Hardcode
-# approximate sector centroids so nearest-centroid assignment works for Bucharest.
-_BUCHAREST_SECTOR_CENTROIDS = {
-    179141: (44.47, 26.01),   # Sector 1 — Aviatorilor / Victoriei
-    179150: (44.46, 26.12),   # Sector 2 — Colentina / Iancului
-    179169: (44.43, 26.16),   # Sector 3 — Titan / Dristor
-    179178: (44.40, 26.07),   # Sector 4 — Berceni / Sudului
-    179187: (44.40, 26.00),   # Sector 5 — Rahova / Ferentari
-    179196: (44.44, 25.97),   # Sector 6 — Militari / Drumul Taberei
-}
+class UatIndex:
+    """Point-in-polygon lookup over the OSM admin boundaries in `uat_boundaries`.
 
+    Covers every UAT OSM knows about — not just the ones the electoral source
+    happens to list. A point outside every boundary resolves to None and its way
+    is dropped; there is deliberately no nearest-neighbour fallback, since that
+    is exactly the behaviour that used to misattribute streets across borders.
+    """
 
-def load_centroid_index(con: sqlite3.Connection, coords_csv: Path) -> list:
-    """Return [(siruta, lat, lon)] filtered to SIRUTAs in the registry DB."""
-    siruta_in_db = {
-        row[0]
-        for row in con.execute(
-            "SELECT DISTINCT siruta FROM streets WHERE siruta IS NOT NULL"
-        )
-    }
-    out = []
-    with coords_csv.open(encoding="utf-8") as f:
-        for row in csv.DictReader(f):
-            try:
-                siruta = int(row["siruta"])
-                if siruta not in siruta_in_db:
-                    continue
-                out.append((siruta, float(row["lat"]), float(row["long"])))
-            except (KeyError, ValueError):
-                continue
-    # Add Bucharest sectors that are missing from the coords CSV
-    for siruta, (lat, lon) in _BUCHAREST_SECTOR_CENTROIDS.items():
-        if siruta in siruta_in_db:
-            out.append((siruta, lat, lon))
-    return out
+    def __init__(self, con: sqlite3.Connection):
+        import shapely
+        from shapely import STRtree
 
+        rows = con.execute(
+            "SELECT siruta, geometry_wkt FROM uat_boundaries"
+        ).fetchall()
+        if not rows:
+            sys.exit(
+                "uat_boundaries is empty — run `python3 tools/osm_boundaries.py "
+                "--rebuild` first (it builds the admin_level=8 polygons this "
+                "ingest assigns ways to)."
+            )
+        self.sirutas = [r[0] for r in rows]
+        self.geoms = [shapely.from_wkt(r[1]) for r in rows]
+        self.tree = STRtree(self.geoms)
 
-def build_grid(centroids: list) -> dict:
-    """Bucket centroids into 0.5°×0.5° grid cells for O(1) neighbour lookup."""
-    grid: dict = {}
-    for item in centroids:
-        _, lat, lon = item
-        cell = (
-            int((lat - _GRID_LAT_MIN) / _GRID_STEP),
-            int((lon - _GRID_LON_MIN) / _GRID_STEP),
-        )
-        grid.setdefault(cell, []).append(item)
-    return grid
+    def __len__(self) -> int:
+        return len(self.sirutas)
 
+    def locate(self, lon: float, lat: float) -> int | None:
+        import shapely
 
-def nearest_siruta(lat: float, lon: float, grid: dict) -> int | None:
-    """Return SIRUTA of the nearest UAT centroid using equirectangular distance."""
-    ci = int((lat - _GRID_LAT_MIN) / _GRID_STEP)
-    cj = int((lon - _GRID_LON_MIN) / _GRID_STEP)
-    candidates = []
-    for di in (-1, 0, 1):
-        for dj in (-1, 0, 1):
-            candidates.extend(grid.get((ci + di, cj + dj), []))
-    if not candidates:
-        candidates = [item for cell in grid.values() for item in cell]
-    if not candidates:
-        return None
-    cos_lat = math.cos(math.radians(lat))
-    best_siruta, best_d = None, float("inf")
-    for siruta, clat, clon in candidates:
-        d = (lat - clat) ** 2 + ((lon - clon) * cos_lat) ** 2
-        if d < best_d:
-            best_d, best_siruta = d, siruta
-    return best_siruta
+        pt = shapely.Point(lon, lat)
+        hits = self.tree.query(pt, predicate="intersects")
+        if len(hits) == 0:
+            return None
+        if len(hits) == 1:
+            return self.sirutas[int(hits[0])]
+        # Overlapping boundaries (shared borders, or a sector inside the city
+        # polygon): prefer the smallest containing area — the most specific UAT.
+        best = min((int(i) for i in hits), key=lambda i: self.geoms[i].area)
+        return self.sirutas[best]
 
 
 def shape_length_m(geom) -> float:
@@ -179,10 +154,6 @@ def main():
     if not db_path.exists():
         sys.exit(f"DB not found at {db_path}. Run build_db.py first.")
 
-    coords_csv = Path(args.siruta_coords)
-    if not coords_csv.exists():
-        sys.exit(f"SIRUTA coords CSV not found at {coords_csv}.")
-
     try:
         import osmium
         import osmium.geom
@@ -193,19 +164,19 @@ def main():
 
     con = sqlite3.connect(db_path)
 
-    print("Loading UAT centroid index…")
-    centroids = load_centroid_index(con, coords_csv)
-    grid = build_grid(centroids)
-    print(f"  → {len(centroids)} UATs indexed")
+    print("Loading UAT boundary index…")
+    uats = UatIndex(con)
+    print(f"  → {len(uats):,} UAT polygons indexed")
 
     wkt_fab = osmium.geom.WKTFactory()
     grouped: dict = {}
     skipped = 0
+    outside = 0
     way_count = 0
 
     class _Handler(osmium.SimpleHandler):
         def way(self, w):
-            nonlocal skipped, way_count
+            nonlocal skipped, outside, way_count
             way_count += 1
             if way_count % 200_000 == 0:
                 print(f"  … {way_count:,} ways scanned, {len(grouped):,} groups", flush=True)
@@ -223,9 +194,9 @@ def main():
                 skipped += 1
                 return
 
-            siruta = nearest_siruta(mid.y, mid.x, grid)
+            siruta = uats.locate(mid.x, mid.y)
             if siruta is None:
-                skipped += 1
+                outside += 1
                 return
             if args.uat_siruta is not None and siruta != args.uat_siruta:
                 return
@@ -269,7 +240,10 @@ def main():
     print(f"Parsing PBF: {pbf}")
     print("  (location pass + way extraction — may take 10–30 min on full Romania PBF)")
     _Handler().apply_file(str(pbf), locations=True)
-    print(f"  → {len(grouped):,} (UAT, street) groups  ({skipped:,} ways skipped)")
+    print(f"  → {len(grouped):,} (UAT, street) groups")
+    print(f"     {skipped:,} ways with unusable geometry")
+    print(f"     {outside:,} ways outside every Romanian UAT boundary "
+          f"(foreign territory in the extract — dropped, not snapped)")
 
     if args.dry_run:
         print("[DRY RUN] Not writing.")
@@ -295,6 +269,7 @@ def main():
             "highway_class": slot["highway_class"],
             "ref": slot["ref"],
             "length_m": shape_length_m(merged),
+            "segment_count": len(slot["way_ids"]),
             "way_ids": json.dumps(slot["way_ids"]),
             "geometry_wkt": merged.wkt,
         })
@@ -307,10 +282,11 @@ def main():
         """INSERT INTO osm_streets
            (uat_siruta, name, name_normalized, street_type, title, rank,
             is_saint, is_date, is_numeric, core_name, core_name_norm,
-            highway_class, ref, length_m, way_ids, geometry_wkt)
+            highway_class, ref, length_m, segment_count, way_ids, geometry_wkt)
            VALUES (:uat_siruta, :name, :name_normalized, :street_type, :title, :rank,
                    :is_saint, :is_date, :is_numeric, :core_name, :core_name_norm,
-                   :highway_class, :ref, :length_m, :way_ids, :geometry_wkt)
+                   :highway_class, :ref, :length_m, :segment_count, :way_ids,
+                   :geometry_wkt)
            ON CONFLICT(uat_siruta, name_normalized) DO UPDATE SET
              name           = excluded.name,
              street_type    = excluded.street_type,
@@ -324,6 +300,7 @@ def main():
              highway_class  = excluded.highway_class,
              ref            = excluded.ref,
              length_m       = excluded.length_m,
+             segment_count  = excluded.segment_count,
              way_ids        = excluded.way_ids,
              geometry_wkt   = excluded.geometry_wkt""",
         rows,

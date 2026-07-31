@@ -97,7 +97,7 @@
 
   // ── SQL fragments — mirror of filter_server.py constants ─────────────
   const BASE_FROM = `
-    FROM streets_dedup sd
+    FROM electoral_dedup sd
     LEFT JOIN persons         p  ON p.core_name_norm  = sd.core_name_norm
     LEFT JOIN name_categories c  ON c.core_name_norm  = sd.core_name_norm
     LEFT JOIN nature_terms    n  ON n.core_name_norm  = sd.core_name_norm
@@ -112,7 +112,7 @@
     sd.siruta,
     sd.core_name,
     sd.name_normalized,
-    (SELECT COUNT(*) FROM streets_dedup x
+    (SELECT COUNT(*) FROM electoral_dedup x
      WHERE x.name_normalized = sd.name_normalized) AS name_count,
     CASE
         WHEN sd.is_numeric = 1             THEN 'numeric'
@@ -278,8 +278,8 @@
     };
 
     return {
-      judete:          await col("SELECT DISTINCT judet FROM streets_dedup WHERE judet IS NOT NULL ORDER BY judet"),
-      street_types:    await col("SELECT DISTINCT street_type FROM streets_dedup WHERE street_type IS NOT NULL ORDER BY street_type"),
+      judete:          await col("SELECT DISTINCT judet FROM electoral_dedup WHERE judet IS NOT NULL ORDER BY judet"),
+      street_types:    await col("SELECT DISTINCT street_type FROM electoral_dedup WHERE street_type IS NOT NULL ORDER BY street_type"),
       classifications: ['person', 'nature', 'place', 'category', 'saint', 'date', 'numeric'],
       professions:     await col("SELECT DISTINCT profession FROM persons WHERE profession IS NOT NULL ORDER BY profession"),
       nationalities:   await col("SELECT DISTINCT nationality FROM persons WHERE nationality IS NOT NULL ORDER BY nationality"),

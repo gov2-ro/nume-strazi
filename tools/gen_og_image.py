@@ -39,13 +39,13 @@ def _stats(db_path: str = "data/streets.db") -> dict:
     c = conn.cursor()
     out = {
         "total_streets": c.execute(
-            "SELECT COUNT(*) FROM streets_dedup WHERE is_numeric=0"
+            "SELECT COUNT(*) FROM electoral_dedup WHERE is_numeric=0"
         ).fetchone()[0],
         "total_uats": c.execute(
-            "SELECT COUNT(DISTINCT siruta) FROM streets_dedup"
+            "SELECT COUNT(DISTINCT siruta) FROM electoral_dedup"
         ).fetchone()[0],
         "total_judete": c.execute(
-            "SELECT COUNT(DISTINCT judet) FROM streets_dedup"
+            "SELECT COUNT(DISTINCT judet) FROM electoral_dedup"
         ).fetchone()[0],
     }
     conn.close()

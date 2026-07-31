@@ -107,7 +107,7 @@ CREATE TABLE nature_terms (
 -- ===== OSM enrichment scaffolds (populated by tools/osm_*.py) =====
 -- One logical street per (uat_siruta, name_normalized). OSM splits a single
 -- street into many `way` rows at every junction; tools/osm_ingest.py groups
--- those before insert, so this table mirrors streets_dedup's grain.
+-- those before insert, so this table mirrors electoral_dedup's grain.
 CREATE TABLE osm_streets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     uat_siruta INTEGER NOT NULL,
@@ -124,6 +124,7 @@ CREATE TABLE osm_streets (
     highway_class TEXT NOT NULL,
     ref TEXT,
     length_m REAL NOT NULL,
+    segment_count INTEGER,         -- contributing OSM ways, materialized from way_ids
     way_ids TEXT NOT NULL,         -- JSON array of contributing OSM way ids
     geometry_wkt TEXT,
     importance_v1 REAL,            -- raw score from tools/osm_score.py
@@ -133,6 +134,20 @@ CREATE TABLE osm_streets (
 CREATE INDEX ix_osm_uat       ON osm_streets(uat_siruta);
 CREATE INDEX ix_osm_namenorm  ON osm_streets(name_normalized);
 CREATE INDEX ix_osm_corenorm  ON osm_streets(core_name_norm);
+
+-- OSM admin_level=8 boundary polygons resolved to SIRUTA, built by
+-- tools/osm_boundaries.py. This is what tools/osm_ingest.py assigns ways to;
+-- it deliberately covers every UAT OSM knows about, not only those the
+-- electoral source lists. Build-time only — dropped from the shipped dist DB.
+CREATE TABLE uat_boundaries (
+    siruta        INTEGER PRIMARY KEY,
+    osm_rel_id    INTEGER,
+    osm_name      TEXT,
+    admin_level   INTEGER,
+    match_method  TEXT NOT NULL,   -- centroid_in_polygon | bucharest_sector | name_unique
+    area_km2      REAL,
+    geometry_wkt  TEXT NOT NULL
+);
 
 CREATE TABLE street_osm_matches (
     street_id INTEGER NOT NULL REFERENCES streets(id),
@@ -148,7 +163,7 @@ CREATE INDEX ix_match_osm     ON street_osm_matches(osm_street_id);
 -- (Bucuresti + Localitati peste 50.000 loc sheets only — the sub-50.000 sheet
 -- has no street-level columns, a structural gap this source can't close; see
 -- CODE_SPEC §12). One row per (uat_siruta, name_normalized), same grain as
--- osm_streets/streets_dedup. `name` excludes the street-type prefix (the
+-- osm_streets/electoral_dedup. `name` excludes the street-type prefix (the
 -- source already separates Tip artera/Denumire artera), unlike osm_streets.
 CREATE TABLE postal_streets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -193,8 +208,8 @@ CREATE INDEX ix_pmatch_postal ON street_postal_matches(postal_street_id);
 -- Stradale) "Drumuri" endpoint. One row per (uat_siruta, name_normalized), same
 -- grain as osm_streets/postal_streets. `name` excludes the street-type prefix
 -- (RENNS separates roadType/name already), like postal_streets. uat_siruta is
--- the RENNS uat.id verbatim — validated 3180/3181 against the registry's own
--- SIRUTA codes, so (unlike postal) no name-matching fallback is needed; the
+-- the RENNS uat.id verbatim — validated 3180/3181 against the electoral
+-- source's own SIRUTA codes, so (unlike postal) no name-matching fallback is needed; the
 -- rare miss is left NULL. See CODE_SPEC §13.
 CREATE TABLE renns_streets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -235,7 +250,7 @@ CREATE INDEX ix_streets_namenorm  ON streets(name_normalized);
 CREATE INDEX ix_streets_corenorm  ON streets(core_name_norm);
 CREATE INDEX ix_streets_type      ON streets(street_type);
 CREATE INDEX ix_streets_flags     ON streets(is_saint, is_date, is_numeric);
--- Composite index allows the optimizer to push WHERE siruta=? into streets_dedup.
+-- Composite index allows the optimizer to push WHERE siruta=? into electoral_dedup.
 CREATE INDEX ix_streets_siruta_name ON streets(siruta, name_normalized);
 -- Supports the cross-source anti-join in the external_corroboration_gap query
 -- (docs/queries.sql) — without it, that query falls back to a slow scan.
@@ -243,16 +258,16 @@ CREATE INDEX ix_streets_siruta_corenorm ON streets(siruta, core_name_norm);
 CREATE INDEX ix_aliases_norm      ON street_aliases(alias_normalized);
 
 -- National SIRUTA -> (judet, uat-name) reference, used only to label
--- all_street_names rows for UATs the registry has zero data for (the
--- registry's own judet/uat columns are preferred wherever available).
+-- all_street_names rows for UATs the electoral source has zero data for (its
+-- own judet/uat columns are preferred wherever available).
 -- Loaded from data/gis/populatie-romania-siruta-coords.csv (3,180 UATs) plus
 -- the 6 Bucharest sectors hardcoded below (missing from that CSV; centroids
 -- for the same 6 are hardcoded the same way in tools/osm_ingest.py).
 -- Validated: resolves 2,258/2,264 (99.7%) of every SIRUTA our 4 sources
 -- actually reference; the 6 misses are exactly those Bucharest sectors.
--- uat names here are not COMUNA/ORAȘ/MUNICIPIUL-prefixed like the registry's
--- own (that prefix isn't derivable from the CSV) — a cosmetic gap, only
--- affects UATs the registry itself has zero rows for.
+-- uat names here are not COMUNA/ORAȘ/MUNICIPIUL-prefixed like the electoral
+-- source's own (that prefix isn't derivable from the CSV) — a cosmetic gap,
+-- only affects UATs the electoral source itself has zero rows for.
 CREATE TABLE uat_reference (
     siruta INTEGER PRIMARY KEY,
     judet TEXT,
@@ -264,10 +279,15 @@ CREATE TABLE uat_reference (
 -- street_type is part of the dedup key: a UAT can legitimately have both
 -- "Bulevardul X" and "Strada X" as two distinct real streets sharing a core
 -- name — grouping by name_normalized alone (which never included the type
--- for registry rows, stripped upstream in parse_artery()) silently merged
--- these. Fixed 2026-07-08 after finding 2,479 (siruta, name_normalized)
+-- for electoral-source rows, stripped upstream in parse_artery()) silently
+-- merged these. Fixed 2026-07-08 after finding 2,479 (siruta, name_normalized)
 -- groups with 2+ distinct street_types — see CODE_SPEC and activity-history.
-CREATE VIEW streets_dedup AS
+-- Deduplicates only the electoral (AEP polling-section) source — one of 4
+-- sources this project tracks, no more authoritative than the others (see
+-- all_street_names below). Kept as its own view because it's the one source
+-- with a stable per-row `id` that the OSM/postal/RENNS match tables join
+-- against.
+CREATE VIEW electoral_dedup AS
 SELECT MIN(id) AS id, judet, uat, siruta, street_type, name, name_normalized,
        title, rank, is_saint, is_date, is_numeric, core_name, core_name_norm
 FROM streets
@@ -285,7 +305,7 @@ WITH base AS (
     MAX(is_date)    AS is_date,
     MAX(is_saint)   AS is_saint,
     COUNT(*)        AS street_count
-  FROM streets_dedup
+  FROM electoral_dedup
   WHERE core_name_norm IS NOT NULL
   GROUP BY core_name_norm
 )
@@ -308,16 +328,22 @@ LEFT JOIN nature_terms    n  ON n.core_name_norm  = b.core_name_norm
 LEFT JOIN name_categories c  ON c.core_name_norm  = b.core_name_norm
 LEFT JOIN place_refs      pr ON pr.core_name_norm = b.core_name_norm;
 
--- Additive consolidation of all 4 street-name sources: registry (authoritative,
--- full attributes) + streets OSM/postal/RENNS found that have no registry match.
--- Does not touch streets_dedup. Cross-source comparison must join on
--- core_name_norm, never name_normalized — osm_streets.name_normalized includes
--- the street-type prefix, postal's/RENNS's and the registry's don't. See CODE_SPEC §12, §13.
+-- Additive consolidation of all 4 street-name sources: electoral (full
+-- attributes, from the AEP polling-section source) + streets OSM/postal/RENNS
+-- found that have no electoral match. Anchored on the electoral source only
+-- because it's the one source with stable per-row ids feeding the match
+-- tables (street_osm_matches/street_postal_matches/street_renns_matches) — a
+-- pre-existing implementation detail, not a claim that it outranks the
+-- others (see all_street_names below, and CODE_SPEC §13.8). Does not touch
+-- electoral_dedup. Cross-source comparison must join on core_name_norm,
+-- never name_normalized — osm_streets.name_normalized includes the
+-- street-type prefix, postal's/RENNS's and the electoral source's don't.
+-- See CODE_SPEC §12, §13.
 CREATE VIEW streets_all_sources AS
-SELECT 'registry' AS source, sd.id, sd.judet, sd.uat, sd.siruta, sd.street_type, sd.name,
+SELECT 'electoral' AS source, sd.id, sd.judet, sd.uat, sd.siruta, sd.street_type, sd.name,
        sd.name_normalized, sd.title, sd.rank, sd.is_saint, sd.is_date, sd.is_numeric,
        sd.core_name, sd.core_name_norm, NULL AS source_note
-FROM streets_dedup sd
+FROM electoral_dedup sd
 
 UNION ALL
 
@@ -351,7 +377,7 @@ WHERE r.uat_siruta IS NOT NULL
 -- The true deduplicated master list of "every distinct street name in
 -- Romania, from any of the 4 sources" — unlike streets_all_sources (which
 -- keeps one row PER SOURCE for external-only streets, so 2-3 sources
--- agreeing on the same registry-missing street produce 2-3 rows), this view
+-- agreeing on the same electoral-missing street produce 2-3 rows), this view
 -- collapses cross-source duplicates and keeps every contributing source's
 -- exact name in `variants` (JSON) rather than silently discarding the losers.
 -- `corroboration_count` is how many of the 4 sources have this exact street;
@@ -361,23 +387,25 @@ WHERE r.uat_siruta IS NOT NULL
 -- use for "give me every Romanian street name, deduplicated."
 --
 -- Fully symmetric across all 4 sources (revised 2026-07-08, replacing an
--- earlier registry/external "layer" split): registry is pooled into the same
--- UNION ALL as OSM/postal/RENNS and grouped by exactly the same key,
--- (siruta, street_type, core_name_norm) — same invariant as streets_dedup,
--- a UAT can have both "Bulevardul X" and "Strada X" as genuinely distinct
--- streets, but not two "Strada X"s. This is NOT the same thing as routing
--- through street_osm_matches/street_postal_matches/street_renns_matches
--- (those keep their own independent match tiers, including a type-blind
--- fuzzy_core_name fallback, for their own coverage-report purposes) — here,
--- deliberately, there's no fuzzy/type-blind fallback at all: two entries
--- that share a core name but disagree on street_type are NEVER auto-merged,
--- since that's exactly the ambiguity "type is identity" was meant to
--- resolve (is it one street two sources mislabeled, or two real streets
--- that happen to share a name? not decidable from the data alone). See the
--- `type_variant_candidates` query in docs/queries.sql for surfacing those
--- cases for manual review instead of guessing. `in_registry` (0/1) replaces
--- the old layer column's practical use (filtering "not in the registry").
--- No source is treated as higher-priority than another (2026-07-08 decision,
+-- earlier registry/external "layer" split): the electoral source is pooled
+-- into the same UNION ALL as OSM/postal/RENNS and grouped by exactly the
+-- same key, (siruta, street_type, core_name_norm) — same invariant as
+-- electoral_dedup, a UAT can have both "Bulevardul X" and "Strada X" as
+-- genuinely distinct streets, but not two "Strada X"s. This is NOT the same
+-- thing as routing through street_osm_matches/street_postal_matches/
+-- street_renns_matches (those keep their own independent match tiers,
+-- including a type-blind fuzzy_core_name fallback, for their own
+-- coverage-report purposes) — here, deliberately, there's no fuzzy/type-blind
+-- fallback at all: two entries that share a core name but disagree on
+-- street_type are NEVER auto-merged, since that's exactly the ambiguity
+-- "type is identity" was meant to resolve (is it one street two sources
+-- mislabeled, or two real streets that happen to share a name? not
+-- decidable from the data alone). See the `type_variant_candidates` query
+-- in docs/queries.sql for surfacing those cases for manual review instead
+-- of guessing. `in_electoral` (0/1) replaces the old layer column's
+-- practical use (filtering "not in the electoral source") — the electoral
+-- source is just one of the 4 contributing sources here, not a special
+-- anchor; no source is treated as higher-priority than another (2026-07-08 decision,
 -- reversing an earlier RENNS > OSM > postal ranking) — when sources
 -- disagree on exact spelling within an otherwise-identical group, the
 -- representative name/core_name is simply the alphabetically-first one
@@ -392,9 +420,9 @@ WHERE r.uat_siruta IS NOT NULL
 -- corroborate each other, but "184" and "185" correctly stay separate.
 CREATE VIEW all_street_names AS
 WITH all_entries AS (
-  SELECT 'registry' AS source, sd.siruta, sd.street_type, sd.name,
+  SELECT 'electoral' AS source, sd.siruta, sd.street_type, sd.name,
          sd.core_name, sd.core_name_norm, sd.is_saint, sd.is_date, sd.is_numeric
-    FROM streets_dedup sd
+    FROM electoral_dedup sd
   UNION ALL
   SELECT 'osm', o.uat_siruta, o.street_type, o.name,
          o.core_name, o.core_name_norm, o.is_saint, o.is_date, o.is_numeric
@@ -414,7 +442,7 @@ grouped AS (
          MIN(name) AS name, MIN(core_name) AS core_name, MIN(core_name_norm) AS core_name_norm,
          json_group_array(json_object('source', source, 'name', name, 'street_type', street_type)) AS variants,
          COUNT(DISTINCT source) AS corroboration_count,
-         MAX(CASE WHEN source = 'registry' THEN 1 ELSE 0 END) AS in_registry,
+         MAX(CASE WHEN source = 'electoral' THEN 1 ELSE 0 END) AS in_electoral,
          MAX(is_saint) AS is_saint, MAX(is_date) AS is_date, MAX(is_numeric) AS is_numeric
     FROM all_entries
    GROUP BY siruta, street_type, COALESCE(core_name_norm, name)
@@ -422,7 +450,7 @@ grouped AS (
 SELECT COALESCE(su.judet, ur.judet) AS judet,
        COALESCE(su.uat, ur.uat) AS uat,
        g.siruta, g.street_type, g.name, g.core_name, g.core_name_norm,
-       g.is_saint, g.is_date, g.is_numeric, g.in_registry,
+       g.is_saint, g.is_date, g.is_numeric, g.in_electoral,
        g.corroboration_count, g.variants
   FROM grouped g
   LEFT JOIN (SELECT DISTINCT siruta, judet, uat FROM streets) su ON su.siruta = g.siruta
@@ -480,11 +508,11 @@ con.commit()
 def n(sql): return con.execute(sql).fetchone()[0]
 print(f"Inserted     {inserted}")
 print(f"Aliases      {n('SELECT COUNT(*) FROM street_aliases')}")
-print(f"Deduped      {n('SELECT COUNT(*) FROM streets_dedup')}")
-print(f"Saints       {n('SELECT COUNT(*) FROM streets_dedup WHERE is_saint=1')}")
-print(f"Dates        {n('SELECT COUNT(*) FROM streets_dedup WHERE is_date=1')}")
-print(f"Numeric      {n('SELECT COUNT(*) FROM streets_dedup WHERE is_numeric=1')}")
-print(f"With title   {n('SELECT COUNT(*) FROM streets_dedup WHERE title IS NOT NULL')}")
-print(f"With rank    {n('SELECT COUNT(*) FROM streets_dedup WHERE rank IS NOT NULL')}")
+print(f"Deduped      {n('SELECT COUNT(*) FROM electoral_dedup')}")
+print(f"Saints       {n('SELECT COUNT(*) FROM electoral_dedup WHERE is_saint=1')}")
+print(f"Dates        {n('SELECT COUNT(*) FROM electoral_dedup WHERE is_date=1')}")
+print(f"Numeric      {n('SELECT COUNT(*) FROM electoral_dedup WHERE is_numeric=1')}")
+print(f"With title   {n('SELECT COUNT(*) FROM electoral_dedup WHERE title IS NOT NULL')}")
+print(f"With rank    {n('SELECT COUNT(*) FROM electoral_dedup WHERE rank IS NOT NULL')}")
 print(f"UAT reference {n('SELECT COUNT(*) FROM uat_reference')}")
 con.close()

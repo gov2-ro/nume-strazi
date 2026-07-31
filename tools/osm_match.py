@@ -1,16 +1,16 @@
-"""Populate `street_osm_matches` by joining streets_dedup ↔ osm_streets.
+"""Populate `street_osm_matches` by joining electoral_dedup ↔ osm_streets.
 
 Pass 1: exact match on (siruta, street_type, core_name_norm) — confidence 1.0.
 Pass 2: fallback on (siruta, core_name_norm) only            — confidence 0.5,
-        only for registry rows still unmatched after pass 1.
+        only for electoral-source rows still unmatched after pass 1.
 
 Pass 1 replaced a raw (siruta, name_normalized) string comparison (2026-07-08)
 — that never worked well for OSM specifically, since osm_streets.name_normalized
-includes the street-type prefix while the registry's doesn't (see CODE_SPEC):
-it produced only 490 matches (0.85% of the total), with 99%+ of real matches
-coming from pass 2 instead. But pass 2 alone is type-blind, and 6.3% of the
-matches it produced connected DIFFERENT street types (e.g. registry's
-"Bulevardul X" linked to OSM's "Strada X") — a UAT can legitimately have both
+includes the street-type prefix while the electoral source's doesn't (see
+CODE_SPEC): it produced only 490 matches (0.85% of the total), with 99%+ of
+real matches coming from pass 2 instead. But pass 2 alone is type-blind, and
+6.3% of the matches it produced connected DIFFERENT street types (e.g. the
+electoral source's "Bulevardul X" linked to OSM's "Strada X") — a UAT can legitimately have both
 as distinct real streets, so a type-blind match risks cross-wiring them.
 Comparing (street_type, core_name_norm) directly sidesteps the
 name_normalized incompatibility AND fixes the type-blindness in one move.
@@ -60,11 +60,11 @@ def main():
 
     # Pass 1: same street_type (NULL-safe via IS) + core_name_norm, within the
     # same UAT. We resolve street_id to MIN(id) per (uat, name_normalized,
-    # street_type) — the same grain streets_dedup now uses.
+    # street_type) — the same grain electoral_dedup now uses.
     con.execute(f"""
         INSERT OR IGNORE INTO {target} (street_id, osm_street_id, match_type, confidence)
         SELECT sd.id, o.id, 'exact_type_core', 1.0
-          FROM streets_dedup sd
+          FROM electoral_dedup sd
           JOIN osm_streets   o
             ON o.uat_siruta = sd.siruta
            AND o.core_name_norm = sd.core_name_norm
@@ -78,7 +78,7 @@ def main():
     con.execute(f"""
         INSERT OR IGNORE INTO {target} (street_id, osm_street_id, match_type, confidence)
         SELECT sd.id, o.id, 'fuzzy_core_name', 0.5
-          FROM streets_dedup sd
+          FROM electoral_dedup sd
           JOIN osm_streets   o
             ON o.uat_siruta = sd.siruta
            AND o.core_name_norm = sd.core_name_norm
@@ -87,13 +87,13 @@ def main():
     """)
     fuzzy = con.execute(f"SELECT COUNT(*) FROM {target} WHERE match_type='fuzzy_core_name'").fetchone()[0]
 
-    total_streets = con.execute("SELECT COUNT(*) FROM streets_dedup").fetchone()[0]
+    total_streets = con.execute("SELECT COUNT(*) FROM electoral_dedup").fetchone()[0]
     matched_streets = con.execute(f"SELECT COUNT(DISTINCT street_id) FROM {target}").fetchone()[0]
     matched_osm = con.execute(f"SELECT COUNT(DISTINCT osm_street_id) FROM {target}").fetchone()[0]
 
     print(f"Pass 1 (exact_type_core): {exact}")
     print(f"Pass 2 (fuzzy_core_name): {fuzzy}")
-    print(f"Registry coverage:         {matched_streets}/{total_streets} "
+    print(f"Electoral coverage:        {matched_streets}/{total_streets} "
           f"({100*matched_streets/total_streets:.1f}%)")
     print(f"OSM coverage:              {matched_osm}/{osm_count} "
           f"({100*matched_osm/osm_count:.1f}%)")

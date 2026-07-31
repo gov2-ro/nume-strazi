@@ -67,16 +67,16 @@ def main():
             print(f"    {method:<20} {count}")
 
     print("\n" + "=" * 72)
-    print("REGISTRY COVERAGE PER REFERENCE UAT (postal)")
+    print("ELECTORAL COVERAGE PER REFERENCE UAT (postal)")
     print("=" * 72)
     print(f"{'UAT':<30} {'reg streets':>12} {'matched':>10} {'coverage':>10}")
     for label, siruta in REFERENCE_UATS:
         total = con.execute(
-            "SELECT COUNT(*) FROM streets_dedup WHERE siruta = ?", (siruta,)
+            "SELECT COUNT(*) FROM electoral_dedup WHERE siruta = ?", (siruta,)
         ).fetchone()[0]
         matched = con.execute("""
             SELECT COUNT(DISTINCT sd.id)
-              FROM streets_dedup sd
+              FROM electoral_dedup sd
               JOIN street_postal_matches m ON m.street_id = sd.id
              WHERE sd.siruta = ?
         """, (siruta,)).fetchone()[0]
@@ -87,7 +87,7 @@ def main():
         print(f"{label:<30} {total:>12} {matched:>10} {pct:>9.1f}%")
 
     print("\n" + "=" * 72)
-    print(f"POSTAL STREETS WITH NO REGISTRY MATCH (sample of {args.limit})")
+    print(f"POSTAL STREETS WITH NO ELECTORAL MATCH (sample of {args.limit})")
     print("=" * 72)
     print("(real coverage gaps OR postal noise — eyeball before trusting)\n")
     rows = con.execute("""

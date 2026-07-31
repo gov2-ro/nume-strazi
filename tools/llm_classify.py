@@ -74,7 +74,7 @@ table values and required fields:
 Return ONLY the JSON array, no prose."""
 
 # Sources from all_street_names_cache (all 4 sources: registry, OSM, postal,
-# RENNS), not streets_dedup (registry-only) -- see tools/materialize_all_street_names.py
+# RENNS), not electoral_dedup (electoral-only) -- see tools/materialize_all_street_names.py
 # and docs/BACKLOG.md's "Make all_street_names the dashboard's main corpus"
 # entry. Registry-only classification is a strict subset of this.
 UNCLASSIFIED_SQL = """

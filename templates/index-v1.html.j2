@@ -218,9 +218,9 @@ body {
 {% set male_pct = (section1.total_persons_m / total_gendered * 100) | round | int if total_gendered else 0 %}
 {% set wikidata_total = section4.tier_counts.universal + section4.tier_counts.national + section4.tier_counts.local %}
 <div class="stats-bar">
-  <span><span class="stat-val">{{ "{:,.0f}".format(section1.total_streets).replace(",", ".") }}</span> străzi (Registru)</span>
+  <span><span class="stat-val">{{ "{:,.0f}".format(section1.total_streets).replace(",", ".") }}</span> străzi (4 surse)</span>
   <span class="stat-sep">·</span>
-  <span><a href="{{ base }}/surse/">{{ "{:,.0f}".format(section1.all_sources_total).replace(",", ".") }} combinând 4 surse ↗</a></span>
+  <span><a href="{{ base }}/surse/">Registrul Secțiilor de Vot: {{ "{:,.0f}".format(section1.electoral_total).replace(",", ".") }} ↗</a></span>
   <span class="stat-sep">·</span>
   <span><span class="stat-val">{{ section6.by_judet | length }}</span> județe</span>
   <span class="stat-sep">·</span>

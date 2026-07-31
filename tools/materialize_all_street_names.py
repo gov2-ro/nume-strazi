@@ -1,14 +1,14 @@
 """Materialize the all_street_names view into a fast, indexed cache table.
 
 all_street_names is a live view — a 4-way UNION ALL + GROUP BY +
-json_group_array aggregation over streets_dedup/osm_streets/postal_streets/
+json_group_array aggregation over electoral_dedup/osm_streets/postal_streets/
 renns_streets, recomputed on every query. Measured ~5-8x slower per call than
-streets_dedup, and missing a diacritic-folded name_normalized column (the
+electoral_dedup, and missing a diacritic-folded name_normalized column (the
 identity key used throughout site_queries.py for routing/slugging). Neither
 is a problem for the view's current one-shot-per-build callers
 (sources_overview(), get_source_coverage_by_judet(), the client-side /surse/
 page), but both block ever calling it per-entity in a loop the way
-streets_dedup is used today.
+electoral_dedup is used today.
 
 This creates a SIBLING table, all_street_names_cache — it does not replace
 or touch the all_street_names view itself, which stays the single source of
@@ -17,7 +17,7 @@ truth for "how the union is computed" and keeps working exactly as before.
 Can't live inside build_db.py: the view reads from osm_streets/
 postal_streets/renns_streets, which are populated by separate tools
 (osm_ingest.py, postal_ingest.py, renns_ingest.py) run *after* build_db.py.
-Materializing too early would snapshot a registry-only "union". Run this
+Materializing too early would snapshot an electoral-only "union". Run this
 after the full 4-source ingest pipeline, and re-run any time one of those
 sources is re-ingested — it's idempotent (drops and rebuilds the cache table
 each time).

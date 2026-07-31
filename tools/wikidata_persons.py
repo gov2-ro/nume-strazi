@@ -39,6 +39,51 @@ from typing import Optional, Tuple
 WIKIDATA_API = "https://www.wikidata.org/w/api.php"
 HEADER = ["core_name_norm", "full_name", "wikidata_qid", "confidence", "auto_match"]
 
+INSTANCE_OF = "P31"
+HUMAN = "Q5"
+
+
+def fetch_instance_of(qids: list) -> dict:
+    """Return {qid: (set_of_P31_ids, label)} for up to 50 QIDs in one call."""
+    if not qids:
+        return {}
+    params = {
+        "action": "wbgetentities",
+        "ids": "|".join(qids[:50]),
+        "props": "claims|labels",
+        "languages": "ro|en",
+        "format": "json",
+    }
+    url = f"{WIKIDATA_API}?{urllib.parse.urlencode(params)}"
+    req = urllib.request.Request(
+        url, headers={"User-Agent": "RomanianStreetsAnalysis/1.0"})
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=20) as response:
+                data = json.loads(response.read().decode())
+            break
+        except urllib.error.HTTPError as e:
+            if e.code == 429:
+                time.sleep(5 * (2 ** attempt))
+            else:
+                raise
+    else:
+        return {}
+
+    out = {}
+    for qid, ent in (data.get("entities") or {}).items():
+        if "missing" in ent:
+            continue
+        p31 = {
+            c["mainsnak"]["datavalue"]["value"]["id"]
+            for c in ent.get("claims", {}).get(INSTANCE_OF, [])
+            if c.get("mainsnak", {}).get("datavalue")
+        }
+        labels = ent.get("labels", {})
+        label = ((labels.get("ro") or labels.get("en") or {}).get("value", ""))
+        out[qid] = (p31, label)
+    return out
+
 
 def search_wikidata(name: str, gender: Optional[str], birth_year: Optional[int], death_year: Optional[int]) -> Optional[Tuple[str, float]]:
     """
@@ -83,12 +128,27 @@ def search_wikidata(name: str, gender: Optional[str], birth_year: Optional[int],
     if not results:
         return None
 
+    # Verify P31 before scoring. Label equality alone is not evidence of
+    # personhood: Romania names communes after national figures, so the commune
+    # "Nicolae Bălcescu" (Q940856) carries that exact label and used to win at
+    # 0.95 confidence over the man himself. A 2026-07-31 audit found 84 of 297
+    # curated QIDs wrong this way — 17 communes, 6 taxa, 5 disambiguation pages,
+    # 4 villages. Only entities with P31 = Q5 are eligible now.
+    candidates = [r.get("id") for r in results[:5] if r.get("id")]
+    meta = fetch_instance_of(candidates)
+
     best_match = None
     best_confidence = 0.0
 
     for result in results[:5]:  # Check top 5 results
         qid = result.get("id")
-        result_label = result.get("label", "").lower()
+        p31, verified_label = meta.get(qid, (set(), ""))
+        if HUMAN not in p31:
+            continue
+
+        # Prefer the authoritative label over the search snippet, which varies
+        # with `uselang` and can carry a disambiguator.
+        result_label = (verified_label or result.get("label", "")).lower()
         result_description = result.get("description", "").lower()
 
         # Exact label match

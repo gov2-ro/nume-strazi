@@ -1,5 +1,312 @@
 # Activity History
 
+## 2026-07-31 — OSM UAT assignment rewritten to polygon containment; 84 bogus Wikidata QIDs found and fixed
+
+Triggered by a comparison against numele-strazilor.mariuscomper.uk, an OSM-only
+street-name ranking. User asked how that site could have "more Mihai Eminescu
+streets than we do."
+
+**It doesn't — but the question exposed two real bugs.** Their metric is
+distinct-UAT presence over OSM alone: 477 UATs for "Mihai Eminescu". Our
+4-source union already held 488 for `mihai eminescu` and 515 across all Eminescu
+spellings. Our *OSM layer*, though, only reached 424, and that gap was real.
+
+### Bug 1 — OSM ingest was capped at the electoral source's UAT list
+
+`tools/osm_ingest.py`'s `load_centroid_index()` filtered the SIRUTA centroid pool
+to `SELECT DISTINCT siruta FROM streets`, i.e. to the electoral export's 1,207
+UATs of Romania's 3,181. Two consequences:
+
+- OSM could never cover a UAT the electoral source missed — the starter list
+  silently became the ceiling for every other source, which is precisely the
+  framing the 2026-07-15 rename set out to remove.
+- Worse, out-of-scope ways were not dropped. `nearest_siruta()` searched a ±0.5°
+  (~55 km) grid neighbourhood and snapped them to the nearest *in-scope*
+  centroid, attributing one UAT's streets to a neighbour. Silent contamination,
+  not just missing data.
+
+The old docstring justified nearest-centroid by saying polygon containment
+"cannot be built on Python 3.12". That was true of pyrosm/geopandas but not of
+the approach itself: pyosmium 4.3.1 ships `osmium.area.AreaManager` and shapely
+ships `STRtree`, both already installed.
+
+**New `tools/osm_boundaries.py`** builds `uat_boundaries` from OSM
+`admin_level=8` relations plus Bucharest's six `admin_level=9` "Sector N"
+relations. OSM tags no SIRUTA on Romanian boundaries (`siruta:code` appears on 6
+of 3,379 relations — checked, not assumed), so resolution is geometric: a
+boundary owns the SIRUTA whose reference centroid it contains. Foreign communes
+in the Geofabrik extract (HU/RS/BG/UA overlap) contain no Romanian centroid and
+drop out for free. Resolves **3,183 of 3,185** SIRUTAs in ~15 s.
+
+`tools/osm_ingest.py` now point-in-polygons each way's midpoint against that
+index, with **no nearest-neighbour fallback** — a way outside every boundary is
+dropped and counted, not snapped.
+
+| | before | after |
+|---|---|---|
+| UATs with OSM streets | 1,185 | **2,630** |
+| `osm_streets` rows | 105,905 | **108,489** |
+| UATs with `mihai eminescu` | 424 | **473** |
+| UATs with `principala` | 574 | **779** |
+| UATs in `all_street_names_cache` | 1,207 | **2,708** |
+| union rows corroborated by 3 sources | 11,523 | **13,927** |
+| union rows from a single source | 106,163 | **100,674** |
+| UATs with any Eminescu spelling | 515 | **567** |
+
+Note the union got *smaller* overall (166,048 → 163,404 rows) while corroboration
+rose. That is the fix working: streets the old ingest had snapped into the wrong
+UAT used to appear there as uncorroborated singletons; correctly placed, they now
+merge with the electoral/postal rows for the same street.
+
+Also refreshed the PBF (2026-04-27 → 2026-07-30, now the canonical
+`data/reference/romania-latest.osm.pbf`) and added a materialized `segment_count`
+column via live migration rather than a rebuild (rule #12). Re-ran `osm_match.py`
+(58.3% electoral / 57.1% OSM), `osm_score.py`, `materialize_all_street_names.py`.
+Full `run_queries.py` catalog passes; `classification_coverage_summary` sits at
+74.7% against restore_curation.py's 59.0% floor (the view reads `electoral_dedup`,
+so it is unaffected either way by this work).
+
+### Bug 2 — 28% of curated Wikidata QIDs pointed at the wrong entity
+
+Noticed while merging Eminescu's name variants: `mihai eminescu` → Q184935
+(correct) but `mihail eminescu` → **Q169930, "Extended play"**, a music release
+format. Both rows carried `full_name = "Mihai Eminescu"`, so nothing downstream
+had ever flagged it.
+
+New `tools/audit_person_qids.py` checked all 297 curated QIDs against Wikidata's
+`P31`. **84 were wrong** — 67 not-a-human plus 17 label mismatches. The failure
+was systematic, not random:
+
+| wrong entity type | n | |
+|---|---|---|
+| Q659103 | 17 | commune of Romania |
+| Q16521 | 6 | taxon (a bee, a shrub…) |
+| Q4167410 | 5 | Wikimedia disambiguation page |
+| Q532 | 4 | village |
+
+**Root cause**: `search_wikidata()` scored candidates on label string equality
+alone and never called `get_entity_details()` (defined, but dead code). Romania
+names communes after national figures, so the commune "Nicolae Bălcescu"
+(Q940856) carries that exact label and beat the historian (Q513394) at 0.95
+confidence. Q659103 dominating the wrong-entity list is that pattern precisely.
+
+Fixed by gating every candidate on `P31 = Q5` before scoring, verified against
+the exact names that had failed: Decebal Q903230 (village) → Q28928, Vlad Țepeș
+Q44611 ("Kawachi district") → Q43715, Ana Aslan Q437004 ("Altendorf") → Q270262.
+
+This was not cosmetic — QIDs feed gender, era, birthplace, cause-of-death and
+sitelink enrichment, so ~28% of that was drawn from communes and shrubs.
+
+Outcome: 71 keys cleared, **44 re-resolved** to verified humans, 15 with no human
+match (`Crișan`, `Horia`, `Dragoș Vodă`, `Aprodul Purice`, `Frații Buzești` and
+the Hungarian-form names — mostly figures Wikidata indexes under a different
+label). ~12 more hit Wikidata 429 exhaustion and were skipped, so they remain
+NULL and need a retry pass. Net `persons.wikidata_qid` coverage 297 → 270, but
+all 270 are now P31-verified rather than 213 verified + 84 wrong.
+
+**Durability trap found while fixing this**: `tools/restore_curation.py` step 7
+replays `data/curation/wikidata_qids.csv` with `--force` after every rebuild, and
+31 of that file's 254 rows carried rejected QIDs — so correcting the DB alone
+would have been undone by the next rebuild. Added
+`audit_person_qids.py --sync-replay-csv` (no API traffic; rewrites the trail from
+the verified DB) and ran it: 294 rows, 37 changed, 18 now blank.
+
+### Query layer
+
+`top_names_national` ran on `electoral_dedup` and ranked by raw occurrence
+count. Repointed to `all_street_names_cache` (nothing else consumed it — checked)
+and switched the headline metric to distinct-UAT reach, with OSM segment/km
+columns alongside. Added `top_honorees_national`, which groups by person identity
+(`wikidata_qid`, else `full_name`) instead of by name key — without it, every
+honoree spelled more than one way is undercounted, and the most-honoured ones
+worst, since fame produces spelling variety (Eminescu has 14 key spellings).
+
+### UI: union becomes the headline corpus (54-reference audit)
+
+Nothing above was visible until the site was rebuilt — `dist/` still held the
+Jul-15 build (166,048 rows / 1,207 UATs). Rebuilt `dist/streets.db` (68.6 MB,
+`uat_boundaries` added to the drop list so its 33 MB of geometry doesn't ship)
+and the site.
+
+Then, at the user's instruction, audited **all 54 `electoral_dedup` references**
+in `site_queries.py` rather than only the headline ones:
+
+- **46 repointed** to `all_street_names_cache` across `section1`, `section3`,
+  `section4`, `section8`, `section_geo`, `municipii_index`, `_contest_*`.
+- **8 deliberately kept** — every one in `section_quirky`, which joins
+  `electoral_dedup.id` → `street_osm_matches` for the OSM length/geometry panels.
+  Phase 2 of the BACKLOG item already ruled these stay electoral-scoped: OSM km
+  is inherently OSM-specific, not a "which corpus" question.
+- `COUNT(sd.id)` → `COUNT(*)` where the cache has no `id` column.
+
+**The Phase 1 gate was measured, not assumed.** The BACKLOG said the headline
+"must not switch before running a classification pass … so switching visible
+classification percentages doesn't crater them." Actual figures: **73.2%
+(electoral) vs 68.9% (union)** — a 4.3pp drop. Flipped on that basis, and
+recorded the real number in the code comment. Worth noting the unclassified
+backlog grew 25,269 → 39,497 distinct keys *because of* the OSM fix — 1,500 new
+UATs bring new names with them.
+
+**Identity merging** applied to the ranking queries: honorees now group by
+`COALESCE(p.wikidata_qid, p.full_name)` (new `PERSON_IDENTITY` constant) instead
+of by `core_name_norm`. This merges only what curation already declared to be one
+person, so it makes no new identity claims and stays inside the "don't auto-merge
+identities" rule. Eminescu 308 → 693 occurrences; the male/female honoree counts
+*dropped* (1,024/55 → 986/52) because Cuza's 4 keys had been counted as 4 people.
+
+Landing page now reads **163.404 străzi (4 surse) / 2.708 UAT-uri**, with the
+electoral figure (107.957) demoted to the secondary line. The three templates'
+caption "Doar Registrul Secțiilor de Vot" sat under a number that was no longer
+electoral-only, so it was corrected in all variants and marked
+`[needs RO editorial review]` — factual edit, not a Romanian-native pass.
+
+Test suite: 49 passed, 3 failed — the same 3 pre-existing failures already logged
+in BACKLOG (stale `href` assertions ×2, a missing `uat_slug` field). No new ones.
+
+### Not done
+
+- **RENNS**: `renns_streets` is empty (0 rows) — its records were lost in an
+  earlier rebuild (the rule #12 failure mode, applied to a source table rather
+  than to curation), and the RENNS site is currently compromised and offline, so
+  re-ingest is impossible rather than merely deferred. Every union figure in this
+  entry is therefore a 3-source number; expect them to rise when RENNS returns.
+  `docs/BACKLOG.md` already tracks that the union total should recover to ~224k.
+- `highway=track` inclusion, the remaining ~935 unresolved persons, the 17
+  `label_mismatch` QIDs, and 2 Hungarian-named UATs: all filed in
+  `docs/BACKLOG.md` under a new P1 block.
+
+### Note on data loss
+
+The user reported that data had been deleted during earlier refactoring. That is
+correct, and it refers to the **RENNS records**: `renns_streets` still exists as
+a table but holds 0 rows, wiped by a `build_db.py` rebuild — rule #12's failure
+mode applied to a source table rather than to curation, which is the case the
+rule's wording doesn't currently cover (it enumerates curation tables only).
+`tools/restore_curation.py` likewise restores curation but asserts nothing about
+source-table row counts, so the loss was silent both times.
+
+The full DB was checked first and was intact (194 MB, `PRAGMA quick_check` = ok,
+127,364 streets / 107,957 dedup / 1,232 persons) — worth doing before acting,
+since the reflexive remedy for a missing DB is `build_db.py`, which would have
+destroyed the curation that was still there. A backup was taken to
+`data/streets.db.bak-preosm` before the re-ingest regardless.
+
+Follow-ups worth considering: widen rule #12 to name source tables explicitly,
+and have `restore_curation.py` assert non-zero `osm_streets`/`postal_streets`/
+`renns_streets` counts the way it already asserts classification coverage.
+
+---
+
+## 2026-07-15 — Renamed "registry" → "electoral"; `streets_dedup` → `electoral_dedup`
+
+User pushed back hard on the codebase's habit of calling the AEP
+electoral/polling-section source "the registry" and treating `streets_dedup`
+(its dedup view) as the implicit default "streets of Romania" everywhere:
+*"this is not a website about the voting polls registry. that's just one of
+the sources... it has no special status, all sources are relevant."* This is
+the same principle CODE_SPEC.md §13.8/§14.5 already documented for
+`all_street_names` ("no source is ranked above another") — the ask was to
+apply it consistently to naming too, not just to the union view's own logic.
+
+Scoped via 3 parallel Explore agents (full "registry"/"Registru" inventory —
+333 occurrences across the requested files, plus README.md/dashboards.yml/
+metadata.json/notebooks; a trace of everything depending on `streets_dedup`'s
+specific electoral-only semantics — its `id` column feeding the OSM/postal/
+RENNS match tables turned out to be the only hard technical dependency; and a
+CODE_SPEC.md design-rationale survey confirming this reverses a still-open
+`docs/BACKLOG.md` item, not a new direction) plus 1 Plan agent, then a direct
+verification read of every high-risk file before editing.
+
+**Decision** (user's explicit pick between two options): `all_street_names`/
+`all_street_names_cache` keep their existing name — already well-documented,
+already the target of 16 `site_queries.py` functions repointed earlier the
+same session, so zero rework there. The old registry-only `streets_dedup`
+view is renamed to `electoral_dedup`, unchanged in every other respect (same
+columns, same `id`, same `(siruta, name_normalized, street_type)` grouping) —
+still needed exactly as before by the 3 match-table populate scripts, the 3
+sanity tools, and `site_queries.py`'s `section_quirky` (the only function
+with a real `.id` → `street_osm_matches` dependency; `municipii_index`/
+`sources_overview`/`get_source_coverage_by_judet` turned out not to need it,
+correcting an earlier assumption in `docs/BACKLOG.md`).
+
+**What changed**: `build_db.py` (view rename, `'registry'`→`'electoral'`
+source-tag literal in `streets_all_sources`/`all_street_names`, `in_registry`
+→`in_electoral`, a stale "registry (authoritative)" comment that was already
+inconsistent with the project's own no-ranking principle); all 6 OSM/postal/
+RENNS ingest/match/sanity tools plus `filter_server.py`, `gen_og_image.py`,
+`resolve_reversed_person_duplicates.py`, `materialize_all_street_names.py`,
+`llm_classify.py`, `export_unclassified.py`; `tools/build_dist_db.py`
+(materialization block + index names — confirmed the shipped dist DB was
+already correctly shipping the union as a real `all_street_names` table, no
+design change needed there); `site_queries.py` (`section1`/`section3`/
+`section4`/`section_geo`/`section8`/`municipii_index`/`section_quirky` plus
+the `sources_overview`/`get_source_coverage_by_judet` JSON-literal filter and
+returned dict key); `templates/surse.html.j2` (CSS custom properties/classes,
+`data-key` attributes, Jinja context reads, and hand-written client-side SQL/
+JS that independently hardcoded the same `'registry'` literal — all changed
+in lockstep with `site_queries.py`'s `sources_overview`, since they share no
+remapping layer); landing-page templates' "(Registru)" parenthetical;
+`docs/queries.sql` (5 named-query renames — `registry_osm_gap` etc. →
+`electoral_osm_gap` etc. — plus alias renames and section headers);
+`CLAUDE.md`, `README.md`, `docs/CODE_SPEC.md`, one open `docs/BACKLOG.md`
+item; `dashboards.yml`/`metadata.json`/`notebooks/*.ipynb`.
+
+**Explicitly not touched**: real-world citations ("Registrul Secțiilor de
+Vot", "Autoritatea Electorală Permanentă", RENNS's own official name
+"Registrul Electronic Național al Nomenclaturii Stradale", the source xlsx
+filenames under `data/reference/`) — these are facts about the data, not an
+internal naming choice. Also left alone: unrelated words sharing the same
+root ("înregistrat(ă)(ți)" = "registered", a normal participle; `wiki_
+birthplace.py`'s unrelated internal "registry code" for județ abbreviations),
+the match-table architecture (still anchored to `electoral_dedup.id`, since
+only the electoral source has stable per-row ids feeding a match system —
+a pre-existing implementation detail, not a primacy claim; redesigning it
+into a symmetric any-source-to-any-source system is a separate, much bigger
+project), and every historical/closed entry in this file and `BACKLOG.md`.
+
+Verified: fresh `build_db.py` + `build_dist_db.py` runs against a scratch DB
+produce `electoral_dedup`/`all_street_names` with the expected columns and
+row counts unchanged (107,957); every touched `site_queries.py` function
+smoke-tested clean against a freshly-built schema; `docs/queries.sql`'s
+renamed named queries execute correctly via `run_queries.py`; all edited
+templates parse cleanly under Jinja2. Full pipeline rebuild + `pytest` +
+browser spot-check of `/surse/` still pending (next step).
+
+## 2026-07-14 — Evaluated osmnames/openstreetdata/overturemaps as a 5th source; rejected all three
+
+Backlog P3 item asked to look into three candidate street-name sources
+before writing any ingestion code, per `docs/INGESTION_PIPELINE.md`'s own
+rule (probe before committing to a design — the rule RENNS's crawl design
+was built on). Research-only, no schema/code changes.
+
+**osmnames.org and openstreetdata.org**: both are pure re-derivations of
+OpenStreetMap (a stale gazetteer last released Dec 2022, and a
+single-maintainer Geofabrik-style PBF/TSV mirror, respectively). Since
+`tools/osm_ingest.py` already reads the live OSM PBF directly with its own
+SIRUTA resolution and feature extraction, either would only ever be an
+older, coarser subset of `osm_streets`. Rejected without further probing —
+no plausible path to new information.
+
+**overturemaps.org**: the only real multi-source candidate (~40% OSM +
+TomTom + ~175 regional feeds), so it got an empirical probe instead of a
+documentation-only judgment. Addresses theme: confirmed via its own docs
+that Romania isn't in the 34-country coverage list — zero rows, dead end.
+Transportation theme (where street names would live): queried directly with
+DuckDB (`spatial`+`httpfs` extensions, no full download) against
+`s3://overturemaps-us-west-2/release/2026-06-17.0/theme=transportation/type=segment/`,
+bbox-filtered to Romania. Of 2,342,570 road segments, 98.6% cite
+OpenStreetMap as a source; the remaining 32,435 cite TomTom with zero OSM
+overlap — but **all 32,435 are unnamed** (`count(names.primary)=0` across
+every road class, mostly `class='unknown'` connector/routing fragments).
+TomTom's exclusive Romanian contribution in this release carries no street
+names at all, so there's nothing to gain even in OSM-sparse regions like
+Gorj — the null result was exhaustive nationally, no per-UAT check needed.
+
+**Decision**: don't build `overturemaps_ingest.py`. Logged in
+`docs/BACKLOG.md` with the exact numbers and release version, so this isn't
+re-litigated without re-probing a newer Overture release first (TomTom has
+stated intent to keep adding non-OSM sources over time — this could change).
+
 ## 2026-07-14 — Cleanup pass before classifying the union's new keys (Phase 1 prep)
 
 Direct continuation of the union-as-main-corpus work (previous entry). User's

@@ -5,7 +5,7 @@ columns ready for classification. Fill in category/subcategory (or whichever
 lookup table columns apply), then import with tools/import_csv.py.
 
 Sources from all_street_names_cache (all 4 sources: registry, OSM, postal,
-RENNS), not streets_dedup (registry-only) -- see
+RENNS), not electoral_dedup (electoral-only) -- see
 tools/materialize_all_street_names.py and docs/BACKLOG.md's "Make
 all_street_names the dashboard's main corpus" entry. Registry-only
 classification is a strict subset of this.

@@ -20,7 +20,7 @@ Geolocation of individual streets is explicitly out of scope for the data layer 
 These are not bugs. They are properties of the source dataset that must be respected throughout.
 
 1. **Polling-section bias.** This is the *electoral* view of streets. Streets without registered voters are excluded. For most analyses this is fine; flag where it matters (e.g. comparing total street counts to OSM).
-2. **Row repetition.** A single street that spans multiple polling sections appears once per section. Frequency analysis must dedup on `(uat, name_normalized)` first. The `streets_dedup` view handles this.
+2. **Row repetition.** A single street that spans multiple polling sections appears once per section. Frequency analysis must dedup on `(uat, name_normalized)` first. The `electoral_dedup` view handles this.
 3. **Diacritic mixing.** The dataset uses the pre-1993 cedilla forms (`ş`, `ţ`) and the post-1993 comma-below forms (`ș`, `ț`) interchangeably. We normalize to post-1993 on ingest.
 4. **Orthography reform of 1993.** The reform changed many `î`→`â` mid-word. Both forms exist for the same street name. We collapse `î ≡ â` *only* in the matching key (`name_normalized`, `core_name_norm`); the display column (`name`) preserves the original form.
 5. **Parenthetical aliases.** Some `Arteră` cells contain `(Strada X)` — historical names. These are extracted into `street_aliases`. Single-letter administrative tags like `(D)` are filtered out (`len > 2` rule).
@@ -35,8 +35,8 @@ These are not bugs. They are properties of the source dataset that must be respe
 | `streets` flat table + 4 curated lookup tables | Curated data evolves independently. Lookups join on `core_name_norm`. |
 | Display vs. matching layers | `name` for humans (preserves orthographic variants); `name_normalized` for joins/groupby. |
 | Greedy prefix peeling for title/rank/saint | Handles "Colonel Dr. Ion X" without combinatorial regex. |
-| `streets_dedup` view, not materialization | Keeps the source rows intact for raw inspection. Re-evaluates cheaply at 140k. |
-| `streets_dedup` dedup key includes `street_type` (`siruta, name_normalized, street_type`) | Revised 2026-07-08 (§14) — a UAT can have both `Bulevardul X` and `Strada X` as genuinely distinct streets; the prior key (without `street_type`) silently merged them. |
+| `electoral_dedup` view, not materialization | Keeps the source rows intact for raw inspection. Re-evaluates cheaply at 140k. |
+| `electoral_dedup` dedup key includes `street_type` (`siruta, name_normalized, street_type`) | Revised 2026-07-08 (§14) — a UAT can have both `Bulevardul X` and `Strada X` as genuinely distinct streets; the prior key (without `street_type`) silently merged them. |
 
 **Deferred decisions** (call out in PRs that touch them):
 - Dashboard runtime
@@ -97,7 +97,7 @@ name_categories  (core_name_norm PK, category, subcategory, notes)
 place_refs       (core_name_norm PK, place_name, place_type, country, notes)
 
 -- Views
-streets_dedup    -- one row per (uat, name_normalized); use this for ALL frequency analysis
+electoral_dedup    -- one row per (uat, name_normalized); use this for ALL frequency analysis
 ```
 
 Indexes: `judet`, `uat`, `name_normalized`, `core_name_norm`, `street_type`, `(is_saint,is_date,is_numeric)`, `alias_normalized`.
@@ -205,7 +205,7 @@ ON CONFLICT(core_name_norm) DO UPDATE SET
 
 ## 9. Query catalog overview
 
-`queries.sql` contains 20+ named queries grouped by dashboard view. Each query stands alone, queries `streets_dedup` (never `streets` directly for analytical purposes), and joins curated tables via `core_name_norm`.
+`queries.sql` contains 20+ named queries grouped by dashboard view. Each query stands alone, queries `electoral_dedup` (never `streets` directly for analytical purposes), and joins curated tables via `core_name_norm`.
 
 View groupings (name prefix in the file):
 - `overview_*` — KPI tiles, street-type distribution
@@ -223,8 +223,8 @@ When adding queries: name them, comment the intent, prefer CTEs over nested subq
 
 ### P0 — Scaling
 
-- [ ] Run `build_db.py` against the full 140k registry. Add a `--limit N` flag for fast iteration.
-- [ ] Verify `streets_dedup` count drops to a reasonable distinct-street total (rough estimate: 80k-100k unique names across UATs). If it doesn't, the dedup grouping is wrong.
+- [ ] Run `build_db.py` against the full 140k electoral-source export. Add a `--limit N` flag for fast iteration.
+- [ ] Verify `electoral_dedup` count drops to a reasonable distinct-street total (rough estimate: 80k-100k unique names across UATs). If it doesn't, the dedup grouping is wrong.
 - [ ] Verify all 41 județe + Bucharest sectors are present.
 
 ### P1 — Curation tooling
@@ -275,7 +275,7 @@ Goal: attach geometry, road class, and an importance score to streets that exist
 
 ### 11.2 Dependency exception
 
-The OSM path imports `osmium` and `shapely`. This is the **only** documented exception to the "stdlib + openpyxl" rule for ETL. Justification: PBF parsing without bindings is not feasible; `geopandas` is intentionally avoided (heavier dep tree, no benefit here). The registry ETL (`build_db.py`) remains stdlib-only.
+The OSM path imports `osmium` and `shapely`. This is the **only** documented exception to the "stdlib + openpyxl" rule for ETL. Justification: PBF parsing without bindings is not feasible; `geopandas` is intentionally avoided (heavier dep tree, no benefit here). The electoral-source ETL (`build_db.py`) remains stdlib-only.
 
 Install in the project venv (`~/devbox/envs/240826/`): `pip install osmium shapely`.
 
@@ -285,7 +285,7 @@ Note: `pyrosm` was the originally planned dep but cannot build on Python 3.12 (`
 
 | Table | Grain | Notes |
 |---|---|---|
-| `osm_streets` | one row per `(uat_siruta, name_normalized)` | OSM splits a single street into many ways at intersections; `tools/osm_ingest.py` merges them before insert. Mirrors `streets_dedup`'s grain. |
+| `osm_streets` | one row per `(uat_siruta, name_normalized)` | OSM splits a single street into many ways at intersections; `tools/osm_ingest.py` merges them before insert. Mirrors `electoral_dedup`'s grain. |
 | `street_osm_matches` | one row per `(street_id, osm_street_id)` | Two pass types: `exact_normalized` (confidence 1.0), `fuzzy_core_name` (0.6). Below this threshold we don't auto-link — see §11.6. |
 
 ### 11.4 Pipeline
@@ -301,7 +301,7 @@ Each step is idempotent. `osm_ingest.py --rebuild` truncates `osm_streets` first
 
 ### 11.5 UAT assignment
 
-Each OSM way is assigned to a UAT by **nearest-centroid matching**: the way's midpoint is compared against a spatial grid of UAT centroids loaded from `data/gis/populatie-romana-siruta-coords.csv`, filtered to SIRUTAs present in the registry DB.
+Each OSM way is assigned to a UAT by **nearest-centroid matching**: the way's midpoint is compared against a spatial grid of UAT centroids loaded from `data/gis/populatie-romana-siruta-coords.csv`, filtered to SIRUTAs present in the electoral-source DB.
 
 Grid is 0.5°×0.5° cells (≈ 50 km), so each lookup checks only the way's cell plus the 8 adjacent cells — typically 9–54 candidates instead of all 1207 UATs. Fast enough for 4M ways without numpy.
 
@@ -328,11 +328,11 @@ Weights (`tools/osm_score.py`): `primary=5, secondary=4, tertiary=3, residential
 
 ### 11.7 Match strategy
 
-Pass 1 `exact_type_core` (1.0): `streets_dedup.(siruta, street_type, core_name_norm)` ↔ `osm_streets.(uat_siruta, street_type, core_name_norm)`, `street_type` compared NULL-safe (SQLite `IS`).
+Pass 1 `exact_type_core` (1.0): `electoral_dedup.(siruta, street_type, core_name_norm)` ↔ `osm_streets.(uat_siruta, street_type, core_name_norm)`, `street_type` compared NULL-safe (SQLite `IS`).
 
-Pass 2 `fuzzy_core_name` (0.5, only for unmatched registry rows): same join on `core_name_norm` alone, ignoring `street_type`.
+Pass 2 `fuzzy_core_name` (0.5, only for unmatched electoral-source rows): same join on `core_name_norm` alone, ignoring `street_type`.
 
-**Revised 2026-07-08** (was: raw `name_normalized` string match at pass 1, confidence 0.6 at pass 2). The original pass 1 compared `osm_streets.name_normalized` (which includes the street-type prefix, e.g. `"bulevardul mircea eliade"`) against the registry's `name_normalized` (which never included it, stripped upstream in `parse_artery()`) — an near-permanent mismatch that made pass 1 a near no-op (490 matches, 0.85% of the total) with 99%+ of real matches falling through to the type-blind pass 2. That type-blindness then risked cross-wiring two genuinely distinct streets sharing a core name but differing by type (e.g. registry's `Bulevardul 1 Decembrie 1918` linked to OSM's `Strada 1 Decembrie 1918` in Alba Iulia, which — after the `streets_dedup` fix below — are confirmed to both really exist): 3,665 of 57,927 matches (6.3%) connected different street types. Comparing `(street_type, core_name_norm)` directly sidesteps the `name_normalized` incompatibility and fixes the type-blindness in one move; pass 2's confidence is lowered to reflect the residual risk for cases it still has to guess on. See §14.
+**Revised 2026-07-08** (was: raw `name_normalized` string match at pass 1, confidence 0.6 at pass 2). The original pass 1 compared `osm_streets.name_normalized` (which includes the street-type prefix, e.g. `"bulevardul mircea eliade"`) against the electoral source's `name_normalized` (which never included it, stripped upstream in `parse_artery()`) — an near-permanent mismatch that made pass 1 a near no-op (490 matches, 0.85% of the total) with 99%+ of real matches falling through to the type-blind pass 2. That type-blindness then risked cross-wiring two genuinely distinct streets sharing a core name but differing by type (e.g. the electoral source's `Bulevardul 1 Decembrie 1918` linked to OSM's `Strada 1 Decembrie 1918` in Alba Iulia, which — after the `electoral_dedup` fix below — are confirmed to both really exist): 3,665 of 57,927 matches (6.3%) connected different street types. Comparing `(street_type, core_name_norm)` directly sidesteps the `name_normalized` incompatibility and fixes the type-blindness in one move; pass 2's confidence is lowered to reflect the residual risk for cases it still has to guess on. See §14.
 
 We deliberately stop there. Levenshtein on ~100k×100k name pairs produces enough false positives to poison the importance index downstream — better to surface gaps in `tools/osm_sanity.py` than auto-link.
 
@@ -342,40 +342,40 @@ The `geocoded_streets` table stub mentioned in §10.P3 is superseded by this pip
 
 ### 11.9 Feature-column extension (2026-07-08)
 
-`osm_streets` originally only carried `core_name_norm` (street-type-stripped, via `strip_street_type`), while the registry's `core_name_norm` is type-stripped *and* honorific-stripped (via `extract_features`). This meant an OSM `Strada Sfântul Andrei` (core "Sfântul Andrei") never matched a registry street honoring the same saint (core "Andrei", `is_saint=1`) — `fuzzy_core_name` compared apples to oranges.
+`osm_streets` originally only carried `core_name_norm` (street-type-stripped, via `strip_street_type`), while the electoral source's `core_name_norm` is type-stripped *and* honorific-stripped (via `extract_features`). This meant an OSM `Strada Sfântul Andrei` (core "Sfântul Andrei") never matched an electoral-source street honoring the same saint (core "Andrei", `is_saint=1`) — `fuzzy_core_name` compared apples to oranges.
 
-Fixed by extending `osm_streets` with `street_type`, `title`, `rank`, `is_saint`, `is_date`, `is_numeric`, `core_name` (alongside the existing `core_name_norm`), computed by `tools/osm_ingest.py` via the now-shared `extract_features()` (promoted to `streets_lib.py`, see §12.2). Registry/OSM coverage moved from 52.1%/53.3% to 53.3%/54.6% after re-running `osm_ingest.py --rebuild` + `osm_match.py` — a real, if modest, improvement, not noise.
+Fixed by extending `osm_streets` with `street_type`, `title`, `rank`, `is_saint`, `is_date`, `is_numeric`, `core_name` (alongside the existing `core_name_norm`), computed by `tools/osm_ingest.py` via the now-shared `extract_features()` (promoted to `streets_lib.py`, see §12.2). Electoral/OSM coverage moved from 52.1%/53.3% to 53.3%/54.6% after re-running `osm_ingest.py --rebuild` + `osm_match.py` — a real, if modest, improvement, not noise.
 
 This also gives `streets_all_sources` (§12.6) genuine column parity across all three sources instead of NULL-padding the OSM arm.
 
 ## 12. Postal-code enrichment pipeline
 
-Goal: a second independent street-name source (Poșta Română's postal-code registry) to cross-reference against the AEP registry and OSM, surfacing streets none of the three sources alone would catch. Unlike OSM (geometry/importance scoring), postal-code data has no independent value beyond names — its only role is completeness checking.
+Goal: a second independent street-name source (Poșta Română's postal-code registry) to cross-reference against the AEP electoral source and OSM, surfacing streets none of the three sources alone would catch. Unlike OSM (geometry/importance scoring), postal-code data has no independent value beyond names — its only role is completeness checking.
 
 ### 12.1 Source
 
-- `data/reference/coduri-postale+/infocod-cu-siruta-mai-2016.xlsx` (May 2016 snapshot). Three sheets: `Bucuresti` (12,400 rows, street-level, direct SIRUTA per sector), `Localitati peste 50.000 loc` (29,204 rows, street-level, direct SIRUTA-equivalent), `Localitati sub 50.000 loc` (13,803 rows, **locality-level only — no street columns at all**). Only the first two sheets are ingested; the third contributes nothing to street names and is a structural coverage gap this source cannot close (small/rural towns rely on the registry and OSM instead).
+- `data/reference/coduri-postale+/infocod-cu-siruta-mai-2016.xlsx` (May 2016 snapshot). Three sheets: `Bucuresti` (12,400 rows, street-level, direct SIRUTA per sector), `Localitati peste 50.000 loc` (29,204 rows, street-level, direct SIRUTA-equivalent), `Localitati sub 50.000 loc` (13,803 rows, **locality-level only — no street columns at all**). Only the first two sheets are ingested; the third contributes nothing to street names and is a structural coverage gap this source cannot close (small/rural towns rely on the electoral source and OSM instead).
 - **Evaluated and excluded**: `data/reference/coduri-postale+/coduri_postale.sql`, a 2009 MySQL dump (51,898 rows, no SIRUTA). Its apparent appeal — covering small towns the 2016 xlsx omits — does not hold up empirically: of 51,898 rows, only 48 distinct localities have any street-level data at all (the rest are locality-only codes, the same structural gap as the excluded xlsx sheet). Of those 48, 47 are already fully covered by the 2016 xlsx (the one apparent miss, "Drobeta-Turnu S", is a truncated "Drobeta-Turnu Severin", itself in the xlsx). It adds zero new locality coverage — not worth the parsing complexity (raw SQL `INSERT` statements, no SIRUTA) for a stale second witness on towns already covered.
 - **Also excluded**: `data/reference/infocod-mai-2016+.csv` — a flattened, SIRUTA-less duplicate of the xlsx's first two sheets. Strictly redundant.
 
 ### 12.2 Dependency exception
 
-None. Stays stdlib + openpyxl, like the registry ETL — the xlsx needs only `openpyxl`, already a dependency.
+None. Stays stdlib + openpyxl, like the electoral-source ETL — the xlsx needs only `openpyxl`, already a dependency.
 
 ### 12.3 Tables
 
 | Table | Grain | Notes |
 |---|---|---|
-| `postal_streets` | one row per `(uat_siruta, name_normalized)` | Same grain as `osm_streets`/`streets_dedup`. `name` **excludes** the street-type prefix (unlike `osm_streets.name`) — the source already separates `Tip artera`/`Denumire artera`, so `name_normalized` is directly comparable to the registry's. |
+| `postal_streets` | one row per `(uat_siruta, name_normalized)` | Same grain as `osm_streets`/`electoral_dedup`. `name` **excludes** the street-type prefix (unlike `osm_streets.name`) — the source already separates `Tip artera`/`Denumire artera`, so `name_normalized` is directly comparable to the electoral source's. |
 | `street_postal_matches` | one row per `(street_id, postal_street_id)` | Three pass types: `exact_normalized` (1.0), `fuzzy_core_name` (0.6), `reordered_core_name` (0.4) — see §12.5. |
 
 ### 12.4 UAT resolution — empirical corrections
 
-Two mislabeled/untrustworthy-column traps discovered by validating against the live registry, not assumed:
+Two mislabeled/untrustworthy-column traps discovered by validating against the live electoral source, not assumed:
 
-1. **`Localitati peste 50.000 loc` sheet: use `SIRSUP`, not the column literally named `SIRUTA`.** Verified: the `SIRUTA` column matches 0/47 registry SIRUTAs (it's a finer-grained internal postal sub-locality/zone code); `SIRSUP` ("SIRUTA superior") matches 47/47.
-2. **`Bucuresti` sheet: the reverse — use `SIRUTA SECTOR`, not `SIRSUP`.** `SIRSUP` there is always 179132 (the whole-municipality code, absent from the registry, which only has sector-level SIRUTAs for București). `SIRUTA SECTOR` matches the registry's 179141–179196 directly, verified 6/6.
-3. **Even a "direct" code isn't always trustworthy.** Example: Câmpulung Moldovenesc's postal SIRUTA (146511, on the excluded sub-50k sheet) differs from the registry's (146502) for the same town. `tools/postal_ingest.py` always validates the resolved code against the live `streets.siruta` set and falls back to județ+localitate name-matching (against `data/gis/populatie-romania-siruta-coords.csv`) when it isn't found.
+1. **`Localitati peste 50.000 loc` sheet: use `SIRSUP`, not the column literally named `SIRUTA`.** Verified: the `SIRUTA` column matches 0/47 electoral-source SIRUTAs (it's a finer-grained internal postal sub-locality/zone code); `SIRSUP` ("SIRUTA superior") matches 47/47.
+2. **`Bucuresti` sheet: the reverse — use `SIRUTA SECTOR`, not `SIRSUP`.** `SIRSUP` there is always 179132 (the whole-municipality code, absent from the electoral source, which only has sector-level SIRUTAs for București). `SIRUTA SECTOR` matches the electoral source's 179141–179196 directly, verified 6/6.
+3. **Even a "direct" code isn't always trustworthy.** Example: Câmpulung Moldovenesc's postal SIRUTA (146511, on the excluded sub-50k sheet) differs from the electoral source's (146502) for the same town. `tools/postal_ingest.py` always validates the resolved code against the live `streets.siruta` set and falls back to județ+localitate name-matching (against `data/gis/populatie-romania-siruta-coords.csv`) when it isn't found.
 
 In practice, both ingested sheets resolved 100% via their direct column (47/47 SIRSUP, 6/6 SIRUTA SECTOR) — the name-match fallback exists as a safety net, not because it's regularly needed.
 
@@ -383,9 +383,9 @@ In practice, both ingested sheets resolved 100% via their direct column (47/47 S
 
 `tools/postal_match.py`, same shape as `osm_match.py` plus a third pass:
 
-1. `exact_type_core` (1.0) — `(siruta, street_type, core_name_norm)`, `street_type` compared NULL-safe. This is the workhorse pass for postal (postal `name` is already type-stripped like the registry's, not embedded like OSM's).
+1. `exact_type_core` (1.0) — `(siruta, street_type, core_name_norm)`, `street_type` compared NULL-safe. This is the workhorse pass for postal (postal `name` is already type-stripped like the electoral source's, not embedded like OSM's).
 2. `fuzzy_core_name` (0.5) — `(siruta, core_name_norm)` only, unmatched rows only.
-3. `reordered_core_name` (0.4) — `(siruta, core_name_norm_swapped)`, unmatched rows only, left type-blind (already the lowest-confidence fallback; small match volume didn't justify splitting it further). Postal person-names are frequently **"Surname Firstname"** (reversed vs. the registry's "Firstname Surname" — e.g. "Alecsandri Vasile" vs. registry's "Vasile Alecsandri"; titles also appear as trailing comma-suffixes, `"Mincu Ion, arh."`, rather than the registry's leading-prefix convention). `core_name_norm_swapped` is a 2-token reorder computed at ingest.
+3. `reordered_core_name` (0.4) — `(siruta, core_name_norm_swapped)`, unmatched rows only, left type-blind (already the lowest-confidence fallback; small match volume didn't justify splitting it further). Postal person-names are frequently **"Surname Firstname"** (reversed vs. the electoral source's "Firstname Surname" — e.g. "Alecsandri Vasile" vs. the electoral source's "Vasile Alecsandri"; titles also appear as trailing comma-suffixes, `"Mincu Ion, arh."`, rather than the electoral source's leading-prefix convention). `core_name_norm_swapped` is a 2-token reorder computed at ingest.
 
 **Revised 2026-07-08**: passes 1-2 used to be a raw `name_normalized` string match (1.0) then a type-blind `core_name_norm` match (0.6) — see §11.7 and §14 for why comparing `(street_type, core_name_norm)` directly replaced that.
 
@@ -395,15 +395,15 @@ We stop there, for the same reason `osm_match.py` stops at `fuzzy_core_name`: br
 
 ### 12.6 `streets_all_sources` view
 
-Additive consolidation, does **not** touch `streets_dedup`: `UNION ALL` of registry rows (full attributes) + `osm_streets` rows with no `street_osm_matches` row + `postal_streets` rows with no `street_postal_matches` row, each flagged by a `source` column (`'registry'`/`'osm'`/`'postal'`). A view in `data/streets.db`; materialized into a real table by `tools/build_dist_db.py` before its source tables (which don't ship) are dropped.
+Additive consolidation, does **not** touch `electoral_dedup`: `UNION ALL` of electoral-source rows (full attributes) + `osm_streets` rows with no `street_osm_matches` row + `postal_streets` rows with no `street_postal_matches` row, each flagged by a `source` column (`'electoral'`/`'osm'`/`'postal'`). A view in `data/streets.db`; materialized into a real table by `tools/build_dist_db.py` before its source tables (which don't ship) are dropped.
 
-**Cross-source comparison must join on `core_name_norm`, never `name_normalized`** — OSM's `name_normalized` includes the type prefix, postal's and the registry's don't. This is why `docs/queries.sql`'s `external_corroboration_gap`/`registry_uncorroborated` queries use `core_name_norm` exclusively.
+**Cross-source comparison must join on `core_name_norm`, never `name_normalized`** — OSM's `name_normalized` includes the type prefix, postal's and the electoral source's don't. This is why `docs/queries.sql`'s `external_corroboration_gap`/`electoral_uncorroborated` queries use `core_name_norm` exclusively.
 
 ### 12.7 Verified results
 
-Initial run (2026-07-08, before the §14 dedup fix): 41,604 raw rows → 23,724 grouped `postal_streets` rows, 100% direct SIRUTA resolution. Registry coverage 19,753/105,343 (18.8%); postal coverage 19,715/23,724 (83.1%); `streets_all_sources` = 105,343 registry + 48,063 OSM-only + 4,009 postal-only = 157,415 rows.
+Initial run (2026-07-08, before the §14 dedup fix): 41,604 raw rows → 23,724 grouped `postal_streets` rows, 100% direct SIRUTA resolution. Electoral coverage 19,753/105,343 (18.8%); postal coverage 19,715/23,724 (83.1%); `streets_all_sources` = 105,343 electoral + 48,063 OSM-only + 4,009 postal-only = 157,415 rows.
 
-After the §14 fix (same day, `streets_dedup` now 107,957 and matching is type-aware): registry coverage 20,644/107,957 (19.1%); postal coverage 19,687/23,724 (83.0%) — essentially unchanged in aggregate, as expected (the fix mainly redistributes *which* streets match which, not how many).
+After the §14 fix (same day, `electoral_dedup` now 107,957 and matching is type-aware): electoral coverage 20,644/107,957 (19.1%); postal coverage 19,687/23,724 (83.0%) — essentially unchanged in aggregate, as expected (the fix mainly redistributes *which* streets match which, not how many).
 
 ## 13. RENNS enrichment pipeline
 
@@ -422,14 +422,14 @@ None. `urllib.request` (stdlib) only — no `requests`, no new dependency.
 
 | Table | Grain | Notes |
 |---|---|---|
-| `renns_streets` | one row per `(uat_siruta, name_normalized)` | Same grain as `osm_streets`/`postal_streets`. `name` **excludes** the street-type prefix (RENNS separates `roadType`/`name` already, like postal) — directly comparable to the registry's `name_normalized`, no `strip_street_type()` needed. |
+| `renns_streets` | one row per `(uat_siruta, name_normalized)` | Same grain as `osm_streets`/`postal_streets`. `name` **excludes** the street-type prefix (RENNS separates `roadType`/`name` already, like postal) — directly comparable to the electoral source's `name_normalized`, no `strip_street_type()` needed. |
 | `street_renns_matches` | one row per `(street_id, renns_street_id)` | Two pass types: `exact_normalized` (1.0), `fuzzy_core_name` (0.6) — same shape as `osm_match.py`, not postal's 3-pass (see §13.6). |
 
 ### 13.4 UAT resolution — no fallback needed
 
-Unlike postal (§12.4), RENNS's `uat.id` **is** the registry's SIRUTA code directly — verified across all 3,181 UATs RENNS knows about: 3,180/3,181 exact matches against `data/gis/populatie-romania-siruta-coords.csv`. The one miss (RENNS's "Racșa", Satu Mare, id 180091) isn't a resolution failure — that commune has no entry in our own registry under any SIRUTA at all, in either judet's UAT list. Left `NULL` and surfaced via `streets_all_sources`/`all_street_names` rather than papered over with a name-matching fallback like postal needed.
+Unlike postal (§12.4), RENNS's `uat.id` **is** the electoral source's SIRUTA code directly — verified across all 3,181 UATs RENNS knows about: 3,180/3,181 exact matches against `data/gis/populatie-romania-siruta-coords.csv`. The one miss (RENNS's "Racșa", Satu Mare, id 180091) isn't a resolution failure — that commune has no entry in our own electoral source under any SIRUTA at all, in either judet's UAT list. Left `NULL` and surfaced via `streets_all_sources`/`all_street_names` rather than papered over with a name-matching fallback like postal needed.
 
-RENNS's `county.shortName` is likewise the registry's judet 2-letter code directly (`"AB"`, `"PH"`, ...). No name-matching axis needed anywhere in this pipeline.
+RENNS's `county.shortName` is likewise the electoral source's judet 2-letter code directly (`"AB"`, `"PH"`, ...). No name-matching axis needed anywhere in this pipeline.
 
 ### 13.5 Crawl strategy — the flat endpoint has confirmed pagination drift
 
@@ -446,34 +446,34 @@ RENNS's `county.shortName` is likewise the registry's judet 2-letter code direct
 1. `exact_type_core` (1.0) — `(uat_siruta, street_type, core_name_norm)`, `street_type` compared NULL-safe.
 2. `fuzzy_core_name` (0.5) — `(uat_siruta, core_name_norm)` only, unmatched rows only.
 
-No third reordered-name pass: RENNS person names follow the registry's "Firstname Surname" convention (confirmed by sampling, e.g. "Mihai Eminescu" appears exactly that way, not reversed like postal's Bucuresti sheet).
+No third reordered-name pass: RENNS person names follow the electoral source's "Firstname Surname" convention (confirmed by sampling, e.g. "Mihai Eminescu" appears exactly that way, not reversed like postal's Bucuresti sheet).
 
 **Revised 2026-07-08**: pass 1 used to be a raw `name_normalized` string match (1.0), pass 2 a type-blind `core_name_norm` match (0.6) — see §11.7 and §14.
 
 ### 13.7 Known caveats
 
 - **București has zero roads in RENNS** — confirmed directly (`idCounty=403&idUAT=179132` → `totalCount: 0`), not a sampling artifact. A genuine structural gap, not a bug to chase.
-- **Only ~60% of Romania's 3,181 UATs have any RENNS road at all** (1,922/3,181 in the full run) — RENNS is a rolling, partial national digitization, not a finished registry. A zero result for a small/rural UAT is plausible and expected. Interestingly, RENNS's own UAT coverage (1,922) is *larger* than the number of distinct UATs our own AEP-sourced registry has street data for (1,207) — RENNS covers UATs our own primary source doesn't.
+- **Only ~60% of Romania's 3,181 UATs have any RENNS road at all** (1,922/3,181 in the full run) — RENNS is a rolling, partial national digitization, not a finished registry. A zero result for a small/rural UAT is plausible and expected. Interestingly, RENNS's own UAT coverage (1,922) is *larger* than the number of distinct UATs our own AEP electoral source has street data for (1,207) — RENNS covers UATs the electoral source doesn't.
 - **`roadType.name` has 90 distinct raw values**, heavily concentrated (top 9 cover 98.6%). Long tail is cedilla variants (folded via `fix_diacritics`), rural/cadastral road-classification codes (`DC`/`DS`/`DE`/`Drum comunal`/`Nespecificat`/blank — mapped to `street_type = NULL`, not forced), and literal double-prefix data-entry glitches (`"Strada aleea"`, `"Strada FUNDATURA"`) handled by a generic strip-and-reresolve rule in `tools/renns_ingest.py`'s `clean_road_type()`.
 - **`alternativeName`/`endDate` are populated on <0.2% of rows** and look like data-entry noise (literal string `"NULL"`, corrupted placeholders, short-lived correction entries) rather than a usable "when was this street renamed" signal. Stored raw in neither table (not ingested at all) — not worth building on top of given the noise level.
 
 ### 13.8 `all_street_names` — the true cross-source deduplicated master list
 
-`streets_all_sources` (§12.6) is additive but **not fully deduplicated**: for a street missing from the registry, each external source that has it contributes its own row — if OSM, postal, and RENNS all independently have "Sfântul Capistrano" in some UAT, that's 3 rows there, not 1.
+`streets_all_sources` (§12.6) is additive but **not fully deduplicated**: for a street missing from the electoral source, each external source that has it contributes its own row — if OSM, postal, and RENNS all independently have "Sfântul Capistrano" in some UAT, that's 3 rows there, not 1.
 
 `all_street_names` fixes this: a single, fully symmetric view across all 4 sources (revised twice on 2026-07-08 — see §14 and §14.5 for the full history; this section describes the current design only). Identity/dedup key: **`(siruta, street_type, core_name_norm)`** — street type is part of a street's identity (a UAT can have both `Bulevardul X` and `Strada X` as genuinely distinct real streets), but a UAT cannot have two different `Strada X`s. No source is ranked above another.
 
-- **One unified pass, no registry/external split.** Registry, OSM, postal, and RENNS entries are pooled into one `UNION ALL` and grouped by the identity key above — the registry is just one of the 4 contributing sources, not a special anchor that others attach to. `in_registry` (0/1) says whether the registry is among the contributing sources for that row (replaces an earlier `layer` column).
+- **One unified pass, no electoral/external split.** The electoral source, OSM, postal, and RENNS entries are pooled into one `UNION ALL` and grouped by the identity key above — the electoral source is just one of the 4 contributing sources, not a special anchor that others attach to. `in_electoral` (0/1) says whether the electoral source is among the contributing sources for that row (replaces an earlier `layer` column).
 - **`variants`** (JSON) preserves every contributing source's exact spelling; the representative `name`/`core_name` populating the convenience columns is simply the alphabetically-first one (`MIN()`) when sources disagree on spelling, since no source outranks another. `corroboration_count` counts distinct sources.
 - **Type mismatches are never auto-merged.** Two entries sharing `(siruta, core_name_norm)` but disagreeing on `street_type` stay as separate rows — deliberately, since the data alone can't distinguish "one street, two sources disagree on its type" from "two real streets that share a name." The `type_variant_candidates` query (§14.5) surfaces these for manual review instead.
 - **Numeric streets** (`core_name_norm IS NULL`, e.g. rural cadastral `"184"`) fall back to grouping by exact `name` instead (`COALESCE(core_name_norm, name)`) — grouping by `core_name_norm` alone would collapse every numeric street in a UAT into one fake merged row, since SQL treats all `NULL`s in a `GROUP BY` as equal.
-- **UAT labeling**: resolves `judet`/`uat` display names by joining back to the registry's own `streets` table first, falling back to the `uat_reference` table (§14) for UATs the registry has zero rows for.
+- **UAT labeling**: resolves `judet`/`uat` display names by joining back to the electoral source's own `streets` table first, falling back to the `uat_reference` table (§14) for UATs the electoral source has zero rows for.
 
 `streets_all_sources` is kept as-is for its existing narrower per-source gap-analysis queries (`postal_only_streets`, `renns_only_streets`, ...); `all_street_names` is the one to use for "every distinct street name in Romania, deduplicated."
 
 ### 13.9 Verified results
 
-Initial RENNS run (2026-07-08): 3,181 UATs crawled (all of Romania), 1,922 with ≥1 road, 133,194 raw roads → 116,016 grouped `renns_streets` rows, zero fetch failures. RENNS match: registry coverage 55,863/105,343 (53.0%); RENNS coverage 55,855/116,016 (48.1%).
+Initial RENNS run (2026-07-08): 3,181 UATs crawled (all of Romania), 1,922 with ≥1 road, 133,194 raw roads → 116,016 grouped `renns_streets` rows, zero fetch failures. RENNS match: electoral coverage 55,863/105,343 (53.0%); RENNS coverage 55,855/116,016 (48.1%).
 
 The `all_street_names` numbers changed twice more the same day — see §14.4 (street-type dedup fix) and §14.5.4 (symmetric redesign) for the current, correct figures (224,208 total rows).
 
@@ -481,66 +481,66 @@ The `all_street_names` numbers changed twice more the same day — see §14.4 (s
 
 ### 14.1 Discovery
 
-While reviewing why the dashboard's headline street count (105,343) hadn't moved after adding RENNS/postal/`all_street_names`, a deeper, pre-existing bug surfaced in `streets_dedup` itself — the single most foundational view in the project, which every dashboard number and query-catalog entry derives from.
+While reviewing why the dashboard's headline street count (105,343) hadn't moved after adding RENNS/postal/`all_street_names`, a deeper, pre-existing bug surfaced in `electoral_dedup` itself — the single most foundational view in the project, which every dashboard number and query-catalog entry derives from.
 
-`streets_dedup`'s `GROUP BY siruta, name_normalized` doesn't include `street_type`. For the registry, `name_normalized` never included the street-type prefix to begin with — it's stripped upstream, at the same `parse_artery()` step that produces `core_name_norm` (§7). So a UAT with both a real `Bulevardul 1 Decembrie 1918` and a real `Strada 1 Decembrie 1918` (confirmed to both exist in Alba Iulia) was silently collapsed by `streets_dedup` into a single row (`MIN(id)`), permanently dropping one of them from every count in the project. Quantified: **2,479 `(siruta, name_normalized)` groups** contained 2+ distinct street types; the corrected count (`GROUP BY siruta, name_normalized, street_type`) is **107,957**, not 105,343.
+`electoral_dedup`'s `GROUP BY siruta, name_normalized` doesn't include `street_type`. For the electoral source, `name_normalized` never included the street-type prefix to begin with — it's stripped upstream, at the same `parse_artery()` step that produces `core_name_norm` (§7). So a UAT with both a real `Bulevardul 1 Decembrie 1918` and a real `Strada 1 Decembrie 1918` (confirmed to both exist in Alba Iulia) was silently collapsed by `electoral_dedup` into a single row (`MIN(id)`), permanently dropping one of them from every count in the project. Quantified: **2,479 `(siruta, name_normalized)` groups** contained 2+ distinct street types; the corrected count (`GROUP BY siruta, name_normalized, street_type`) is **107,957**, not 105,343.
 
-This cascaded into a second, independent problem in the external-match pipelines. `osm_match.py`'s pass 1 (`exact_normalized`, comparing raw `name_normalized` strings) was already a near no-op for OSM specifically, because `osm_streets.name_normalized` *includes* the type prefix while the registry's doesn't (§11.7) — so 99%+ of real OSM matches fell through to pass 2 (`fuzzy_core_name`), which is type-blind by construction. Checking how often that type-blind pass linked two *different* street types: **3,665 of 57,927 OSM matches (6.3%)** — e.g. the exact Alba Iulia case above, registry's (collapsed) `Bulevardul 1 Decembrie 1918` linked to OSM's `Strada 1 Decembrie 1918`, plausibly two different real streets cross-wired by a type-blind key.
+This cascaded into a second, independent problem in the external-match pipelines. `osm_match.py`'s pass 1 (`exact_normalized`, comparing raw `name_normalized` strings) was already a near no-op for OSM specifically, because `osm_streets.name_normalized` *includes* the type prefix while the electoral source's doesn't (§11.7) — so 99%+ of real OSM matches fell through to pass 2 (`fuzzy_core_name`), which is type-blind by construction. Checking how often that type-blind pass linked two *different* street types: **3,665 of 57,927 OSM matches (6.3%)** — e.g. the exact Alba Iulia case above, the electoral source's (collapsed) `Bulevardul 1 Decembrie 1918` linked to OSM's `Strada 1 Decembrie 1918`, plausibly two different real streets cross-wired by a type-blind key.
 
 ### 14.2 Decisions (confirmed with the user, 2026-07-08)
 
-1. **Street type is part of a street's identity.** A UAT can have both `Bulevardul X` and `Strada X` as two distinct, independently-real streets, but cannot have two different `Strada X`s. Applies uniformly to the registry and to all three external sources.
+1. **Street type is part of a street's identity.** A UAT can have both `Bulevardul X` and `Strada X` as two distinct, independently-real streets, but cannot have two different `Strada X`s. Applies uniformly to the electoral source and to all three external sources.
 2. **No source is ranked above another.** Reverses an earlier RENNS > OSM > postal priority used only to pick a "representative" spelling in `all_street_names`'s external layer. Now a neutral, source-blind tie-break (`MIN()`, alphabetically-first) is used instead; `variants` continues to preserve every source's exact spelling regardless.
 3. Rejected `data/reference/coduri-postale+/localitati-siruta.csv` as a SIRUTA resolver (user-proposed, then deleted after verification): it resolved only 119 of the project's 2,264 referenced SIRUTA codes, and spot-checking "Ciugud" (Alba) showed it uses a genuinely different numbering (1080) than every one of our 4 sources (1071) — the same "SIRUTA column is actually a sub-code" quirk already documented for the postal source (§12.4), but not reconcilable here. `data/gis/populatie-romania-siruta-coords.csv` — already in the repo, already validated against RENNS's own UAT list (§13.4) — was used instead: resolves 2,258/2,264 (99.7%) of the SIRUTA codes our data actually references, missing only the 6 Bucharest sectors (handled the same way `tools/osm_ingest.py` already does, via hardcoded centroids).
 
 ### 14.3 Fix
 
-- **`streets_dedup`**: `GROUP BY siruta, name_normalized, street_type` (was: `siruta, name_normalized`).
+- **`electoral_dedup`**: `GROUP BY siruta, name_normalized, street_type` (was: `siruta, name_normalized`).
 - **`osm_match.py` / `postal_match.py` / `renns_match.py`**: pass 1 renamed `exact_normalized` → `exact_type_core`, now comparing `(street_type, core_name_norm)` directly (NULL-safe via SQLite's `IS`) instead of the raw `name_normalized` string — sidesteps the cross-source `name_normalized` incompatibility (§11.7) and fixes the type-blindness in the same move. Pass 2 (`fuzzy_core_name`) confidence lowered 0.6 → 0.5, reflecting the now-known cross-type risk for the cases it still has to guess on. Postal's pass 3 (`reordered_core_name`, 0.4) is unchanged — already the lowest-confidence fallback, left type-blind.
-- **New `uat_reference` table** (`build_db.py`): `(siruta, judet, uat)`, loaded from `data/gis/populatie-romania-siruta-coords.csv` (3,180 rows) plus the 6 hardcoded Bucharest sectors. Used as a fallback in `all_street_names` when the registry itself has zero rows for a SIRUTA — previously those ~50,000 external-layer rows had blank `judet`/`uat` (not because SIRUTA is ambiguous, but because the label lookup only ever consulted the registry's own `streets` table). Dropped from the shipped `dist/streets.db` by `tools/build_dist_db.py` (its data is already baked into `all_street_names`'s materialized `judet`/`uat` columns).
-- **`all_street_names` external layer**: regrouped by `(siruta, street_type, core_name_norm)` — was `(siruta, core_name_norm)` alone — for consistency with the now-fixed registry layer's identity definition. Priority-based representative-name selection (RENNS > OSM > postal) replaced with `MIN()` (source-blind).
+- **New `uat_reference` table** (`build_db.py`): `(siruta, judet, uat)`, loaded from `data/gis/populatie-romania-siruta-coords.csv` (3,180 rows) plus the 6 hardcoded Bucharest sectors. Used as a fallback in `all_street_names` when the electoral source itself has zero rows for a SIRUTA — previously those ~50,000 external-layer rows had blank `judet`/`uat` (not because SIRUTA is ambiguous, but because the label lookup only ever consulted the electoral source's own `streets` table). Dropped from the shipped `dist/streets.db` by `tools/build_dist_db.py` (its data is already baked into `all_street_names`'s materialized `judet`/`uat` columns).
+- **`all_street_names` external layer**: regrouped by `(siruta, street_type, core_name_norm)` — was `(siruta, core_name_norm)` alone — for consistency with the now-fixed electoral layer's identity definition. Priority-based representative-name selection (RENNS > OSM > postal) replaced with `MIN()` (source-blind).
 
 Applied directly to the live `data/streets.db` via a one-off migration (not a full `build_db.py` rebuild, to avoid re-wiping curation state — see the earlier 2026-07-08 entry in `docs/activity-history.md` for why that's a real risk) — `build_db.py` itself was also updated so future rebuilds are consistent.
 
 ### 14.4 Verified results
 
-- `streets_dedup`: 105,343 → **107,957** (+2,614).
-- OSM match: pass 1 (`exact_type_core`) now 55,441 of 57,947 total matches (95.7%, up from 0.85%); pass 2 (`fuzzy_core_name`) 2,506, and — confirmed by direct query — **100% of pass-1 matches are same-type, 100% of pass-2 matches are different-type**, exactly as designed. Registry coverage 57,798/107,957 (53.5%); OSM coverage 56,865/105,905 (53.7%).
-- Postal match: pass 1 15,261, pass 2 1,556, pass 3 (reordered) 3,834. Registry coverage 20,644/107,957 (19.1%); postal coverage 19,687/23,724 (83.0%).
-- RENNS match: pass 1 54,479, pass 2 1,991. Registry coverage 56,458/107,957 (52.3%); RENNS coverage 55,333/116,016 (47.7%).
-- `all_street_names`: registry layer 107,957, external layer 108,403 (corroboration: 105,172 single-source, 3,162 two-source, 69 three-source), **total 216,360** (was 211,719). External layer split: 58,402 rows in UATs the registry already partially covers, 50,001 in UATs the registry has zero data for — all now correctly labeled via `uat_reference`, zero blank `judet`/`uat` rows (was ~50,000).
+- `electoral_dedup`: 105,343 → **107,957** (+2,614).
+- OSM match: pass 1 (`exact_type_core`) now 55,441 of 57,947 total matches (95.7%, up from 0.85%); pass 2 (`fuzzy_core_name`) 2,506, and — confirmed by direct query — **100% of pass-1 matches are same-type, 100% of pass-2 matches are different-type**, exactly as designed. Electoral coverage 57,798/107,957 (53.5%); OSM coverage 56,865/105,905 (53.7%).
+- Postal match: pass 1 15,261, pass 2 1,556, pass 3 (reordered) 3,834. Electoral coverage 20,644/107,957 (19.1%); postal coverage 19,687/23,724 (83.0%).
+- RENNS match: pass 1 54,479, pass 2 1,991. Electoral coverage 56,458/107,957 (52.3%); RENNS coverage 55,333/116,016 (47.7%).
+- `all_street_names`: electoral layer 107,957, external layer 108,403 (corroboration: 105,172 single-source, 3,162 two-source, 69 three-source), **total 216,360** (was 211,719). External layer split: 58,402 rows in UATs the electoral source already partially covers, 50,001 in UATs the electoral source has zero data for — all now correctly labeled via `uat_reference`, zero blank `judet`/`uat` rows (was ~50,000).
 - Full `run_queries.py` catalog and `osm_sanity.py`/`postal_sanity.py`/`renns_sanity.py` all re-verified clean (exit 0, no errors) after the fix. Curation state (`persons`/`nature_terms`/`name_categories`/`place_refs`, 397/575/507/376 rows) confirmed untouched by the migration.
 
 ### 14.5 Symmetric `all_street_names` redesign (same day, follow-up)
 
 #### 14.5.1 Discovery
 
-After §14.1-14.4 shipped, the user compared the locally-rebuilt dashboard (107,957 streets) against the not-yet-deployed `lab.gov2.ro` and separately pushed back on `all_street_names` still having a `layer` column (`'registry'`/`'external'`), pointing out this contradicts "no source outranks another." A read-only audit confirmed it wasn't just naming: the `registry` layer was `streets_dedup` annotated via the match tables, which include a `fuzzy_core_name` pass (0.5 confidence) that links a registry street to an external one **even when `street_type` differs**; the `external` layer grouped unmatched OSM/postal/RENNS streets by `(siruta, street_type, core_name_norm)` — a **strict** equi-join, no type-mismatch tolerance at all. So the registry got a laxer, type-tolerant corroboration path no pair of external sources got.
+After §14.1-14.4 shipped, the user compared the locally-rebuilt dashboard (107,957 streets) against the not-yet-deployed `lab.gov2.ro` and separately pushed back on `all_street_names` still having a `layer` column (`'registry'`/`'external'`), pointing out this contradicts "no source outranks another." A read-only audit confirmed it wasn't just naming: the `electoral` layer was `electoral_dedup` annotated via the match tables, which include a `fuzzy_core_name` pass (0.5 confidence) that links an electoral-source street to an external one **even when `street_type` differs**; the `external` layer grouped unmatched OSM/postal/RENNS streets by `(siruta, street_type, core_name_norm)` — a **strict** equi-join, no type-mismatch tolerance at all. So the electoral source got a laxer, type-tolerant corroboration path no pair of external sources got.
 
 Quantified: 1,003 external-layer groups (2,041 rows) shared `(siruta, core_name_norm)` but differed only in `street_type`; 273 involved 2+ different sources disagreeing on type for what's plausibly the same real street — e.g. Alba Iulia: OSM's `Calea Moților` vs postal's `Strada Moților`, each shown as `corroboration_count=1` instead of a corroborated pair.
 
 #### 14.5.2 Decision (confirmed with the user via AskUserQuestion)
 
-`all_street_names` becomes one flat, fully symmetric view (§13.8) — registry is just another source, no dependency on the match tables at all. Type mismatches are **never** auto-merged, even between the registry and an external source (removing the `fuzzy_core_name`-based tolerance the registry used to get) — consistent with "type is identity" applied without exception, and with the project's existing stated philosophy (every match tool's docstring already says "we'd rather surface gaps... than auto-link"). A new query, `type_variant_candidates` (`docs/queries.sql`), surfaces same-core-name/different-type sibling groups for manual review instead.
+`all_street_names` becomes one flat, fully symmetric view (§13.8) — the electoral source is just another source, no dependency on the match tables at all. Type mismatches are **never** auto-merged, even between the electoral source and an external source (removing the `fuzzy_core_name`-based tolerance the electoral source used to get) — consistent with "type is identity" applied without exception, and with the project's existing stated philosophy (every match tool's docstring already says "we'd rather surface gaps... than auto-link"). A new query, `type_variant_candidates` (`docs/queries.sql`), surfaces same-core-name/different-type sibling groups for manual review instead.
 
 #### 14.5.3 Fix
 
 - Rewrote `all_street_names` (`build_db.py`) as a single `UNION ALL` of all 4 sources' raw entries, grouped by `(siruta, street_type, COALESCE(core_name_norm, name))` — the `COALESCE` fallback exists specifically for numeric streets (§13.8). No more `reg_variant_src`/`ext_candidates` two-CTE structure, no dependency on `street_osm_matches`/`street_postal_matches`/`street_renns_matches` at all.
-- New `in_registry` (0/1) column replaces `layer`'s practical use.
+- New `in_electoral` (0/1) column replaces `layer`'s practical use.
 - Added `type_variant_candidates` to `docs/queries.sql`: finds `(siruta, core_name_norm)` groups with 2+ distinct `street_type`s, ranked by how many distinct sources are involved across the siblings (2+ sources disagreeing is more interesting than one source using 2 labels for what's plausibly 2 real streets).
-- Updated `all_street_names_summary`, `corroboration_distribution`, `high_confidence_registry_misses` to use `in_registry` instead of `layer`. `all_street_names_summary`'s "naive union" comparison basis also changed — it used to diff against `streets_all_sources`, but that view's exclusion logic (drop anything matched at *any* confidence tier) is no longer equivalent to `all_street_names`'s stricter symmetric grouping, and can now legitimately be *smaller* than `all_street_names` for the same data (confirmed: an early attempt at this migration produced `duplicates_collapsed = -2,491`, i.e. `all_street_names` had grown past `streets_all_sources`, since former fuzzy-tier-merged registry/external pairs now split into 2 rows). Fixed by comparing against the true raw union (`streets_dedup` + `osm_streets` + `postal_streets` + `renns_streets` row counts, before any grouping) instead, which is a real upper bound by construction.
+- Updated `all_street_names_summary`, `corroboration_distribution`, `high_confidence_electoral_misses` to use `in_electoral` instead of `layer`. `all_street_names_summary`'s "naive union" comparison basis also changed — it used to diff against `streets_all_sources`, but that view's exclusion logic (drop anything matched at *any* confidence tier) is no longer equivalent to `all_street_names`'s stricter symmetric grouping, and can now legitimately be *smaller* than `all_street_names` for the same data (confirmed: an early attempt at this migration produced `duplicates_collapsed = -2,491`, i.e. `all_street_names` had grown past `streets_all_sources`, since former fuzzy-tier-merged electoral/external pairs now split into 2 rows). Fixed by comparing against the true raw union (`electoral_dedup` + `osm_streets` + `postal_streets` + `renns_streets` row counts, before any grouping) instead, which is a real upper bound by construction.
 - Applied as a live migration against `data/streets.db` (view-only change, no schema/table edits needed), same reasoning as §14.3 — avoid a full `build_db.py` rebuild wiping curation state again.
 
-**Bug caught during implementation**: an early version of the rewrite filtered `WHERE core_name_norm IS NOT NULL` on the registry arm too (copied from the old external-candidates filter) — this silently dropped all ~876 registry numeric streets from the master list entirely, a straight regression. Caught by comparing `in_registry=1` row count (107,048) against `streets_dedup`'s 107,957 before shipping — the mismatch was the tell. Fixed via the `COALESCE(core_name_norm, name)` grouping key described above, applied to all 4 sources uniformly (also fixing external numeric streets, which were *already* being silently dropped before today, an existing gap now closed as a side effect).
+**Bug caught during implementation**: an early version of the rewrite filtered `WHERE core_name_norm IS NOT NULL` on the electoral arm too (copied from the old external-candidates filter) — this silently dropped all ~876 electoral-source numeric streets from the master list entirely, a straight regression. Caught by comparing `in_electoral=1` row count (107,048) against `electoral_dedup`'s 107,957 before shipping — the mismatch was the tell. Fixed via the `COALESCE(core_name_norm, name)` grouping key described above, applied to all 4 sources uniformly (also fixing external numeric streets, which were *already* being silently dropped before today, an existing gap now closed as a side effect).
 
 #### 14.5.4 Verified results
 
-`all_street_names`: 224,208 total rows (`in_registry=1`: 107,924; `in_registry=0`: 116,284). Corroboration distribution: 1 source — 139,043; 2 — 47,116; 3 — 32,014; all 4 — 6,035. `duplicates_collapsed` (vs. the 353,602-row raw union) = 129,394.
+`all_street_names`: 224,208 total rows (`in_electoral=1`: 107,924; `in_electoral=0`: 116,284). Corroboration distribution: 1 source — 139,043; 2 — 47,116; 3 — 32,014; all 4 — 6,035. `duplicates_collapsed` (vs. the 353,602-row raw union) = 129,394.
 
 `type_variant_candidates`: 6,541 total `(siruta, core_name_norm)` groups have 2+ distinct `street_type`s; 5,519 of those involve 2+ different sources (1,022 involve only 1 source using 2 type labels — more plausibly 2 real streets, less interesting to review first).
 
 Two known, minor, pre-existing caveats surfaced while spot-checking (neither is a new regression, both predate today, both left as-is — logged in `docs/BACKLOG.md`):
-- **`core_name_norm` can conflate different real-world referents that happen to share a stripped core name** — e.g. registry rows "Regina Maria" (Queen Maria) and "Sfânta Maria" (Saint Mary) both reduce to `core_name_norm='maria'` (rank/saint prefixes stripped) and now merge into one `all_street_names` row despite being different honorees. Rare (part of only ~33 registry-side collapses total, most of which — e.g. "Dr. George Ulieru" / "George Ulieru" — are genuine title-prefix display variants of the same real street) and an inherent limitation of using `core_name_norm` as an identity key at all (the same ambiguity already exists in the `persons` curation join), not something introduced by this redesign.
+- **`core_name_norm` can conflate different real-world referents that happen to share a stripped core name** — e.g. electoral-source rows "Regina Maria" (Queen Maria) and "Sfânta Maria" (Saint Mary) both reduce to `core_name_norm='maria'` (rank/saint prefixes stripped) and now merge into one `all_street_names` row despite being different honorees. Rare (part of only ~33 electoral-side collapses total, most of which — e.g. "Dr. George Ulieru" / "George Ulieru" — are genuine title-prefix display variants of the same real street) and an inherent limitation of using `core_name_norm` as an identity key at all (the same ambiguity already exists in the `persons` curation join), not something introduced by this redesign.
 - **`street_type` itself has minor cross-source spelling inconsistency** — e.g. `"Piața"` (with the definite-article suffix) vs `"Piață"` (without) for the same type, likely a postal/RENNS raw-data convention difference. Shows up as a false-positive "type mismatch" in `type_variant_candidates`. Not fixed — logged as a follow-up.
 
 Full `run_queries.py` catalog re-verified clean (exit 0) after this fix too; curation state confirmed untouched.
@@ -549,7 +549,7 @@ Full `run_queries.py` catalog re-verified clean (exit 0) after this fix too; cur
 
 These are the booby traps. A senior engineer reading this should not have to discover any of them by stubbing toes.
 
-1. **Never count without dedup.** `SELECT COUNT(*) FROM streets WHERE name='Eminescu'` overcounts by section repetition. Use `streets_dedup` — which itself groups by `(siruta, name_normalized, street_type)` since 2026-07-08 (§14); grouping by `(siruta, name_normalized)` alone silently merges e.g. `Bulevardul X` and `Strada X` into one row.
+1. **Never count without dedup.** `SELECT COUNT(*) FROM streets WHERE name='Eminescu'` overcounts by section repetition. Use `electoral_dedup` — which itself groups by `(siruta, name_normalized, street_type)` since 2026-07-08 (§14); grouping by `(siruta, name_normalized)` alone silently merges e.g. `Bulevardul X` and `Strada X` into one row.
 2. **Renamings query needs DISTINCT.** Section-rows duplicate aliases. The current `real_renamings` query handles this; future ones must too.
 3. **`name_normalized` ≠ `core_name_norm`.** Frequency by canonical street name → `name_normalized`. Joining to `persons` → `core_name_norm`. Mixing them gives subtly wrong answers.
 4. **Sample bias.** The 4-județ prototype is 75% Prahova-rural. Top frequencies are nature-dominated. Do not generalize from sample-only output to "Romanian streets in general." The full 140k will show person names overtaking nature names.
@@ -559,14 +559,14 @@ These are the booby traps. A senior engineer reading this should not have to dis
 8. **Don't strip diacritics for display.** It happens naturally when bugs are introduced. Add a startup assertion that `name` columns contain non-ASCII Romanian characters.
 9. **`core_name=NULL` on numeric streets is intentional.** Queries that join curated tables on `core_name_norm` will correctly skip these. Queries that filter for "anonymous" should use `is_numeric=1`.
 10. **The `(D)` parenthetical is filtered as too short, but other admin codes might exist.** Audit the full 140k for unexpected short parentheticals (`(I)`, `(II)`, `(B)`?).
-11. **`osm_streets.name_normalized` includes the street-type prefix; `postal_streets.name_normalized`, `renns_streets.name_normalized`, and `streets_dedup.name_normalized` don't.** Comparing across sources by `name_normalized` silently under-corroborates. Always use `core_name_norm` for cross-source comparison (see §12.6, §13.8).
+11. **`osm_streets.name_normalized` includes the street-type prefix; `postal_streets.name_normalized`, `renns_streets.name_normalized`, and `electoral_dedup.name_normalized` don't.** Comparing across sources by `name_normalized` silently under-corroborates. Always use `core_name_norm` for cross-source comparison (see §12.6, §13.8).
 12. **`postal_streets` covers Bucuresti + localities over 50,000 population only.** Zero postal rows for a small/rural UAT is expected, not a bug — don't read it as "this town has no streets."
 13. **RENNS's unfiltered/flat `/api/public/roads` endpoint looks tempting** (67 requests for all of Romania vs. ~3,181 per-UAT calls) **but has confirmed pagination drift on the live dataset** (3,680 duplicate ids out of 133,194 in a full sequential crawl, §13.5). Always use the per-`(county, UAT)` filtered endpoint; don't re-introduce the flat crawl without re-verifying that finding first.
-14. **`streets_all_sources` is additive but not cross-source-deduplicated** — a street missing from the registry but present in 2-3 external sources gets one row *per source* there, not one. Use `all_street_names` (§13.8) when you need a genuinely deduplicated "every street name in Romania" list.
+14. **`streets_all_sources` is additive but not cross-source-deduplicated** — a street missing from the electoral source but present in 2-3 external sources gets one row *per source* there, not one. Use `all_street_names` (§13.8) when you need a genuinely deduplicated "every street name in Romania" list.
 15. **`build_db.py` wipes ALL curation state, not just the schema** — rebuilding drops `persons`/`nature_terms`/`name_categories`/`place_refs`/QIDs/wiki_scope/birthplaces/biostats along with everything else. The full restore sequence is in `CLAUDE.md`'s Common Commands; skipping any step silently degrades classification coverage. For a schema-only change (like §14's dedup fix), prefer a targeted live migration over a full rebuild — verify with `classification_coverage_summary` either way.
-16. **Street type is part of a street's identity, confirmed 2026-07-08 (§14)** — `streets_dedup` and `all_street_names` both dedup on `(..., street_type, core_name)`, not core name alone. A UAT can have both `Bulevardul X` and `Strada X` as genuinely distinct streets.
-17. **`all_street_names` has no `layer` column** (removed 2026-07-08, §14.5) — it's a single symmetric view across all 4 sources, no registry-as-special-anchor mechanic. Use `in_registry` (0/1) to filter "not in the registry," not a `layer='external'` check — that column no longer exists.
-18. **`all_street_names` never auto-merges type mismatches, even registry-to-external** (§14.5) — two entries sharing `core_name_norm` but disagreeing on `street_type` always stay as separate rows, deliberately. Check `type_variant_candidates` (`docs/queries.sql`) if you need to review "possibly the same street, sources disagree on type" cases — don't assume `all_street_names` already resolved them.
+16. **Street type is part of a street's identity, confirmed 2026-07-08 (§14)** — `electoral_dedup` and `all_street_names` both dedup on `(..., street_type, core_name)`, not core name alone. A UAT can have both `Bulevardul X` and `Strada X` as genuinely distinct streets.
+17. **`all_street_names` has no `layer` column** (removed 2026-07-08, §14.5) — it's a single symmetric view across all 4 sources, no electoral-as-special-anchor mechanic. Use `in_electoral` (0/1) to filter "not in the electoral source," not a `layer='external'` check — that column no longer exists.
+18. **`all_street_names` never auto-merges type mismatches, even electoral-to-external** (§14.5) — two entries sharing `core_name_norm` but disagreeing on `street_type` always stay as separate rows, deliberately. Check `type_variant_candidates` (`docs/queries.sql`) if you need to review "possibly the same street, sources disagree on type" cases — don't assume `all_street_names` already resolved them.
 
 ## 16. Out of scope for the data layer
 
@@ -574,7 +574,7 @@ These are the booby traps. A senior engineer reading this should not have to dis
 - Editorial copy in Romanian — see Design Brief.
 - Per-street geocoding — Phase 3.
 - Voter-data joins — different project.
-- Real-time updates — the registry updates infrequently; manual rebuild is fine.
+- Real-time updates — the electoral source updates infrequently; manual rebuild is fine.
 
 ## 17. Reference: current state files
 

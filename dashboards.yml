@@ -135,10 +135,10 @@ dashboards:
 
   osm:
     title: "OSM Integration: Coverage Gaps & Real Streets"
-    description: "Electoral registry vs OpenStreetMap mapping"
+    description: "Electoral source vs OpenStreetMap mapping"
     cards:
       - query_name: dashboard_osm_gaps
-        title: "Registry Streets NOT in OSM (Gaps)"
+        title: "Electoral Streets NOT in OSM (Gaps)"
         description: "Frequent streets with zero OSM coverage"
         chart_type: bar
         x: name

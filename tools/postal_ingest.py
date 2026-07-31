@@ -12,11 +12,11 @@ UAT resolution (see CODE_SPEC §12 for the empirical corrections this encodes):
   - 'Localitati peste 50.000 loc' sheet:  SIRSUP column, direct — NOT the
     column literally named SIRUTA (verified 0/47 match vs SIRSUP's 47/47;
     SIRUTA here is a finer-grained internal postal sub-code).
-  - Fallback (either sheet, or if the direct code isn't a real registry
-    SIRUTA): name-match judet+localitate against the SIRUTA-coords CSV.
+  - Fallback (either sheet, or if the direct code isn't a real electoral-
+    source SIRUTA): name-match judet+localitate against the SIRUTA-coords CSV.
 
 Person names in this source are frequently "Surname Firstname" (reversed vs.
-the registry's "Firstname Surname") — core_name_norm_swapped captures the
+the electoral source's "Firstname Surname") — core_name_norm_swapped captures the
 2-token reorder so tools/postal_match.py can catch these.
 
 Idempotent: --rebuild truncates postal_streets (and street_postal_matches,
@@ -79,7 +79,7 @@ def load_siruta_in_db(con: sqlite3.Connection) -> set:
 
 
 def load_locality_index(coords_csv: Path, siruta_in_db: set) -> list:
-    """[(cod_judet, name_normalized, siruta)] filtered to SIRUTAs in the registry DB."""
+    """[(cod_judet, name_normalized, siruta)] filtered to SIRUTAs in the electoral source DB."""
     out = []
     with coords_csv.open(encoding="utf-8") as f:
         for row in csv.DictReader(f):
@@ -131,7 +131,7 @@ def clean_name(denumire_raw: str) -> str | None:
 
 # Trailing title/rank abbreviations seen in the Bucuresti sheet's comma-suffix
 # convention ("Surname Firstname, <abbr>.", e.g. "Mincu Ion, arh.") -- distinct
-# from the registry's leading-prefix TITLES/RANKS in streets_lib.py, which use
+# from the electoral source's leading-prefix TITLES/RANKS in streets_lib.py, which use
 # full/differently-abbreviated forms these don't match (logged in BACKLOG.md
 # "Postal source: trailing comma-suffixed titles not stripped"). Full-word
 # suffixes already spelled out (doctor, general, pictor, ...) don't need an
@@ -236,7 +236,7 @@ def main():
     con = sqlite3.connect(db_path)
     siruta_in_db = load_siruta_in_db(con)
     locality_index = load_locality_index(coords_csv, siruta_in_db)
-    print(f"Loaded {len(siruta_in_db):,} registry SIRUTAs, "
+    print(f"Loaded {len(siruta_in_db):,} electoral-source SIRUTAs, "
           f"{len(locality_index):,} localities for name-match fallback.")
 
     wb = openpyxl.load_workbook(xlsx_path, read_only=True)

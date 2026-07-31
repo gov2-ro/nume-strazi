@@ -1,7 +1,7 @@
 """Alias reversed-spelling duplicates of already-curated persons.
 
-For two-token core_name_norm keys that are new to the registry (present in
-all_street_names_cache but not streets_dedup) and not yet classified in ANY
+For two-token core_name_norm keys that are new to the electoral source (present in
+all_street_names_cache but not electoral_dedup) and not yet classified in ANY
 curation table, check whether the REVERSED token order already exists as a
 classified person in `persons`. If so, alias the new key to that person's
 row instead of letting it surface as a spurious "unclassified new key" for
@@ -39,7 +39,7 @@ con = sqlite3.connect(args.db)
 con.row_factory = sqlite3.Row
 
 reg_keys = {r[0] for r in con.execute(
-    "SELECT DISTINCT core_name_norm FROM streets_dedup WHERE core_name_norm IS NOT NULL"
+    "SELECT DISTINCT core_name_norm FROM electoral_dedup WHERE core_name_norm IS NOT NULL"
 )}
 curated_keys: set[str] = set()
 for t in ("persons", "nature_terms", "name_categories", "place_refs"):

@@ -33,6 +33,13 @@ wiki_scope.py has no --replay-csv mode (always a live, rate-limited Wikidata
 call) so it's reported on but not run by default; pass --wiki-scope to fetch
 pending rows live, with the 429→'unknown' remediation from CLAUDE.md applied
 automatically (reset + one bounded retry pass).
+
+NOTE on step 7: the replay CSV is the durable record of curated QIDs — whatever
+it contains wins after a rebuild, --force and all. The 2026-07-31 audit found
+84 of 297 QIDs pointing at communes/taxa/disambiguation pages rather than people
+(CLAUDE.md rule #16), and 31 of those were sitting in this CSV. If you correct
+QIDs in the DB, run `tools/audit_person_qids.py --sync-replay-csv` or the next
+restore silently replays the bad ones.
 """
 import argparse, json, subprocess, sys, sqlite3, time
 from pathlib import Path

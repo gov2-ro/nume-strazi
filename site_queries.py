@@ -10,6 +10,20 @@ from streets_lib import slugify, fix_diacritics
 _COORDS_CSV = Path(__file__).resolve().parent / "data" / "gis" / "populatie-romania-siruta-coords.csv"
 _SIRUTA_COORDS: dict | None = None
 
+# Grouping key for honoree rankings. One person can own several core_name_norm
+# keys — Cuza has 4 spellings, Eminescu 14 — and `persons` rows sharing a
+# wikidata_qid or full_name ARE the project's alias mechanism (CLAUDE.md #16),
+# not duplicates. Grouping on core_name_norm therefore undercounts every honoree
+# spelled more than one way, and undercounts the most-honoured ones worst, since
+# fame produces spelling variety: Eminescu ranked 308 by key vs 564 by identity.
+#
+# This merges only what curation has ALREADY declared to be one person. It makes
+# no new identity claims, so it stays inside the project's "don't auto-merge
+# person identities" rule. Figures that genuinely lack a shared QID or full_name
+# (Mihai Viteazul / Mihai Viteazu) stay split until someone decides — see
+# docs/BACKLOG.md.
+PERSON_IDENTITY = "COALESCE(p.wikidata_qid, p.full_name)"
+
 
 def _siruta_coords() -> dict:
     """Lazy-load {siruta:int -> (lat, lon)} from the GIS coords CSV (cached).
@@ -47,30 +61,45 @@ def _one(conn: sqlite3.Connection, sql: str, params: tuple = ()) -> dict:
 
 
 def section1(conn: sqlite3.Connection) -> dict:
-    total = _one(conn, "SELECT COUNT(*) AS n FROM streets_dedup")["n"]
+    # Headline corpus = the cross-source union (electoral + OSM + postal + RENNS,
+    # deduplicated by (siruta, street_type, core_name_norm)). Flipped from
+    # electoral-only on 2026-07-31, completing the "all_street_names as main
+    # corpus" migration in docs/BACKLOG.md.
+    #
+    # Phase 1 had gated this flip on classifying the union's genuinely-new keys,
+    # so the visible classification percentage wouldn't crater. Measured before
+    # flipping: 73.2% (electoral) vs 68.9% (union) — a 4.3pp drop, not a crater.
+    # The unclassified backlog is real but larger than the note assumed (39,497
+    # distinct keys, up from 25,269, since the 2026-07-31 OSM boundary fix added
+    # ~1,500 UATs' worth of new names).
+    total = _one(conn, "SELECT COUNT(*) AS n FROM all_street_names_cache")["n"]
 
-    # Cross-source union (registry + OSM + postal + RENNS, deduplicated by
-    # (siruta, street_type, core_name_norm) — see all_street_names in build_db.py).
-    # Shown alongside the registry-only `total` above so the landing page doesn't
-    # silently imply the registry count is a consolidated cross-source figure.
-    all_sources_total = _one(conn, "SELECT COUNT(*) AS n FROM all_street_names")["n"]
+    # Kept as the secondary figure so the page can still say how much of the
+    # corpus one source accounts for — the electoral export covers ~1,207 of the
+    # union's 2,708 UATs and is a starter list, not an authority.
+    electoral_total = _one(conn, "SELECT COUNT(*) AS n FROM electoral_dedup")["n"]
+    total_uats = _one(
+        conn, "SELECT COUNT(DISTINCT siruta) AS n FROM all_street_names_cache")["n"]
+
+    # Back-compat: templates still reference all_sources_total.
+    all_sources_total = total
 
     top_men = _rows(conn, """
         SELECT p.full_name, COUNT(*) AS street_count
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         JOIN persons p ON p.core_name_norm = sd.core_name_norm
         WHERE p.gender = 'M'
-        GROUP BY p.core_name_norm
+        GROUP BY COALESCE(p.wikidata_qid, p.full_name)
         ORDER BY street_count DESC
         LIMIT 5
     """)
 
     top_women = _rows(conn, """
         SELECT p.full_name, COUNT(*) AS street_count
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         JOIN persons p ON p.core_name_norm = sd.core_name_norm
         WHERE p.gender = 'F'
-        GROUP BY p.core_name_norm
+        GROUP BY COALESCE(p.wikidata_qid, p.full_name)
         ORDER BY street_count DESC
         LIMIT 5
     """)
@@ -80,8 +109,8 @@ def section1(conn: sqlite3.Connection) -> dict:
           SUM(CASE WHEN p.gender = 'M' THEN 1 ELSE 0 END) AS m,
           SUM(CASE WHEN p.gender = 'F' THEN 1 ELSE 0 END) AS f
         FROM (
-          SELECT DISTINCT p.core_name_norm, p.gender
-          FROM streets_dedup sd
+          SELECT DISTINCT COALESCE(p.wikidata_qid, p.full_name) AS identity, p.gender
+          FROM all_street_names_cache sd
           JOIN persons p ON p.core_name_norm = sd.core_name_norm
         ) p
     """)
@@ -89,6 +118,8 @@ def section1(conn: sqlite3.Connection) -> dict:
     return {
         "total_streets": total,
         "all_sources_total": all_sources_total,
+        "electoral_total": electoral_total,
+        "total_uats": total_uats,
         "top_men": top_men,
         "top_women": top_women,
         "total_persons_m": counts.get("m", 0) or 0,
@@ -114,7 +145,7 @@ def section2(conn: sqlite3.Connection) -> dict:
             WHEN nc.category IS NOT NULL THEN nc.category
             ELSE 'altele'
           END AS category
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         LEFT JOIN persons p ON p.core_name_norm = sd.core_name_norm
         LEFT JOIN nature_terms nt ON nt.core_name_norm = sd.core_name_norm
         LEFT JOIN name_categories nc ON nc.core_name_norm = sd.core_name_norm
@@ -143,7 +174,7 @@ def section2(conn: sqlite3.Connection) -> dict:
               WHEN nc.category IS NOT NULL THEN nc.category
               ELSE 'altele'
             END AS category
-          FROM streets_dedup sd
+          FROM all_street_names_cache sd
           LEFT JOIN persons p ON p.core_name_norm = sd.core_name_norm
           LEFT JOIN nature_terms nt ON nt.core_name_norm = sd.core_name_norm
           LEFT JOIN name_categories nc ON nc.core_name_norm = sd.core_name_norm
@@ -188,9 +219,9 @@ def section3(conn: sqlite3.Connection) -> dict:
         SELECT p.full_name, p.gender, p.profession, p.era, p.wikidata_qid,
                COALESCE(p.wiki_scope, 'unknown') AS wiki_scope,
                COUNT(*) AS street_count
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         JOIN persons p ON p.core_name_norm = sd.core_name_norm
-        GROUP BY p.core_name_norm
+        GROUP BY COALESCE(p.wikidata_qid, p.full_name)
         ORDER BY street_count DESC
         LIMIT 50
     """)
@@ -200,16 +231,16 @@ def section3(conn: sqlite3.Connection) -> dict:
           SUM(CASE WHEN p.gender = 'M' THEN 1 ELSE 0 END) AS m,
           SUM(CASE WHEN p.gender = 'F' THEN 1 ELSE 0 END) AS f
         FROM (
-          SELECT DISTINCT p.core_name_norm, p.gender
-          FROM streets_dedup sd
+          SELECT DISTINCT COALESCE(p.wikidata_qid, p.full_name) AS identity, p.gender
+          FROM all_street_names_cache sd
           JOIN persons p ON p.core_name_norm = sd.core_name_norm
         ) p
     """)
 
     profession_dist = _rows(conn, """
         SELECT COALESCE(p.profession, 'necunoscut') AS profession,
-               COUNT(DISTINCT p.core_name_norm) AS n
-        FROM streets_dedup sd
+               COUNT(DISTINCT COALESCE(p.wikidata_qid, p.full_name)) AS n
+        FROM all_street_names_cache sd
         JOIN persons p ON p.core_name_norm = sd.core_name_norm
         GROUP BY profession
         ORDER BY n DESC
@@ -220,8 +251,8 @@ def section3(conn: sqlite3.Connection) -> dict:
 
     era_dist = _rows(conn, """
         SELECT COALESCE(p.era, 'necunoscută') AS era,
-               COUNT(DISTINCT p.core_name_norm) AS n
-        FROM streets_dedup sd
+               COUNT(DISTINCT COALESCE(p.wikidata_qid, p.full_name)) AS n
+        FROM all_street_names_cache sd
         JOIN persons p ON p.core_name_norm = sd.core_name_norm
         GROUP BY era
         ORDER BY n DESC
@@ -231,19 +262,19 @@ def section3(conn: sqlite3.Connection) -> dict:
     # Gender-specific top lists for the split Bărbați / Femei sub-panels.
     top_men = _rows(conn, """
         SELECT p.full_name, p.gender, p.wikidata_qid, COUNT(*) AS street_count
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         JOIN persons p ON p.core_name_norm = sd.core_name_norm
         WHERE p.gender = 'M'
-        GROUP BY p.core_name_norm
+        GROUP BY COALESCE(p.wikidata_qid, p.full_name)
         ORDER BY street_count DESC
         LIMIT 15
     """)
     top_women = _rows(conn, """
         SELECT p.full_name, p.gender, p.wikidata_qid, COUNT(*) AS street_count
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         JOIN persons p ON p.core_name_norm = sd.core_name_norm
         WHERE p.gender = 'F'
-        GROUP BY p.core_name_norm
+        GROUP BY COALESCE(p.wikidata_qid, p.full_name)
         ORDER BY street_count DESC
         LIMIT 15
     """)
@@ -254,12 +285,12 @@ def section3(conn: sqlite3.Connection) -> dict:
               SELECT
                 CASE WHEN sd.judet LIKE 'BUCURESTI%%' OR sd.judet = 'B' THEN 'B'
                      ELSE sd.judet END AS judet,
-                p.core_name_norm,
+                COALESCE(p.wikidata_qid, p.full_name) AS identity,
                 MAX(p.full_name)       AS full_name,
                 MAX(p.gender)          AS gender,
                 MAX(p.wikidata_qid)    AS wikidata_qid,
                 COUNT(*)               AS street_count
-              FROM streets_dedup sd
+              FROM all_street_names_cache sd
               JOIN persons p ON p.core_name_norm = sd.core_name_norm
               WHERE sd.is_numeric = 0
                 {gender_filter}
@@ -299,10 +330,10 @@ def section3(conn: sqlite3.Connection) -> dict:
         SELECT p.full_name, p.nationality, p.profession, p.wikidata_qid,
                COUNT(*) AS street_count,
                GROUP_CONCAT(DISTINCT sd.judet) AS judete
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         JOIN persons p ON p.core_name_norm = sd.core_name_norm
         WHERE p.nationality IS NOT NULL AND p.nationality != 'RO'
-        GROUP BY p.core_name_norm
+        GROUP BY COALESCE(p.wikidata_qid, p.full_name)
         ORDER BY street_count DESC
         LIMIT 20
     """)
@@ -313,13 +344,13 @@ def section3(conn: sqlite3.Connection) -> dict:
               SELECT
                 CASE WHEN sd.judet LIKE 'BUCURESTI%%' OR sd.judet = 'B' THEN 'B'
                      ELSE sd.judet END AS judet,
-                p.core_name_norm,
+                COALESCE(p.wikidata_qid, p.full_name) AS identity,
                 MAX(p.full_name)       AS full_name,
                 MAX(p.nationality)     AS nationality,
                 MAX(p.profession)      AS profession,
                 MAX(p.wikidata_qid)    AS wikidata_qid,
                 COUNT(*)               AS street_count
-              FROM streets_dedup sd
+              FROM all_street_names_cache sd
               JOIN persons p ON p.core_name_norm = sd.core_name_norm
               WHERE sd.is_numeric = 0
                 AND p.nationality IS NOT NULL
@@ -360,8 +391,8 @@ def section3(conn: sqlite3.Connection) -> dict:
         SELECT CASE WHEN sd.judet LIKE 'BUCURESTI%%' OR sd.judet = 'B' THEN 'B'
                     ELSE sd.judet END AS judet,
                COALESCE(p.profession, 'necunoscut') AS profession,
-               COUNT(DISTINCT p.core_name_norm) AS n
-        FROM streets_dedup sd
+               COUNT(DISTINCT COALESCE(p.wikidata_qid, p.full_name)) AS n
+        FROM all_street_names_cache sd
         JOIN persons p ON p.core_name_norm = sd.core_name_norm
         WHERE p.profession IS NOT NULL
         GROUP BY 1, 2
@@ -378,8 +409,8 @@ def section3(conn: sqlite3.Connection) -> dict:
         SELECT CASE WHEN sd.judet LIKE 'BUCURESTI%%' OR sd.judet = 'B' THEN 'B'
                     ELSE sd.judet END AS judet,
                COALESCE(p.era, 'necunoscută') AS era,
-               COUNT(DISTINCT p.core_name_norm) AS n
-        FROM streets_dedup sd
+               COUNT(DISTINCT COALESCE(p.wikidata_qid, p.full_name)) AS n
+        FROM all_street_names_cache sd
         JOIN persons p ON p.core_name_norm = sd.core_name_norm
         WHERE p.era IS NOT NULL
         GROUP BY 1, 2
@@ -396,7 +427,7 @@ def section3(conn: sqlite3.Connection) -> dict:
                     ELSE sd.judet END AS judet,
                SUM(CASE WHEN p.gender = 'M' THEN 1 ELSE 0 END) AS m,
                SUM(CASE WHEN p.gender = 'F' THEN 1 ELSE 0 END) AS f
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         JOIN persons p ON p.core_name_norm = sd.core_name_norm
         GROUP BY 1
     """)
@@ -408,11 +439,11 @@ def section3(conn: sqlite3.Connection) -> dict:
           SELECT
             CASE WHEN sd.judet LIKE 'BUCURESTI%%' OR sd.judet = 'B' THEN 'B'
                  ELSE sd.judet END AS judet,
-            p.core_name_norm,
+            COALESCE(p.wikidata_qid, p.full_name) AS identity,
             MAX(p.full_name) AS full_name,
             MAX(p.gender)    AS gender,
             COUNT(*)         AS street_count
-          FROM streets_dedup sd
+          FROM all_street_names_cache sd
           JOIN persons p ON p.core_name_norm = sd.core_name_norm
           WHERE sd.is_numeric = 0
           GROUP BY 1, 2
@@ -450,10 +481,10 @@ def section3(conn: sqlite3.Connection) -> dict:
     # "by person" / "by street" panel. Includes RO so the chart can show shares.
     nat_rows = _rows(conn, """
         SELECT COALESCE(p.nationality, 'XX') AS nationality,
-               COUNT(DISTINCT p.core_name_norm) AS persons,
-               COUNT(sd.id) AS streets
+               COUNT(DISTINCT COALESCE(p.wikidata_qid, p.full_name)) AS persons,
+               COUNT(*) AS streets
         FROM persons p
-        LEFT JOIN streets_dedup sd ON sd.core_name_norm = p.core_name_norm
+        LEFT JOIN all_street_names_cache sd ON sd.core_name_norm = p.core_name_norm
         GROUP BY nationality
         ORDER BY streets DESC
     """)
@@ -467,9 +498,9 @@ def section3(conn: sqlite3.Connection) -> dict:
     nat_judet_rows = _rows(conn, """
         SELECT sd.judet,
                COALESCE(p.nationality, 'XX') AS nationality,
-               COUNT(DISTINCT p.core_name_norm) AS persons,
-               COUNT(sd.id) AS streets
-        FROM streets_dedup sd
+               COUNT(DISTINCT COALESCE(p.wikidata_qid, p.full_name)) AS persons,
+               COUNT(*) AS streets
+        FROM all_street_names_cache sd
         JOIN persons p ON p.core_name_norm = sd.core_name_norm
         GROUP BY sd.judet, nationality
         ORDER BY sd.judet, streets DESC
@@ -487,9 +518,9 @@ def section3(conn: sqlite3.Connection) -> dict:
     nat_siruta_rows = _rows(conn, """
         SELECT sd.siruta,
                COALESCE(p.nationality, 'XX') AS nationality,
-               COUNT(DISTINCT p.core_name_norm) AS persons,
-               COUNT(sd.id) AS streets
-        FROM streets_dedup sd
+               COUNT(DISTINCT COALESCE(p.wikidata_qid, p.full_name)) AS persons,
+               COUNT(*) AS streets
+        FROM all_street_names_cache sd
         JOIN persons p ON p.core_name_norm = sd.core_name_norm
         WHERE sd.uat LIKE 'MUNICIPIUL%'
         GROUP BY sd.siruta, nationality
@@ -532,10 +563,10 @@ def section4(conn: sqlite3.Connection) -> dict:
         SELECT p.full_name, p.wikidata_qid, p.wiki_scope, p.wiki_sitelinks,
                p.wiki_ro_views, p.wiki_ro_url,
                COUNT(*) AS street_count
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         JOIN persons p ON p.core_name_norm = sd.core_name_norm
         WHERE p.wiki_ro_views IS NOT NULL AND p.wiki_ro_views > 0
-        GROUP BY p.core_name_norm
+        GROUP BY COALESCE(p.wikidata_qid, p.full_name)
         ORDER BY p.wiki_ro_views DESC
         LIMIT 10
     """)
@@ -555,13 +586,13 @@ def section4(conn: sqlite3.Connection) -> dict:
         WITH per_judet AS (
           SELECT CASE WHEN sd.judet LIKE 'BUCURESTI%%' OR sd.judet = 'B' THEN 'B'
                       ELSE sd.judet END AS judet,
-                 p.core_name_norm,
+                 COALESCE(p.wikidata_qid, p.full_name) AS identity,
                  MAX(p.full_name)      AS full_name,
                  MAX(p.wikidata_qid)   AS wikidata_qid,
                  MAX(p.wiki_ro_views)  AS wiki_ro_views,
                  MAX(p.wiki_scope)     AS wiki_scope,
                  COUNT(*)              AS street_count
-          FROM streets_dedup sd
+          FROM all_street_names_cache sd
           JOIN persons p ON p.core_name_norm = sd.core_name_norm
           WHERE p.wiki_ro_views IS NOT NULL AND p.wiki_ro_views > 0
           GROUP BY 1, 2
@@ -596,26 +627,26 @@ def section5(conn: sqlite3.Connection) -> dict:
     theme_dist = _rows(conn, """
         SELECT category, SUM(cnt) AS count FROM (
           SELECT 'persoană' AS category, COUNT(*) AS cnt
-          FROM streets_dedup sd
+          FROM all_street_names_cache sd
           JOIN persons p ON p.core_name_norm = sd.core_name_norm
           UNION ALL
           SELECT 'natură', COUNT(*)
-          FROM streets_dedup sd
+          FROM all_street_names_cache sd
           JOIN nature_terms nt ON nt.core_name_norm = sd.core_name_norm
           UNION ALL
           SELECT 'religios', COUNT(*)
-          FROM streets_dedup WHERE is_saint = 1
+          FROM all_street_names_cache WHERE is_saint = 1
           UNION ALL
           SELECT 'dată / sărbătoare', COUNT(*)
-          FROM streets_dedup WHERE is_date = 1
+          FROM all_street_names_cache WHERE is_date = 1
           UNION ALL
           SELECT 'ideologic', COUNT(*)
-          FROM streets_dedup sd
+          FROM all_street_names_cache sd
           JOIN name_categories nc ON nc.core_name_norm = sd.core_name_norm
           WHERE nc.category = 'ideological'
           UNION ALL
           SELECT 'concept / abstract', COUNT(*)
-          FROM streets_dedup sd
+          FROM all_street_names_cache sd
           JOIN name_categories nc ON nc.core_name_norm = sd.core_name_norm
           WHERE nc.category IN ('abstract', 'commemorative', 'institutional')
         ) GROUP BY category
@@ -625,7 +656,7 @@ def section5(conn: sqlite3.Connection) -> dict:
     nature_subtypes = _rows(conn, """
         SELECT COALESCE(nature_type, 'altele') AS nature_type,
                COUNT(*) AS n
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         JOIN nature_terms nt ON nt.core_name_norm = sd.core_name_norm
         GROUP BY nature_type
         ORDER BY n DESC
@@ -634,7 +665,7 @@ def section5(conn: sqlite3.Connection) -> dict:
 
     ideo_tokens = _rows(conn, """
         SELECT nc.subcategory AS token, COUNT(*) AS n
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         JOIN name_categories nc ON nc.core_name_norm = sd.core_name_norm
         WHERE nc.category = 'ideological'
           AND nc.subcategory IS NOT NULL
@@ -664,7 +695,7 @@ def section5(conn: sqlite3.Connection) -> dict:
                     ELSE sd.judet END AS judet,
                COALESCE(nt.nature_type, 'altele') AS nature_type,
                COUNT(DISTINCT sd.name_normalized) AS n
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         JOIN nature_terms nt ON nt.core_name_norm = sd.core_name_norm
         WHERE sd.is_numeric = 0 AND sd.core_name IS NOT NULL
         GROUP BY 1, 2
@@ -682,7 +713,7 @@ def section5(conn: sqlite3.Connection) -> dict:
                     ELSE sd.judet END AS judet,
                nc.subcategory AS token,
                COUNT(DISTINCT sd.name_normalized) AS n
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         JOIN name_categories nc ON nc.core_name_norm = sd.core_name_norm
         WHERE nc.category = 'ideological' AND nc.subcategory IS NOT NULL
           AND sd.is_numeric = 0
@@ -705,7 +736,7 @@ def section5(conn: sqlite3.Connection) -> dict:
                SUM(CASE WHEN nc.category = 'ideological' THEN 1 ELSE 0 END) AS ideologic,
                SUM(CASE WHEN nc.category IN ('abstract','commemorative','institutional') THEN 1 ELSE 0 END) AS abstract,
                COUNT(*) AS total
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         LEFT JOIN persons p      ON p.core_name_norm  = sd.core_name_norm
         LEFT JOIN nature_terms nt ON nt.core_name_norm = sd.core_name_norm
         LEFT JOIN name_categories nc ON nc.core_name_norm = sd.core_name_norm
@@ -760,7 +791,7 @@ def section6_uat(conn: sqlite3.Connection, min_streets: int = 10) -> dict:
                ROUND(100.0 * SUM(CASE WHEN nc.category = 'ideological' THEN 1 ELSE 0 END) / COUNT(*), 2) AS ideology_pct,
                ROUND(100.0 * SUM(CASE WHEN p.birth_judet = sd.judet THEN 1 ELSE 0 END)
                            / NULLIF(SUM(CASE WHEN p.birth_judet IS NOT NULL THEN 1 ELSE 0 END), 0), 1) AS self_honor_pct
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         LEFT JOIN persons p          ON p.core_name_norm  = sd.core_name_norm
         LEFT JOIN nature_terms nt    ON nt.core_name_norm = sd.core_name_norm
         LEFT JOIN name_categories nc ON nc.core_name_norm = sd.core_name_norm
@@ -773,7 +804,7 @@ def section6_uat(conn: sqlite3.Connection, min_streets: int = 10) -> dict:
         SELECT siruta, display_name FROM (
           SELECT siruta, MIN(name) AS display_name, COUNT(*) AS cnt,
                  ROW_NUMBER() OVER (PARTITION BY siruta ORDER BY COUNT(*) DESC, MIN(name)) AS rn
-          FROM streets_dedup
+          FROM all_street_names_cache
           WHERE is_numeric = 0 AND core_name IS NOT NULL
           GROUP BY siruta, name_normalized
         ) WHERE rn = 1
@@ -817,7 +848,7 @@ def section6(conn: sqlite3.Connection) -> dict:
                ROUND(100.0 * SUM(CASE WHEN p.birth_judet = sd.judet THEN 1 ELSE 0 END)
                            / NULLIF(SUM(CASE WHEN p.birth_judet IS NOT NULL THEN 1 ELSE 0 END), 0), 1)
                                                                                   AS self_honor_pct
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         LEFT JOIN persons p ON p.core_name_norm = sd.core_name_norm
         LEFT JOIN nature_terms nt ON nt.core_name_norm = sd.core_name_norm
         LEFT JOIN name_categories nc ON nc.core_name_norm = sd.core_name_norm
@@ -829,7 +860,7 @@ def section6(conn: sqlite3.Connection) -> dict:
         SELECT judet, name_normalized, cnt FROM (
           SELECT judet, name_normalized, COUNT(*) AS cnt,
                  ROW_NUMBER() OVER (PARTITION BY judet ORDER BY COUNT(*) DESC) AS rn
-          FROM streets_dedup
+          FROM all_street_names_cache
           WHERE is_numeric = 0 AND core_name IS NOT NULL
           GROUP BY judet, name_normalized
         ) WHERE rn = 1
@@ -838,7 +869,7 @@ def section6(conn: sqlite3.Connection) -> dict:
 
     top_rows = _rows(conn, """
         SELECT judet, MIN(name) AS display_name, COUNT(*) AS cnt
-        FROM streets_dedup
+        FROM all_street_names_cache
         WHERE is_numeric = 0 AND core_name IS NOT NULL
         GROUP BY judet, name_normalized
         ORDER BY judet, cnt DESC
@@ -855,7 +886,7 @@ def section6(conn: sqlite3.Connection) -> dict:
     rare_rows = _rows(conn, """
         WITH global_rarity AS (
           SELECT name_normalized, COUNT(DISTINCT judet) AS judet_count
-          FROM streets_dedup
+          FROM all_street_names_cache
           WHERE is_numeric = 0 AND core_name IS NOT NULL
           GROUP BY name_normalized
         ),
@@ -865,7 +896,7 @@ def section6(conn: sqlite3.Connection) -> dict:
                    PARTITION BY sd.judet
                    ORDER BY gr.judet_count ASC, MIN(sd.name)
                  ) AS rn
-          FROM streets_dedup sd
+          FROM all_street_names_cache sd
           JOIN global_rarity gr ON gr.name_normalized = sd.name_normalized
           WHERE sd.is_numeric = 0 AND sd.core_name IS NOT NULL
           GROUP BY sd.judet, sd.name_normalized, gr.judet_count
@@ -892,7 +923,7 @@ def section6(conn: sqlite3.Connection) -> dict:
                  ROW_NUMBER() OVER (
                    PARTITION BY sd.judet ORDER BY COUNT(*) DESC
                  ) AS rn
-          FROM streets_dedup sd
+          FROM all_street_names_cache sd
           JOIN persons p ON p.core_name_norm = sd.core_name_norm
           WHERE sd.is_numeric = 0
           GROUP BY sd.judet, p.full_name
@@ -946,7 +977,7 @@ def section_quirky(conn: sqlite3.Connection) -> dict:
             p.wikidata_qid,
             COUNT(DISTINCT sd.id)              AS matched_streets,
             ROUND(SUM(o.length_m) / 1000.0, 1) AS total_km
-        FROM streets_dedup sd
+        FROM electoral_dedup sd
         JOIN persons p              ON p.core_name_norm = sd.core_name_norm
         JOIN street_osm_matches m   ON m.street_id      = sd.id
         JOIN osm_streets o          ON o.id             = m.osm_street_id
@@ -972,7 +1003,7 @@ def section_quirky(conn: sqlite3.Connection) -> dict:
               WHEN c.core_name_norm  IS NOT NULL         THEN 'categorii'
               ELSE 'neclasificate'
             END AS category
-          FROM streets_dedup sd
+          FROM electoral_dedup sd
           LEFT JOIN persons         p  ON p.core_name_norm  = sd.core_name_norm
           LEFT JOIN nature_terms    n  ON n.core_name_norm  = sd.core_name_norm
           LEFT JOIN place_refs      pl ON pl.core_name_norm = sd.core_name_norm
@@ -1030,7 +1061,7 @@ def section_quirky(conn: sqlite3.Connection) -> dict:
                ROUND(100.0 * SUM(CASE WHEN p.birth_judet = s.judet THEN 1 ELSE 0 END)
                            / NULLIF(SUM(CASE WHEN p.birth_judet IS NOT NULL THEN 1 ELSE 0 END), 0), 1)
                                                                               AS pct
-        FROM streets_dedup s
+        FROM electoral_dedup s
         JOIN persons p ON p.core_name_norm = s.core_name_norm
         GROUP BY s.judet
         HAVING known_birth_streets >= 20
@@ -1044,7 +1075,7 @@ def section_quirky(conn: sqlite3.Connection) -> dict:
         SELECT
           SUM(CASE WHEN p.birth_judet IS NOT NULL THEN 1 ELSE 0 END) AS known,
           SUM(CASE WHEN p.birth_judet = s.judet THEN 1 ELSE 0 END)   AS self_count
-        FROM streets_dedup s
+        FROM electoral_dedup s
         JOIN persons p ON p.core_name_norm = s.core_name_norm
     """)
     nat_pct = round(100.0 * nat["self_count"] / nat["known"], 1) if nat["known"] else 0.0
@@ -1060,7 +1091,7 @@ def section_quirky(conn: sqlite3.Connection) -> dict:
                MIN(p.wikidata_qid)                  AS wikidata_qid,
                COUNT(DISTINCT sd.id)                AS street_count
         FROM persons p
-        JOIN streets_dedup sd ON sd.core_name_norm = p.core_name_norm
+        JOIN electoral_dedup sd ON sd.core_name_norm = p.core_name_norm
         WHERE p.birth_year IS NOT NULL AND p.death_year IS NOT NULL
           AND p.death_year > p.birth_year AND p.birth_year > 0
         GROUP BY p.full_name
@@ -1102,7 +1133,7 @@ def section_quirky(conn: sqlite3.Connection) -> dict:
     cause_raw = _rows(conn, """
         WITH sc AS (
             SELECT core_name_norm, COUNT(DISTINCT id) AS street_count
-            FROM streets_dedup GROUP BY core_name_norm
+            FROM electoral_dedup GROUP BY core_name_norm
         )
         SELECT
             COALESCE(NULLIF(p.cause_of_death_label,''), '') AS cause_label,
@@ -1137,7 +1168,7 @@ def section_quirky(conn: sqlite3.Connection) -> dict:
     century_rows = _rows(conn, """
         WITH sc AS (
             SELECT core_name_norm, COUNT(DISTINCT id) AS street_count
-            FROM streets_dedup GROUP BY core_name_norm
+            FROM electoral_dedup GROUP BY core_name_norm
         )
         SELECT (p.birth_year / 100) * 100   AS century_start,
                COUNT(DISTINCT p.core_name_norm) AS persons,
@@ -1166,7 +1197,7 @@ def section_quirky(conn: sqlite3.Connection) -> dict:
                ROUND(AVG(o.length_m), 0)                           AS avg_length_m,
                ROUND(SUM(o.length_m) / 1000.0
                      / COUNT(DISTINCT p.full_name), 1)             AS km_per_honoree
-        FROM streets_dedup sd
+        FROM electoral_dedup sd
         JOIN persons p            ON p.core_name_norm = sd.core_name_norm
         JOIN street_osm_matches m ON m.street_id      = sd.id
         JOIN osm_streets o        ON o.id             = m.osm_street_id
@@ -1180,7 +1211,7 @@ def section_quirky(conn: sqlite3.Connection) -> dict:
                COUNT(DISTINCT sd.id)               AS streets,
                ROUND(SUM(o.length_m) / 1000.0, 1) AS km,
                ROUND(AVG(o.length_m), 0)           AS avg_m
-        FROM streets_dedup sd
+        FROM electoral_dedup sd
         JOIN persons p            ON p.core_name_norm = sd.core_name_norm
         JOIN street_osm_matches m ON m.street_id      = sd.id
         JOIN osm_streets o        ON o.id             = m.osm_street_id
@@ -1204,7 +1235,7 @@ def section_quirky(conn: sqlite3.Connection) -> dict:
     # inflate counts — a UAT "has Cuza" if any of his 4 name-forms are present).
     presence_rows = _rows(conn, """
         SELECT p.full_name, sd.siruta
-        FROM streets_dedup sd
+        FROM electoral_dedup sd
         JOIN persons p ON p.core_name_norm = sd.core_name_norm
         GROUP BY p.full_name, sd.siruta
     """)
@@ -1299,7 +1330,7 @@ def section_lexical(conn: sqlite3.Connection) -> dict:
     rows = _rows(conn, """
         SELECT name_normalized AS n, MIN(name) AS disp,
                COUNT(*) AS streets, COUNT(DISTINCT siruta) AS uats
-        FROM streets_dedup
+        FROM all_street_names_cache
         WHERE is_numeric = 0 AND name_normalized != ''
         GROUP BY name_normalized
     """)
@@ -1308,7 +1339,7 @@ def section_lexical(conn: sqlite3.Connection) -> dict:
     # Per-name județ sets — drives the near-universal / universal anomaly.
     jud_rows = _rows(conn, """
         SELECT DISTINCT name_normalized AS n, judet
-        FROM streets_dedup
+        FROM all_street_names_cache
         WHERE is_numeric = 0 AND name_normalized != ''
     """)
     name_jud: dict[str, set] = defaultdict(set)
@@ -1436,11 +1467,11 @@ def section_geo(conn: sqlite3.Connection) -> dict:
                MIN(p.birth_judet)                                          AS birth_judet,
                MIN(p.wikidata_qid)                                         AS wikidata_qid,
                MIN(p.profession)                                           AS profession,
-               COUNT(DISTINCT s.id)                                        AS total_streets,
+               COUNT(*)                                        AS total_streets,
                COUNT(DISTINCT s.judet)                                     AS judete_reach,
                SUM(CASE WHEN s.judet = p.birth_judet THEN 1 ELSE 0 END)   AS home_streets
         FROM persons p
-        JOIN streets_dedup s ON s.core_name_norm = p.core_name_norm
+        JOIN all_street_names_cache s ON s.core_name_norm = p.core_name_norm
         WHERE p.birth_judet IS NOT NULL
         GROUP BY p.full_name
     """)
@@ -1470,7 +1501,7 @@ def section_geo(conn: sqlite3.Connection) -> dict:
             SELECT p.full_name, p.birth_judet, s.judet,
                    MIN(p.wikidata_qid) AS wikidata_qid,
                    COUNT(*) AS streets_in_judet
-            FROM streets_dedup s
+            FROM all_street_names_cache s
             JOIN persons p ON p.core_name_norm = s.core_name_norm
             GROUP BY p.full_name, s.judet
         ),
@@ -1513,14 +1544,14 @@ def section8(conn: sqlite3.Connection) -> dict:
     ciorani_row = _one(conn, """
         SELECT COUNT(*) AS total,
                SUM(is_numeric) AS numeric_streets
-        FROM streets_dedup
+        FROM all_street_names_cache
         WHERE judet = 'PH'
           AND uat LIKE '%CIORANI%'
     """)
 
     longest_names = _rows(conn, """
         SELECT name, LENGTH(name) AS char_count
-        FROM streets_dedup
+        FROM all_street_names_cache
         WHERE is_numeric = 0
           AND core_name IS NOT NULL
           AND LENGTH(name) > 30
@@ -1533,9 +1564,9 @@ def section8(conn: sqlite3.Connection) -> dict:
     local_honorees = _rows(conn, """
         SELECT p.full_name, p.profession, sd.judet, sd.uat,
                COUNT(DISTINCT sd.siruta) AS uat_count
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         JOIN persons p ON p.core_name_norm = sd.core_name_norm
-        GROUP BY p.core_name_norm
+        GROUP BY COALESCE(p.wikidata_qid, p.full_name)
         HAVING COUNT(DISTINCT sd.siruta) = 1
         ORDER BY sd.judet, sd.uat
         LIMIT 12
@@ -1555,14 +1586,14 @@ def section8(conn: sqlite3.Connection) -> dict:
     regional_signatures = _rows(conn, """
         WITH per_name AS (
           SELECT name_normalized, COUNT(*) AS national_total
-          FROM streets_dedup
+          FROM all_street_names_cache
           WHERE is_numeric = 0 AND core_name IS NOT NULL
           GROUP BY name_normalized
         ),
         per_jn AS (
           SELECT name_normalized, judet, MIN(name) AS display_name,
                  COUNT(*) AS local_total
-          FROM streets_dedup
+          FROM all_street_names_cache
           WHERE is_numeric = 0 AND core_name IS NOT NULL
           GROUP BY name_normalized, judet
         )
@@ -1588,7 +1619,7 @@ def section8(conn: sqlite3.Connection) -> dict:
                  MIN(sd.name) AS display_name,
                  MIN(sd.judet) AS judet, MIN(sd.uat) AS uat,
                  COUNT(DISTINCT sd.siruta) AS uat_n
-          FROM streets_dedup sd
+          FROM all_street_names_cache sd
           WHERE sd.is_numeric = 0 AND sd.core_name IS NOT NULL
           GROUP BY sd.name_normalized
         )
@@ -1636,13 +1667,13 @@ def section8(conn: sqlite3.Connection) -> dict:
         WITH per_name AS (
           SELECT name_normalized,
                  COUNT(DISTINCT judet) AS judet_n
-          FROM streets_dedup
+          FROM all_street_names_cache
           WHERE is_numeric = 0 AND core_name IS NOT NULL
           GROUP BY name_normalized
         ),
         per_jn AS (
           SELECT name_normalized, judet, COUNT(*) AS local_total
-          FROM streets_dedup
+          FROM all_street_names_cache
           WHERE is_numeric = 0 AND core_name IS NOT NULL
           GROUP BY name_normalized, judet
         )
@@ -1660,7 +1691,7 @@ def section8(conn: sqlite3.Connection) -> dict:
                ROUND(100.0 * SUM(CASE WHEN nt.nature_type IS NOT NULL THEN 1 ELSE 0 END)
                      / COUNT(*), 1) AS pct,
                COUNT(*) AS total
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         LEFT JOIN nature_terms nt ON nt.core_name_norm = sd.core_name_norm
         WHERE sd.is_numeric = 0
         GROUP BY sd.judet
@@ -1673,7 +1704,7 @@ def section8(conn: sqlite3.Connection) -> dict:
                ROUND(100.0 * SUM(CASE WHEN nc.category = 'ideological' THEN 1 ELSE 0 END)
                      / COUNT(*), 1) AS pct,
                COUNT(*) AS total
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         LEFT JOIN name_categories nc ON nc.core_name_norm = sd.core_name_norm
         WHERE sd.is_numeric = 0
         GROUP BY sd.judet
@@ -1700,7 +1731,7 @@ def section8(conn: sqlite3.Connection) -> dict:
 def _contest_by_nature(conn: sqlite3.Connection, nature_type: str) -> list[dict]:
     return _rows(conn, """
         SELECT nt.term AS label, sd.name_normalized, COUNT(*) AS n
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         JOIN nature_terms nt ON nt.core_name_norm = sd.core_name_norm
         WHERE nt.nature_type = ?
         GROUP BY nt.term
@@ -1716,7 +1747,7 @@ def _contest_trades(conn: sqlite3.Connection) -> list[dict]:
         SELECT sd.name_normalized AS label,
                sd.name_normalized,
                COUNT(*) AS n
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         JOIN name_categories nc ON nc.core_name_norm = sd.core_name_norm
         WHERE nc.category IN ('trade', 'occupational')
         GROUP BY sd.name_normalized
@@ -1743,7 +1774,7 @@ MACRO_THEMES = [
 
 
 def _street_theme(row: dict) -> str:
-    """Pick the dominant theme label for a single streets_dedup row+joins."""
+    """Pick the dominant theme label for a single all_street_names_cache row+joins."""
     if row.get("is_saint"):
         return "religios"
     if row.get("is_date"):
@@ -1768,7 +1799,7 @@ def enumerate_streets(conn: sqlite3.Connection, min_uats: int = 5) -> list[dict]
                COUNT(DISTINCT sd.siruta) AS uat_count,
                MAX(p.wikidata_qid) AS qid,
                MAX(p.core_name_norm) AS person_core
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         LEFT JOIN persons p ON p.core_name_norm = sd.core_name_norm
         WHERE sd.is_numeric = 0 AND sd.core_name IS NOT NULL
         GROUP BY sd.name_normalized
@@ -1804,9 +1835,9 @@ def enumerate_persons(conn: sqlite3.Connection) -> list[dict]:
     """Every person in the persons table — they all get a detail page."""
     rows = _rows(conn, """
         SELECT p.core_name_norm, p.full_name, p.wikidata_qid,
-               COUNT(sd.id) AS street_count
+               COUNT(sd.core_name_norm) AS street_count
         FROM persons p
-        LEFT JOIN streets_dedup sd ON sd.core_name_norm = p.core_name_norm
+        LEFT JOIN all_street_names_cache sd ON sd.core_name_norm = p.core_name_norm
         GROUP BY p.core_name_norm
         ORDER BY street_count DESC, p.full_name
     """)
@@ -1861,7 +1892,7 @@ def enumerate_uats(conn: sqlite3.Connection, min_streets: int = 50) -> list[dict
     seat_set = set(COUNTY_SEAT_SIRUTAS.values())
     rows = _rows(conn, """
         SELECT sd.judet, sd.uat, sd.siruta, COUNT(*) AS total
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         GROUP BY sd.siruta
         ORDER BY total DESC
     """)
@@ -1896,7 +1927,7 @@ def enumerate_themes(conn: sqlite3.Connection) -> list[dict]:
     # Macro themes — fixed list, counts computed via SQL
     macro_counts = {r["theme"]: r["n"] for r in _rows(conn, """
         WITH classified AS (
-          SELECT sd.id,
+          SELECT
             CASE
               WHEN sd.is_saint = 1                       THEN 'religios'
               WHEN sd.is_date = 1                        THEN 'data'
@@ -1906,7 +1937,7 @@ def enumerate_themes(conn: sqlite3.Connection) -> list[dict]:
               WHEN nc.category = 'ideological'           THEN 'ideologic'
               ELSE 'alte'
             END AS theme
-          FROM streets_dedup sd
+          FROM all_street_names_cache sd
           LEFT JOIN persons p          ON p.core_name_norm  = sd.core_name_norm
           LEFT JOIN nature_terms nt    ON nt.core_name_norm = sd.core_name_norm
           LEFT JOIN place_refs pl      ON pl.core_name_norm = sd.core_name_norm
@@ -1938,7 +1969,7 @@ def enumerate_themes(conn: sqlite3.Connection) -> list[dict]:
     }
     for r in _rows(conn, """
         SELECT p.profession AS key, COUNT(*) AS n
-        FROM streets_dedup sd JOIN persons p ON p.core_name_norm = sd.core_name_norm
+        FROM all_street_names_cache sd JOIN persons p ON p.core_name_norm = sd.core_name_norm
         WHERE p.profession IS NOT NULL
         GROUP BY p.profession ORDER BY n DESC
     """):
@@ -1963,7 +1994,7 @@ def enumerate_themes(conn: sqlite3.Connection) -> list[dict]:
     }
     for r in _rows(conn, """
         SELECT nt.nature_type AS key, COUNT(*) AS n
-        FROM streets_dedup sd JOIN nature_terms nt ON nt.core_name_norm = sd.core_name_norm
+        FROM all_street_names_cache sd JOIN nature_terms nt ON nt.core_name_norm = sd.core_name_norm
         WHERE nt.nature_type IS NOT NULL
         GROUP BY nt.nature_type ORDER BY n DESC
     """):
@@ -1994,7 +2025,7 @@ def enumerate_themes(conn: sqlite3.Connection) -> list[dict]:
     }
     for r in _rows(conn, """
         SELECT nc.subcategory AS key, COUNT(*) AS n
-        FROM streets_dedup sd JOIN name_categories nc ON nc.core_name_norm = sd.core_name_norm
+        FROM all_street_names_cache sd JOIN name_categories nc ON nc.core_name_norm = sd.core_name_norm
         WHERE nc.category = 'ideological' AND nc.subcategory IS NOT NULL
         GROUP BY nc.subcategory ORDER BY n DESC
     """):
@@ -2027,7 +2058,7 @@ def street_detail(conn: sqlite3.Connection, name_normalized: str,
                nt.core_name_norm AS nature_core, nt.nature_type,
                pl.core_name_norm AS place_core,  pl.place_type,
                nc.category       AS ideo_cat,    nc.subcategory AS ideo_subcat
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         LEFT JOIN persons p          ON p.core_name_norm  = sd.core_name_norm
         LEFT JOIN nature_terms nt    ON nt.core_name_norm = sd.core_name_norm
         LEFT JOIN place_refs pl      ON pl.core_name_norm = sd.core_name_norm
@@ -2130,7 +2161,7 @@ def person_detail(conn: sqlite3.Connection, core_name_norm: str,
 
     rows = _rows(conn, """
         SELECT sd.judet, sd.uat, sd.siruta, sd.name, sd.core_name, sd.name_normalized
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         WHERE sd.core_name_norm = ?
         ORDER BY sd.judet, sd.uat
     """, (core_name_norm,))
@@ -2165,9 +2196,9 @@ def person_detail(conn: sqlite3.Connection, core_name_norm: str,
     # Peers: other persons sharing profession or era
     peers = _rows(conn, """
         SELECT p.core_name_norm, p.full_name, p.wikidata_qid,
-               COUNT(sd.id) AS street_count
+               COUNT(sd.core_name_norm) AS street_count
         FROM persons p
-        LEFT JOIN streets_dedup sd ON sd.core_name_norm = p.core_name_norm
+        LEFT JOIN all_street_names_cache sd ON sd.core_name_norm = p.core_name_norm
         WHERE p.core_name_norm != ?
           AND (p.profession = ? OR p.era = ?)
         GROUP BY p.core_name_norm
@@ -2204,7 +2235,7 @@ def uat_detail(
         SELECT judet, uat, siruta, COUNT(*) AS total,
                SUM(is_saint)   AS saints,
                SUM(is_numeric) AS numerics
-        FROM streets_dedup
+        FROM all_street_names_cache
         WHERE siruta = ?
         GROUP BY siruta
     """, (siruta,))
@@ -2225,7 +2256,7 @@ def uat_detail(
               WHEN nc.category = 'ideological'           THEN 'ideologic'
               ELSE 'alte'
             END AS theme
-          FROM streets_dedup sd
+          FROM all_street_names_cache sd
           LEFT JOIN persons p          ON p.core_name_norm  = sd.core_name_norm
           LEFT JOIN nature_terms nt    ON nt.core_name_norm = sd.core_name_norm
           LEFT JOIN place_refs pl      ON pl.core_name_norm = sd.core_name_norm
@@ -2240,7 +2271,7 @@ def uat_detail(
         SELECT sd.name_normalized, MIN(sd.core_name) AS display,
                COUNT(*) AS n, MAX(p.wikidata_qid) AS qid,
                MAX(p.core_name_norm) AS person_core
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         LEFT JOIN persons p ON p.core_name_norm = sd.core_name_norm
         WHERE sd.siruta = ? AND sd.is_numeric = 0 AND sd.core_name IS NOT NULL
         GROUP BY sd.name_normalized
@@ -2253,10 +2284,10 @@ def uat_detail(
     top_persons = _rows(conn, """
         SELECT p.full_name, p.wikidata_qid, p.core_name_norm, p.profession,
                COUNT(*) AS n
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         JOIN persons p ON p.core_name_norm = sd.core_name_norm
         WHERE sd.siruta = ?
-        GROUP BY p.core_name_norm
+        GROUP BY COALESCE(p.wikidata_qid, p.full_name)
         ORDER BY n DESC, p.full_name
         LIMIT 12
     """, (siruta,))
@@ -2269,7 +2300,7 @@ def uat_detail(
     if global_rarity is not None:
         uat_names = _rows(conn, """
             SELECT sd.name_normalized, MIN(sd.core_name) AS display
-            FROM streets_dedup sd
+            FROM all_street_names_cache sd
             WHERE sd.siruta = ? AND sd.is_numeric = 0 AND sd.core_name IS NOT NULL
             GROUP BY sd.name_normalized
         """, (siruta,))
@@ -2286,12 +2317,12 @@ def uat_detail(
         distinctive = _rows(conn, """
             WITH global_rarity AS (
               SELECT name_normalized, COUNT(DISTINCT siruta) AS uat_n
-              FROM streets_dedup
+              FROM all_street_names_cache
               WHERE is_numeric = 0 AND core_name IS NOT NULL
               GROUP BY name_normalized
             )
             SELECT sd.name_normalized, MIN(sd.core_name) AS display, gr.uat_n
-            FROM streets_dedup sd
+            FROM all_street_names_cache sd
             JOIN global_rarity gr ON gr.name_normalized = sd.name_normalized
             WHERE sd.siruta = ? AND sd.is_numeric = 0 AND sd.core_name IS NOT NULL
               AND gr.uat_n <= 3
@@ -2308,7 +2339,7 @@ def uat_detail(
             SELECT
               ROUND(100.0 * SUM(is_saint)   / COUNT(*), 2) AS saint_pct,
               ROUND(100.0 * SUM(is_numeric) / COUNT(*), 2) AS numeric_pct
-            FROM streets_dedup
+            FROM all_street_names_cache
         """)
     saint_pct   = round(100.0 * (head["saints"]   or 0) / head["total"], 2) if head["total"] else 0
     numeric_pct = round(100.0 * (head["numerics"] or 0) / head["total"], 2) if head["total"] else 0
@@ -2379,7 +2410,7 @@ def theme_detail(conn: sqlite3.Connection, theme_type: str, theme_key: str) -> d
                MAX(p.core_name_norm) AS person_core,
                COUNT(*) AS total,
                COUNT(DISTINCT sd.siruta) AS uat_count
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         {join_clause}
         {person_join}
         WHERE {where_clause}
@@ -2394,7 +2425,7 @@ def theme_detail(conn: sqlite3.Connection, theme_type: str, theme_key: str) -> d
     # Județ heatmap data
     per_judet = _rows(conn, f"""
         SELECT sd.judet, COUNT(*) AS n
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         {join_clause}
         WHERE {where_clause}
           AND sd.is_numeric = 0
@@ -2433,7 +2464,7 @@ def explorer_indexes(conn: sqlite3.Connection) -> dict:
     streets = _rows(conn, """
         SELECT sd.name_normalized, MIN(sd.core_name) AS display,
                COUNT(*) AS total, COUNT(DISTINCT sd.siruta) AS uat_count
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         WHERE sd.is_numeric = 0 AND sd.core_name IS NOT NULL
         GROUP BY sd.name_normalized
         ORDER BY total DESC
@@ -2477,8 +2508,8 @@ def browser_export(conn: sqlite3.Connection) -> dict:
         return [r[0] for r in conn.execute(sql)]
 
     meta = {
-        "judete":          col("SELECT DISTINCT judet FROM streets_dedup WHERE judet IS NOT NULL ORDER BY judet"),
-        "street_types":    col("SELECT DISTINCT street_type FROM streets_dedup WHERE street_type IS NOT NULL ORDER BY street_type"),
+        "judete":          col("SELECT DISTINCT judet FROM all_street_names_cache WHERE judet IS NOT NULL ORDER BY judet"),
+        "street_types":    col("SELECT DISTINCT street_type FROM all_street_names_cache WHERE street_type IS NOT NULL ORDER BY street_type"),
         "professions":     col("SELECT DISTINCT profession FROM persons WHERE profession IS NOT NULL ORDER BY profession"),
         "nationalities":   col("SELECT DISTINCT nationality FROM persons WHERE nationality IS NOT NULL ORDER BY nationality"),
         "genders":         col("SELECT DISTINCT gender FROM persons WHERE gender IS NOT NULL ORDER BY gender"),
@@ -2521,7 +2552,7 @@ def browser_export(conn: sqlite3.Connection) -> dict:
             MAX(n.nature_type)    AS nature_type,
             MAX(pr.place_type)    AS place_type,
             MAX(pr.country)       AS place_country
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         LEFT JOIN persons         p  ON p.core_name_norm  = sd.core_name_norm
         LEFT JOIN name_categories c  ON c.core_name_norm  = sd.core_name_norm
         LEFT JOIN nature_terms    n  ON n.core_name_norm  = sd.core_name_norm
@@ -2569,7 +2600,7 @@ def municipii_index(conn: sqlite3.Connection) -> dict:
         SELECT CASE WHEN judet LIKE 'BUCURESTI%%' OR judet = 'B' THEN 'B'
                     ELSE judet END AS judet,
                siruta, uat, COUNT(*) AS total
-        FROM streets_dedup
+        FROM all_street_names_cache
         WHERE uat LIKE 'MUNICIPIUL%%' AND is_numeric = 0
         GROUP BY siruta, uat, judet
         ORDER BY judet, total DESC
@@ -2582,12 +2613,15 @@ def municipii_index(conn: sqlite3.Connection) -> dict:
         })
 
     # Top-25 streets per municipiu, ordered by national occurrence count so the
-    # most recognisable names appear first (each name appears exactly once per UAT
-    # in streets_dedup, so national frequency is the meaningful ranking signal).
+    # most recognisable names appear first. `nat` counts DISTINCT siruta and
+    # `uat_streets` groups by (siruta, name_normalized), so both are UAT-reach
+    # figures — which matters on all_street_names_cache, whose grain is
+    # (siruta, street_type, core_name_norm): unlike electoral_dedup, one name CAN
+    # appear twice in a UAT there (Strada X and Bulevardul X are distinct rows).
     streets_rows = _rows(conn, """
         WITH nat AS (
           SELECT name_normalized, COUNT(DISTINCT siruta) AS nat_count
-          FROM streets_dedup
+          FROM all_street_names_cache
           WHERE is_numeric = 0 AND core_name IS NOT NULL
           GROUP BY name_normalized
         ),
@@ -2598,7 +2632,7 @@ def municipii_index(conn: sqlite3.Connection) -> dict:
                       WHEN MAX(nt.core_name_norm) IS NOT NULL THEN 'natura'
                       WHEN MAX(sd.is_saint) = 1 THEN 'religios'
                       ELSE 'altele' END AS category
-          FROM streets_dedup sd
+          FROM all_street_names_cache sd
           LEFT JOIN persons p ON p.core_name_norm = sd.core_name_norm
           LEFT JOIN nature_terms nt ON nt.core_name_norm = sd.core_name_norm
           WHERE sd.is_numeric = 0 AND sd.core_name IS NOT NULL
@@ -2634,7 +2668,7 @@ def municipii_index(conn: sqlite3.Connection) -> dict:
                      MAX(p.full_name) AS full_name, MAX(p.gender) AS gender,
                      MAX(p.wikidata_qid) AS wikidata_qid, COUNT(*) AS street_count,
                      ROW_NUMBER() OVER (PARTITION BY sd.siruta ORDER BY COUNT(*) DESC) AS rn
-              FROM streets_dedup sd
+              FROM all_street_names_cache sd
               JOIN persons p ON p.core_name_norm = sd.core_name_norm
               WHERE sd.uat LIKE 'MUNICIPIUL%%' AND p.gender = '{gender}'
               GROUP BY sd.siruta, p.core_name_norm
@@ -2657,7 +2691,7 @@ def municipii_index(conn: sqlite3.Connection) -> dict:
         SELECT sd.siruta,
                SUM(CASE WHEN p.gender = 'M' THEN 1 ELSE 0 END) AS m,
                SUM(CASE WHEN p.gender = 'F' THEN 1 ELSE 0 END) AS f
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         JOIN persons p ON p.core_name_norm = sd.core_name_norm
         WHERE sd.uat LIKE 'MUNICIPIUL%%'
         GROUP BY sd.siruta
@@ -2674,7 +2708,7 @@ def municipii_index(conn: sqlite3.Connection) -> dict:
                SUM(CASE WHEN nc.category = 'ideological' THEN 1 ELSE 0 END) AS ideologic,
                SUM(CASE WHEN nc.category IN ('abstract','commemorative','institutional') THEN 1 ELSE 0 END) AS abstract,
                COUNT(*) AS total
-        FROM streets_dedup sd
+        FROM all_street_names_cache sd
         LEFT JOIN persons p       ON p.core_name_norm  = sd.core_name_norm
         LEFT JOIN nature_terms nt  ON nt.core_name_norm = sd.core_name_norm
         LEFT JOIN name_categories nc ON nc.core_name_norm = sd.core_name_norm
@@ -2705,7 +2739,7 @@ def get_source_coverage_by_judet(conn: sqlite3.Connection) -> list[dict]:
     """Per-source street coverage by județul, sorted by total descending."""
     rows = _rows(conn, """
         SELECT judet,
-          SUM(EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='registry')) AS registry,
+          SUM(EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='electoral')) AS electoral,
           SUM(EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='osm')) AS osm,
           SUM(EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='postal')) AS postal,
           SUM(EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='renns')) AS renns,
@@ -2721,15 +2755,15 @@ def get_source_coverage_by_judet(conn: sqlite3.Connection) -> list[dict]:
 def sources_overview(conn: sqlite3.Connection) -> dict:
     """Global overview: distinct streets and UAT coverage per source.
 
-    Returns {source -> {count: N, uats: M}} for registry, osm, postal, renns.
+    Returns {source -> {count: N, uats: M}} for electoral, osm, postal, renns.
     Also includes total combined entries.
     """
     stats = _one(conn, """
         SELECT
           COUNT(*) AS total_entries,
           COUNT(DISTINCT siruta) AS total_uats,
-          SUM(EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='registry')) AS registry_count,
-          COUNT(DISTINCT CASE WHEN EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='registry') THEN a.siruta END) AS registry_uats,
+          SUM(EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='electoral')) AS electoral_count,
+          COUNT(DISTINCT CASE WHEN EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='electoral') THEN a.siruta END) AS electoral_uats,
           SUM(EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='osm')) AS osm_count,
           COUNT(DISTINCT CASE WHEN EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='osm') THEN a.siruta END) AS osm_uats,
           SUM(EXISTS(SELECT 1 FROM json_each(a.variants) je WHERE json_extract(je.value,'$.source')='postal')) AS postal_count,
@@ -2745,9 +2779,9 @@ def sources_overview(conn: sqlite3.Connection) -> dict:
         "total_entries": stats.get("total_entries", 0),
         "total_uats": stats.get("total_uats", 0),
         "total_uats_romania": total_uats,
-        "registry": {
-            "count": stats.get("registry_count", 0),
-            "uats": stats.get("registry_uats", 0),
+        "electoral": {
+            "count": stats.get("electoral_count", 0),
+            "uats": stats.get("electoral_uats", 0),
         },
         "osm": {
             "count": stats.get("osm_count", 0),
