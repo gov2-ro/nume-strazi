@@ -1,5 +1,99 @@
 # Activity History
 
+## 2026-08-01 — Taxonomy normalisation: 461 → 372 subcategories, canonicalised at import
+
+Prerequisite for filter UI. `name_categories.subcategory` is free text written
+by whichever model classified the key, and it had drifted to **461 distinct
+values under 9 categories** — enough that any filter built on it would have been
+wrong from the start, and getting worse with every batch.
+
+### Five defect classes, all present
+
+| class | example |
+|---|---|
+| separator drift | `historical event` / `historical_event`; `public utility` / `public_utility` / `utility` |
+| singular vs plural | `saint`/`saints`, `craftsman`/`craftsmen`, `blacksmith`/`blacksmiths` |
+| adjective vs noun | `geometry`/`geometric`/`geometrical`; `topographic`/`topographical`/`topography` |
+| Romanian leakage | `valori`, `profesii`, `resurse`, `codificare`, `tehnologie` — the prompt is English, these slipped through |
+| tautology | category `abstract` with subcategory `abstract` (6 rows), same for 5 other categories |
+
+The numbering family alone had six spellings for one concept: `numeric`,
+`numerical`, `numbering`, `numbered_street`, `ordinal`, `ordinal_number`.
+
+### `tools/normalize_taxonomy.py`
+
+Two passes, deliberately separated so they can be audited independently:
+
+- `_mechanical()` — lowercase, trim, collapse any run of separators to `_`.
+  Pure syntax, no judgement.
+- `SYNONYMS` — hand-curated, and only merges spellings that genuinely denote
+  the same thing.
+
+**Neither pass invents a controlled vocabulary or drops detail.** `sieve_maker`
+is still `sieve_maker`. That was a deliberate call: collapsing the long tail into
+a tidy fixed vocabulary would have destroyed the distinctions the classification
+exists to capture, and inventing that vocabulary is an editorial decision, not a
+data-cleaning one.
+
+461 → 372 values, 411 rows changed, idempotent (rule #6). Per category:
+
+| category | before | after |
+|---|---|---|
+| abstract | 120 | 109 |
+| infrastructure | 81 | 61 |
+| occupational | 77 | 58 |
+| trade | 71 | 54 |
+| institutional | 67 | 62 |
+| commemorative | 64 | 56 |
+| religious | 32 | 29 |
+| mythology | 20 | 14 |
+| ideological | 35 | 35 |
+
+A near-duplicate scan over the normalised set (shared 6-char prefix) caught a
+second round — `architectural`/`architecture`, `astronomical`/`astronomy`,
+`public_administration`/`administration`, `cooperative_movement`/`cooperative`,
+`blacksmith_shop`/`blacksmith` — and confirmed the rest are legitimately
+distinct (`communist_press` is not `community`).
+
+### Faceting is presentation, not data
+
+372 values is still too many for a dropdown, but that is a UI problem, not a
+reason to mangle the data. `GROUPS` maps each normalised value to one of **23
+buckets** (`road` 439, `craft_trade` 300, `numbering` 103, `social` 102,
+`civic` 97, …) and is *reported* by `--groups` rather than written back, so the
+fine-grained value survives for analysis. Every value buckets — after one
+iteration on the 12 that initially fell through, nothing lands in `other`.
+
+### What stops it drifting again
+
+`tools/import_csv.py` now canonicalises `subcategory` on the way in. That is the
+part that matters: without it the cleanup would have to be re-run after every
+batch and would silently rot in between. It is load-bearing right now, since the
+full-backlog classification run started today will keep inventing spellings —
+`trade/brand` appeared for the first time only yesterday.
+
+`normalize_taxonomy.py` is also step 8 of `restore_curation.py`, as a safety net
+for the paths that write INSERTs directly (`seed_lookups.py`) rather than going
+through `import_csv.py`.
+
+### No UI breakage
+
+`ideological` subcategories came through unchanged, so theme-page slugs are
+byte-identical — verified by diffing the category's values against a pre-change
+snapshot. Nothing downstream hardcodes a subcategory literal; `site_queries.py`
+only ever groups or selects distinct. Tests: 49 passed, 3 failed (the same
+pre-existing failures in BACKLOG P3).
+
+### Note on the running classification
+
+User started `llm_classify.py --model deepseek-v4-flash --limit 45000` during
+this session. At the 69.94 s/key measured earlier today that is ~745 hours for
+the backlog; it will not complete in a useful timeframe on this model, though
+the split-retry fix means it no longer loses work while it runs. Left running at
+the user's discretion. `data/curation/llm_deepseek-v4-flash.csv` and
+`llm_runs.jsonl` are being appended live and were deliberately excluded from
+these commits.
+
 ## 2026-08-01 — LLM run review: poison-pill batch, two deterministic-classifier gaps, 4 bad classifications
 
 User ran a small `deepseek-v4-flash` classification batch and asked for a review
