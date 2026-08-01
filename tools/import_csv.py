@@ -13,6 +13,9 @@ Usage:
 import sqlite3, csv, argparse, sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from normalize_taxonomy import canonical  # noqa: E402
+
 TABLES = {
     "persons": {
         "key": "core_name_norm",
@@ -81,6 +84,14 @@ with open(args.csv_path, newline="", encoding="utf-8") as f:
                     v = None
             vals[col] = v
         vals["core_name_norm"] = cnorm
+
+        # `subcategory` is free text, so every model spells it differently and
+        # the vocabulary drifts on each import — it reached 461 distinct values
+        # under 9 categories before the 2026-08-01 cleanup. Canonicalise on the
+        # way in, so a normalised DB stays normalised without anyone having to
+        # remember to re-run the cleanup after every batch.
+        if table == "name_categories":
+            vals["subcategory"] = canonical(vals["category"], vals["subcategory"])
 
         col_list  = spec["cols"]
         placeholders = ", ".join("?" * len(col_list))

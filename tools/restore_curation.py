@@ -14,7 +14,7 @@ two weeks while every assertion still passed.
 Always operates on data/streets.db. tools/seed_top500.py and
 tools/seed_batch2.py shell out to import_csv.py without a --db flag, so they
 can only ever write to that fixed path — there's no way to honor a
---db override across all ten steps without silently splitting writes across
+--db override across all eleven steps without silently splitting writes across
 two different databases, so this script doesn't offer one.
 
 Usage:
@@ -31,9 +31,10 @@ Steps (in order, stop on first failure):
     4-6. tools/import_csv.py on the 3 one-off LLM batch CSVs (not regenerated
          by any seed script — see CLAUDE.md Common Commands)
     7. tools/seed_road_codes.py (deterministic DN/DJ/DC/DE codes, no CSV)
-    8. tools/wikidata_persons.py --replay-csv --force
-    9. tools/wiki_birthplace.py --replay-csv --force
-    10. tools/wiki_biostats.py --replay-csv --force
+    8. tools/normalize_taxonomy.py (subcategory vocabulary safety net)
+    9. tools/wikidata_persons.py --replay-csv --force
+    10. tools/wiki_birthplace.py --replay-csv --force
+    11. tools/wiki_biostats.py --replay-csv --force
 Then: run_queries.py --name classification_coverage_summary, asserting
 pct_streets_classified >= known-good floor minus tolerance.
 
@@ -42,7 +43,7 @@ call) so it's reported on but not run by default; pass --wiki-scope to fetch
 pending rows live, with the 429→'unknown' remediation from CLAUDE.md applied
 automatically (reset + one bounded retry pass).
 
-NOTE on step 8: the replay CSV is the durable record of curated QIDs — whatever
+NOTE on step 9: the replay CSV is the durable record of curated QIDs — whatever
 it contains wins after a rebuild, --force and all. The 2026-07-31 audit found
 84 of 297 QIDs pointing at communes/taxa/disambiguation pages rather than people
 (CLAUDE.md rule #16), and 31 of those were sitting in this CSV. If you correct
@@ -214,6 +215,11 @@ def main():
         # imports so a road code that was also hand-curated ends up with the
         # deterministic classification.
         ("tools/seed_road_codes.py", [py, "tools/seed_road_codes.py", "--db", DB]),
+        # Safety net. import_csv.py canonicalises subcategory on the way in, so
+        # everything above should already be clean — but seed_lookups.py writes
+        # its INSERTs directly, and a hand-edited DB can drift. Idempotent, so
+        # running it when there is nothing to fix costs a single scan.
+        ("tools/normalize_taxonomy.py", [py, "tools/normalize_taxonomy.py", "--db", DB]),
         ("wikidata_persons.py --replay-csv --force",
          [py, "tools/wikidata_persons.py", "--replay-csv", "--force", "--db", DB]),
         ("wiki_birthplace.py --replay-csv --force",
