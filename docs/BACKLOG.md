@@ -85,7 +85,16 @@ Items detected during sessions. Each entry has enough context to act on cold.
 
   Greedy order after `track`: `proposed` +33, `path` +26, `construction` +18, `footway` +8, `motorway` +4, `trunk` +3, `services` +1, then zero. **381 of 3,183 UATs contain no named highway way of any class in the whole PBF**, so no scope widening can reach them from this data. `track` costs 9,141 ways of scope dilution for 77 UATs (2.4% reach) — still a real call to make, but it is a small one, not the explanation for the ~550-UAT gap it was filed as.
 
-  **Therefore the ~3,181 figure attributed to numele-strazilor.mariuscomper.uk is not "UATs with OSM street names"** — that quantity does not exist in OSM. Most likely it is all Romanian UATs used as a denominator, with empty ones rendered as zero-street rows. Cheap to confirm: pick one of the 381 zero-named-highway UATs and check whether their site lists any street for it. Do that before treating their number as a target. Diagnostic worth re-creating as `tools/osm_reach_report.py` if this comes up again (~6 min full-PBF pass).
+  **The ~3,181 figure was never their claim — checked 2026-08-01.** The site states no total UAT count anywhere. It is a single ranked table of street names by distinct-UAT presence, with no per-UAT drill-down (so there were no commune pages to test against the 381). "~3,181" is Romania's total UAT count, a number from our own `2026-07-31` history entry, misattributed to them. Their methodology line is essentially ours: *"Majoritatea sunt limite OpenStreetMap de nivel administrativ 8; Bucureștiul este inclus o singură dată prin limita sa de municipiu cu rang de județ"* — `admin_level=8` containment, Bucharest counted once (we split it into 6 sectors). Source date 2026-07-29 against our PBF's 2026-07-30.
+
+  **Like-for-like, we are at parity.** Their highest per-name figure is 803; ours is 790.
+
+  | name | theirs | ours (exact key) | ours (all spellings) |
+  |---|---|---|---|
+  | Principală | 803 | 779 | 790 |
+  | Mihai Eminescu | 477 | 473 | 481 |
+
+  Their 477 falls *between* our two Eminescu figures, so that gap is entirely about which spellings each side folds into a canonical form, not coverage. The residual on `Principală` is ~13-24 UATs. **No ~550-UAT reach gap exists**; the original note compared their per-name UAT counts against our total UAT reach. Re-scope this item to "is 13-24 UATs on `Principală` worth adding `track` for", which is a much smaller question.
 
 ---
 
