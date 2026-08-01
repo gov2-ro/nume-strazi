@@ -95,8 +95,21 @@ with open(args.csv_path, newline="", encoding="utf-8") as f:
 
         col_list  = spec["cols"]
         placeholders = ", ".join("?" * len(col_list))
+        # COALESCE, not a bare assignment: a column the CSV leaves blank must not
+        # erase a curated value. `wikidata_qid` is the case that bit — LLM batch
+        # output never fills it, so importing 415 classified rows on 2026-08-01
+        # silently nulled 33 P31-verified QIDs (Eminescu, Creangă, Enescu,
+        # Eliade, Vladimirescu...), which in turn split their identities and
+        # changed the honoree ranking. QIDs gate gender/era/birthplace
+        # enrichment and identity grouping (CLAUDE.md rule #16), so this is
+        # expensive to lose and invisible when it happens.
+        #
+        # Consequence: a CSV can no longer CLEAR a field, only set or leave it.
+        # That is the right default for batch classifier output. Deliberate
+        # clearing has a dedicated path — tools/audit_person_qids.py
+        # --fix-not-human, which knows why it is clearing.
         update_set = ", ".join(
-            f"{c} = excluded.{c}" for c in col_list if c != spec["key"]
+            f"{c} = COALESCE(excluded.{c}, {c})" for c in col_list if c != spec["key"]
         )
         sql = (
             f"INSERT INTO {table} ({', '.join(col_list)}) VALUES ({placeholders})\n"

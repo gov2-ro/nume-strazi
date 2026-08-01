@@ -75,6 +75,12 @@ SYNONYMS = {
     "beekeepers": "beekeeping", "values": "value", "objects": "object",
     "ideals": "ideal", "border_guards": "border_guard",
     "historical_figures": "historical_figure",
+    # Second wave, 2026-08-01: plurals arriving from the full-backlog run. The
+    # vocabulary keeps growing as classification proceeds, which is expected —
+    # import_csv.py canonicalises on the way in, so these only need adding once.
+    "artists": "artist", "goldsmiths": "goldsmith", "tailors": "tailor",
+    "vessels": "vessel", "angels": "angel", "goatherds": "goatherd",
+    "pigeon_fanciers": "pigeon_fancier",
 
     # -- adjective/noun/verb variants of one concept (defect class 3) --
     "geometric": "geometry", "geometrical": "geometry",
@@ -104,6 +110,8 @@ SYNONYMS = {
     "religious_service": "religious",
     "blacksmith_shop": "blacksmith",
     "literary_work": "literature",
+    "innkeeping": "inn",
+    "press": "media",
 
     # -- separator-only survivors that also differ in wording (class 1) --
     "public_utility": "utility",
