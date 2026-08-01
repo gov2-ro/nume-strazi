@@ -1,5 +1,172 @@
 # Activity History
 
+## 2026-08-01 — Person pages rekeyed to identity; source-table floors added; 13 bogus QIDs that the previous fix missed
+
+Closing out the phase started on 2026-07-31. User asked "are we done for this
+phase?" — the answer was no, on three counts, all now addressed.
+
+### 1. Person detail pages rekeyed from `core_name_norm` to identity
+
+Yesterday's ranking audit made `top_honorees_national` group by
+`COALESCE(wikidata_qid, full_name)` but left detail pages grouped by
+`core_name_norm`, so a ranking row linked to a page contradicting the number
+just clicked: Eminescu ranked 693, his page said 561; Cuza 419 vs 244.
+
+`enumerate_persons` now folds aliases into one entry per identity and returns
+the whole `core_name_norms` group; `person_detail` takes an identity and widens
+its `persons` and `all_street_names_cache` lookups to `IN (…)`; `peers` groups
+by identity as well (Cuza's four keys were otherwise eligible to fill half a
+peer list). Detail totals now equal the ranking exactly for all four spot
+checks.
+
+Two things turned out better and one worse than the BACKLOG entry predicted:
+
+- **Better:** slugs were *already* qid-or-name — i.e. already the identity — so
+  no URL moved and no template changed. Scope was three functions plus the
+  caller.
+- **Better:** the entry claimed duplicate slugs meant one page "silently
+  overwrites the other". `build_site.py` was already skipping the duplicate, so
+  no page was ever lost. Only the undercount was real.
+- **Worse:** collapsing 1,232 keys into 1,077 identities orphaned 112
+  directories under `dist/persoana/`. Nothing linked to them, but they would
+  have kept serving smaller counts to anyone holding the URL, which is the
+  precise mismatch this change existed to remove. Added a prune sweep mirroring
+  the one `/oras/` has had since 2026-05-18.
+
+### 1b. Two pre-existing dist/ bugs the prune sweep exposed
+
+Crawling all rendered HTML for broken links (the verification step for the
+above) turned up problems that predate this session:
+
+- **1,290 orphaned `/strada/` directories and 5 `/tema/`.** `/oras/` had a prune
+  sweep; `/strada/`, `/tema/` and `/persoana/` never did, so every shrink of the
+  rendered set since 2026-05-18 left its pages behind serving stale content.
+  Factored the sweep into `_prune_stale()` and applied it to all four.
+- **1,204 genuinely broken `/strada/` links** — not caused by the prune, though
+  it made them visible. UAT pages link every "Nume distinctive" entry to a
+  street page, but that list selects names present in **≤ 3 UATs nationally**,
+  which by construction never reach the top-N that get pages. So essentially
+  every distinctive pill was a 404, and had been. Same for the tail of UAT
+  "cele mai frecvente" and theme street lists.
+
+  Fixed with the guard the codebase already uses in the other direction
+  (`built_uat_keys`): `build_site.py` now passes the set of street slugs it
+  actually rendered into `uat_detail`/`theme_detail`, `_attach_street_slugs()`
+  sets `slug = None` for the rest, and the templates render those as plain
+  `<span>` instead of an anchor. Note `uat_detail` computes `distinctive` on two
+  code paths — a batch path when `global_rarity` is precomputed (which is what
+  `build_site.py` uses) and a standalone path — and only patching the standalone
+  one left 1,204 of the 2,170 links still broken. Site-wide crawl now reports
+  **0 broken links across `/strada/`, `/persoana/`, `/tema/` and `/oras/`.**
+
+### 2. `restore_curation.py` now asserts source-table row counts
+
+`renns_streets` sat empty from 2026-07-15 to 2026-08-01 while every assertion in
+the restore script passed, because they only ever looked at curation coverage.
+Added `SOURCE_FLOORS` (~10% under verified counts) as a **pre-flight** rather
+than post-flight — none of the nine restore steps touch source tables, so there
+was no reason to spend five minutes replaying curation before reporting a wipe.
+
+RENNS genuinely cannot be re-ingested (site compromised, offline), so a blanket
+failure would be useless. `--allow-empty <table>` waives one floor and prints
+the waiver in the run log, so the exemption has to be re-typed each run instead
+of quietly becoming permanent. Verified in both directions: bare run exits 1
+naming `renns_streets: 0 < 100,000`; waived run completes at 74.7%.
+
+### 3. Thirteen bogus QIDs the 2026-07-31 fix reported as fixed
+
+Checking the restore hadn't replayed bad QIDs turned up 13 `not_human` QIDs live
+in `persons` — Ana Aslan → *Altendorf* (a settlement), Petőfi Sándor →
+*arhitectura romanică*, Jókai Mór → *ProSieben*, Regina Maria → *Eleocharis
+palustris* (a sedge), Kossuth Lajos → *Noma* (a disease), Ion Neculce →
+*Chienti* (a river).
+
+**The 2026-07-31 diagnosis of these was wrong.** The BACKLOG recorded them as
+"cleared but the replacement search never completed, so they are NULL". They
+were never cleared. The 429s hit during the *audit* phase that builds the
+`not_human` list, so those keys never entered `bad`, `--fix-not-human` skipped
+them, and the run still printed a confident "Cleared N bogus QIDs". A
+rate-limited audit under-reports, and the fix then cleans only what the
+throttled pass happened to see.
+
+Re-ran the audit at `--sleep 1.5`; it re-derived every verdict live, confirmed
+all 13 independently, and cleared them. 267 QIDs remain, zero `not_human`.
+Filed a tool fix: the audit should count API failures and refuse to run the fix
+when any verdict is unknown, rather than treating "couldn't check" as "fine".
+
+### 4. LLM access ported to simonw/llm, with cost and provenance logging
+
+The classification pass was blocked on credentials. A `.env` arrived mid-session
+with `GOOGLE_API_KEY` and `DEEPSEEK_API_KEY` (Anthropic and OpenAI blank), which
+surfaced that `llm_classify.py` read `os.environ` directly and never loaded
+`.env` at all. User asked whether we use simonw's `llm` like `haplea-trips` and
+`fomo-gobbler` do. We didn't — three hand-rolled urllib clients. Now we do.
+
+New `tools/llm_layer.py`, modelled on `haplea-trips/shared/llm_layer.py`:
+`.env` loading, the `DEEPSEEK_API_KEY→LLM_DEEPSEEK_KEY` / `GOOGLE_API_KEY→
+LLM_GEMINI_KEY` bridge (those plugins read their key at *registration* time, so
+a key set later leaves the model invisible to `llm.get_model()`), a provider
+registry, and a direct OpenAI-compatible fallback for model ids the installed
+plugins predate — `llm-deepseek` 0.1.6 registers only `deepseek-chat/coder/
+reasoner`, so the current `deepseek-v4-flash` id only works through that path.
+`llm_classify.py` lost ~120 lines of provider code in exchange.
+
+Google turned out to be unusable anyway: the key is IP-restricted and 403s from
+this network. DeepSeek works.
+
+**Empirical finding that changed the recommended model.** `deepseek-v4-flash`
+(the `.env` default) is a *reasoning* model. It bills thinking against
+`max_tokens` and regularly spends the entire budget before emitting a single
+content token — the reply then arrives `finish_reason="length"` with empty
+content, which to a JSON parser is indistinguishable from a malformed response.
+At the old `max_tokens=4096` every 20-key batch failed this way; at 16384 it
+still lost roughly half. Measured on identical 20-key batches:
+
+| model | s/key | $/1k keys | failed batches |
+|---|---|---|---|
+| `deepseek-chat` | 0.44 | $0.11 | 0 |
+| `deepseek-v4-flash` | 11.09 | $0.40 | ~50% |
+
+25× slower, 3.6× dearer, and it loses half its work — raising `max_tokens`
+doesn't help, since reasoning expands to fill whatever it is given. Full backlog:
+~5 h and ~$4.30 on `deepseek-chat` versus ~58 h. `MAX_TOKENS` default raised to
+16384 and `llm_layer` now raises a message naming the actual cause instead of
+letting it surface as a parse error.
+
+**Cost and provenance.** Previously the only record of a run was the output
+filename. Now `complete_with_usage()` returns the provider's token accounting,
+and `llm_classify.py` appends one JSON record per batch to
+`data/curation/llm_runs.jsonl` — run_id, model, provider, key range, first key,
+input/output/reasoning/cached tokens, seconds, estimated cost — plus a summary
+per run. `tools/llm_runs_report.py` reads it (`--batches`, `--errors`,
+`--reprice`). Token counts are exact; cost is an estimate from a hand-maintained
+`llm_layer.PRICING` table, so `--reprice` recosts past runs from the logged
+tokens when a price is corrected. Unpriced models report `?`, never `$0.00` — a
+silent zero reads as free. Added `!data/curation/*.jsonl` to `.gitignore`: the
+carve-out only un-ignored `*.csv`, so the provenance would have stayed on one
+machine while the CSVs it explains were tracked.
+
+**Fail-fast guard.** The log immediately earned its keep: it showed a run with a
+double-hyphen typo (`deepseek-v4--flash`) grinding through **1,271 consecutive
+400s over 11 minutes**, producing nothing, with no record beyond scrollback. The
+tool now aborts after 5 consecutive failed batches
+(`--max-consecutive-errors`) — nothing recoverable fails that way; it is always
+configuration. Verified against that exact typo.
+
+### Deliberately not done
+
+- **The classification pass itself** — tooling is verified end to end (resume,
+  cost accounting, error logging, abort guard) but the 39,372-key run has not
+  been started. It should be preceded by `resolve_reversed_person_duplicates.py`
+  (see below), which is a user decision.
+- **493 keys resolvable with zero LLM calls** — `resolve_reversed_person_duplicates.py --dry-run`
+  finds 493 reversed "Surname Firstname" forms of already-curated people, incl.
+  the three most frequent unclassified keys (`balcescu nicolae`,
+  `vladimirescu tudor`, `cosbuc george`). Writing them is an identity merge,
+  which CLAUDE.md reserves for an explicit call.
+- **67 `full_name`s split across multiple identities** (709 street rows) and two
+  hyphenation slug collisions — same class, same reason. All three filed.
+
 ## 2026-07-31 — OSM UAT assignment rewritten to polygon containment; 84 bogus Wikidata QIDs found and fixed
 
 Triggered by a comparison against numele-strazilor.mariuscomper.uk, an OSM-only

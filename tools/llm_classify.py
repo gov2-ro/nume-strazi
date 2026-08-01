@@ -1,17 +1,24 @@
 #!/usr/bin/env python3
 """LLM-assisted classification of unclassified street name keys.
 
-Supports three providers; auto-detected from the model name:
-  claude-*      →  Anthropic   (ANTHROPIC_API_KEY)
+Provider access goes through tools/llm_layer.py (simonw/llm), which loads .env,
+bridges key names to what the llm plugins expect, and falls back to a direct
+OpenAI-compatible call for model ids the installed plugins predate:
+
+  deepseek-*    →  DeepSeek    (DEEPSEEK_API_KEY)
   gemini-*      →  Google      (GOOGLE_API_KEY)
+  claude-*      →  Anthropic   (ANTHROPIC_API_KEY)
   <org>/<model> →  OpenRouter  (OPENROUTER_API_KEY)
 
-Idempotent: re-running with the same --out file skips already-written keys.
+With no --model, the model comes from LLM_MODEL / LLM_model in .env.
+
+Idempotent: re-running with the same --out file skips already-written keys, so
+a long run can be interrupted and resumed, losing at most one in-flight batch.
 
 Usage:
     python3 tools/llm_classify.py [--model MODEL] [--limit N]
-    python3 tools/llm_classify.py --model gemini-2.0-flash-lite --limit 500
-    python3 tools/llm_classify.py --model google/gemini-flash-1.5-8b --limit 500
+    python3 tools/llm_classify.py --limit 0                    # whole backlog
+    python3 tools/llm_classify.py --model gemini-2.5-flash-lite --limit 500
     python3 tools/llm_classify.py --dry-run
     python3 tools/llm_classify.py --limit 500 --import
 
@@ -21,9 +28,25 @@ different models land in separate files without extra flags.
 import argparse, csv, json, os, re, sqlite3, subprocess, sys, time, urllib.request
 from pathlib import Path
 
-DEFAULT_MODEL = "claude-haiku-4-5-20251001"
+# Provider access goes through llm_layer (simonw/llm + key bridging + .env
+# loading), so adding a provider is a registry entry there rather than another
+# hand-rolled HTTP client here.
+from llm_layer import complete_with_usage, resolve_model
+
+# Append-only provenance log, one JSON object per batch. The CSV records what
+# was decided; this records what it cost and which model decided it, so a run
+# stays auditable after the terminal scrollback is gone.
+RUN_LOG = Path("data/curation/llm_runs.jsonl")
+
+DEFAULT_MODEL = None          # None → llm_layer picks from LLM_MODEL/.env
 BATCH_SIZE    = 20
 SLEEP_S       = 1.0
+# Headroom for reasoning models: they bill thinking against max_tokens and can
+# spend the entire budget before emitting any content. deepseek-v4-flash used
+# ~14k reasoning tokens on a 20-key batch, so 4096 returned an empty string that
+# looked exactly like a malformed reply. Harmless for non-reasoning models —
+# it is a ceiling, not an allocation.
+MAX_TOKENS    = 16384
 
 HEADER = [
     "core_name_norm", "freq", "judete_n", "uats_n", "sample_name", "judete_list",
@@ -103,20 +126,7 @@ LIMIT ?
 """
 
 
-# ── provider detection ────────────────────────────────────────────────────────
-
-def detect_provider(model: str) -> str:
-    if "/" in model:
-        return "openrouter"
-    if model.startswith("gemini"):
-        return "google"
-    if model.startswith("claude"):
-        return "anthropic"
-    raise ValueError(
-        f"Cannot auto-detect provider for '{model}'. "
-        "Use 'claude-*' (Anthropic), 'gemini-*' (Google), or 'org/model' (OpenRouter)."
-    )
-
+# ── model naming ──────────────────────────────────────────────────────────────
 
 def model_slug(model: str) -> str:
     slug = model.split("/")[-1]
@@ -124,7 +134,7 @@ def model_slug(model: str) -> str:
     return re.sub(r"[^a-z0-9.-]", "-", slug.lower())[:40]
 
 
-# ── API calls ─────────────────────────────────────────────────────────────────
+# ── API call ──────────────────────────────────────────────────────────────────
 
 def _parse_text(text: str) -> list:
     text = text.strip()
@@ -133,82 +143,21 @@ def _parse_text(text: str) -> list:
     return json.loads(text)
 
 
-def _call_anthropic(model: str, entries: list) -> list:
-    import anthropic
-    client = anthropic.Anthropic()
-    msg = client.messages.create(
-        model=model, max_tokens=4096, system=SYSTEM,
-        messages=[{"role": "user", "content": json.dumps(entries, ensure_ascii=False)}],
+def call_llm(model: str, entries: list,
+             max_tokens: int = MAX_TOKENS) -> tuple[list, dict]:
+    """One batch → (parsed JSON array, token usage).
+
+    Provider routing, key bridging and the direct-HTTP fallback for model ids
+    the installed llm plugins don't know all live in llm_layer.
+    """
+    text, usage = complete_with_usage(
+        system=SYSTEM,
+        user=json.dumps(entries, ensure_ascii=False),
+        model=model,
+        max_tokens=max_tokens,
+        temperature=0,
     )
-    return _parse_text(msg.content[0].text)
-
-
-def _call_google(model: str, entries: list) -> list:
-    key = os.environ.get("GOOGLE_API_KEY")
-    if not key:
-        raise RuntimeError("GOOGLE_API_KEY environment variable not set")
-
-    body = json.dumps({
-        "system_instruction": {"parts": [{"text": SYSTEM}]},
-        "contents": [{"role": "user", "parts": [{"text": json.dumps(entries, ensure_ascii=False)}]}],
-        "generationConfig": {"maxOutputTokens": 4096, "temperature": 0},
-    }, ensure_ascii=False).encode()
-
-    url = (f"https://generativelanguage.googleapis.com/v1beta"
-           f"/models/{model}:generateContent?key={key}")
-    req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
-
-    try:
-        with urllib.request.urlopen(req, timeout=60) as r:
-            data = json.loads(r.read())
-    except urllib.error.HTTPError as e:
-        raise RuntimeError(f"Google API error {e.code}: {e.read().decode()[:200]}")
-
-    candidates = data.get("candidates", [])
-    if not candidates:
-        raise RuntimeError(f"Google returned no candidates (safety filter?): {data}")
-
-    return _parse_text(candidates[0]["content"]["parts"][0]["text"])
-
-
-def _call_openrouter(model: str, entries: list) -> list:
-    key = os.environ.get("OPENROUTER_API_KEY")
-    if not key:
-        raise RuntimeError("OPENROUTER_API_KEY environment variable not set")
-
-    body = json.dumps({
-        "model": model,
-        "messages": [
-            {"role": "system", "content": SYSTEM},
-            {"role": "user", "content": json.dumps(entries, ensure_ascii=False)},
-        ],
-        "max_tokens": 4096,
-        "temperature": 0,
-    }, ensure_ascii=False).encode()
-
-    req = urllib.request.Request(
-        "https://openrouter.ai/api/v1/chat/completions",
-        data=body,
-        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-    )
-
-    try:
-        with urllib.request.urlopen(req, timeout=60) as r:
-            data = json.loads(r.read())
-    except urllib.error.HTTPError as e:
-        raise RuntimeError(f"OpenRouter error {e.code}: {e.read().decode()[:200]}")
-
-    return _parse_text(data["choices"][0]["message"]["content"])
-
-
-def call_llm(model: str, provider: str, entries: list) -> list:
-    if provider == "anthropic":
-        return _call_anthropic(model, entries)
-    if provider == "google":
-        return _call_google(model, entries)
-    if provider == "openrouter":
-        return _call_openrouter(model, entries)
-    raise ValueError(f"Unknown provider: {provider}")
+    return _parse_text(text), usage
 
 
 # ── row helpers ───────────────────────────────────────────────────────────────
@@ -252,6 +201,10 @@ def main():
     ap.add_argument("--limit",      type=int, default=200,
                     help="Max keys to classify this run (0 = all, default: %(default)s)")
     ap.add_argument("--batch-size", type=int, default=BATCH_SIZE)
+    ap.add_argument("--max-consecutive-errors", type=int, default=5,
+                    help="Abort after this many failing batches in a row (default: %(default)s)")
+    ap.add_argument("--max-tokens", type=int, default=MAX_TOKENS,
+                    help="Output ceiling; reasoning models need slack (default: %(default)s)")
     ap.add_argument("--sleep",      type=float, default=SLEEP_S,
                     help="Seconds to sleep between batches (default: %(default)s)")
     ap.add_argument("--out",        default=None,
@@ -262,11 +215,14 @@ def main():
                     help="Print first batch; make no API calls")
     args = ap.parse_args()
 
-    provider = detect_provider(args.model)
-    slug     = model_slug(args.model)
+    # Resolve here rather than inside the batch loop: the CSV name is derived
+    # from the model id, so it has to be the concrete one, not None.
+    provider, model, api_key = resolve_model(args.model)
+    slug     = model_slug(model)
     out_path = Path(args.out) if args.out else Path(f"data/curation/llm_{slug}.csv")
 
-    print(f"Model: {args.model}  provider: {provider}  out: {out_path}")
+    print(f"Model: {model}  provider: {provider}  "
+          f"key: {'set' if api_key else 'MISSING'}  out: {out_path}")
 
     # Keys already written (resume support)
     processed: set[str] = set()
@@ -302,6 +258,24 @@ def main():
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     n_classified = n_skipped = n_errors = 0
+    run_id  = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    totals  = {"input_tokens": 0, "output_tokens": 0, "reasoning_tokens": 0,
+               "cached_tokens": 0}
+    cost_usd, cost_known, t_start = 0.0, True, time.time()
+    consecutive_errors = 0
+    RUN_LOG.parent.mkdir(parents=True, exist_ok=True)
+    log_f = open(RUN_LOG, "a", encoding="utf-8")
+
+    def log(event: str, **fields) -> None:
+        log_f.write(json.dumps(
+            {"ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+             "run_id": run_id, "event": event, "model": model,
+             "provider": provider, "out": str(out_path), **fields},
+            ensure_ascii=False) + "\n")
+        log_f.flush()
+
+    log("run_start", batch_size=args.batch_size, max_tokens=args.max_tokens,
+        candidates=len(candidates), db=args.db, resumed_from=len(processed))
 
     with open(out_path, "a", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=HEADER)
@@ -316,12 +290,39 @@ def main():
             lookup     = {r[0]: r for r in batch_rows}
 
             print(f"Batch {batch_no:>3}  [{i+1:>4}–{i+len(batch_rows):>4}]  … ", end="", flush=True)
+            t0 = time.time()
             try:
-                results = call_llm(args.model, provider, entries)
+                results, usage = call_llm(model, entries, args.max_tokens)
             except Exception as e:
                 print(f"ERROR: {e}")
                 n_errors += len(batch_rows)
+                log("batch_error", batch=batch_no, keys=len(batch_rows),
+                    seconds=round(time.time() - t0, 2), error=str(e)[:300],
+                    first_key=batch_rows[0][0])
+                # A misspelled model name returns 400 on every batch, forever. On
+                # 2026-08-01 one such run churned through 1,271 consecutive
+                # failures over 11 minutes before the backlog ran out. Nothing
+                # recoverable looks like this: stop and let the operator fix it.
+                consecutive_errors += 1
+                if consecutive_errors >= args.max_consecutive_errors:
+                    print(f"\nABORTING: {consecutive_errors} batches failed in a "
+                          f"row without a single success. The cause is almost "
+                          f"certainly configuration (model name, key, quota), not "
+                          f"the data — fix it and re-run; work already in "
+                          f"{out_path.name} is kept and will be skipped.")
+                    log("run_abort", reason="consecutive_errors",
+                        consecutive_errors=consecutive_errors, batch=batch_no)
+                    break
                 continue
+            consecutive_errors = 0
+
+            for k in totals:
+                totals[k] += usage.get(k) or 0
+            batch_cost = usage.get("estimated_cost_usd")
+            if batch_cost is None:
+                cost_known = False          # unpriced model: don't fake a total
+            else:
+                cost_usd += batch_cost
 
             b_cls = b_skip = 0
             for cls in results:
@@ -338,13 +339,39 @@ def main():
                     n_skipped += 1
 
             f.flush()
-            print(f"{b_cls} classified, {b_skip} skipped")
+            cost_note = f"  ${batch_cost:.4f}" if batch_cost is not None else ""
+            print(f"{b_cls} classified, {b_skip} skipped{cost_note}")
+            log("batch", batch=batch_no, keys=len(batch_rows),
+                classified=b_cls, skipped=b_skip,
+                seconds=round(time.time() - t0, 2),
+                first_key=batch_rows[0][0], **usage)
 
             if i + args.batch_size < len(candidates):
                 time.sleep(args.sleep)
 
+    elapsed = time.time() - t_start
+    done = n_classified + n_skipped
     print(f"\nDone — classified: {n_classified}, skipped: {n_skipped}, errors: {n_errors}")
+    print(f"Tokens: {totals['input_tokens']:,} in "
+          f"({totals['cached_tokens']:,} cached) / {totals['output_tokens']:,} out"
+          + (f" / {totals['reasoning_tokens']:,} reasoning"
+             if totals["reasoning_tokens"] else ""))
+    if cost_known:
+        per_1k = f"  (${cost_usd / done * 1000:.2f} per 1k keys)" if done else ""
+        print(f"Estimated cost: ${cost_usd:.4f}{per_1k}   — estimate from "
+              f"llm_layer.PRICING, not a provider invoice")
+    else:
+        print("Estimated cost: unavailable (model not in llm_layer.PRICING); "
+              "token counts above are exact")
+    print(f"Elapsed: {elapsed/60:.1f} min"
+          + (f"  ({elapsed/done:.2f} s/key)" if done else ""))
     print(f"Output: {out_path}")
+    print(f"Run log: {RUN_LOG}  (run_id {run_id})")
+
+    log("run_end", classified=n_classified, skipped=n_skipped, errors=n_errors,
+        seconds=round(elapsed, 1),
+        estimated_cost_usd=round(cost_usd, 6) if cost_known else None, **totals)
+    log_f.close()
 
     if n_classified and args.do_import:
         print("Importing …")

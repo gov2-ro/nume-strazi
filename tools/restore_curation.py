@@ -6,6 +6,11 @@ birthplaces, and biostats (see CLAUDE.md rule #12). Fails loudly instead of
 silently shipping degraded data — asserts classification_coverage_summary's
 pct_streets_classified lands within tolerance of a known-good floor.
 
+Also pre-flight-checks the OSM/postal/RENNS source tables against SOURCE_FLOORS.
+It does not restore them (that's a per-source re-ingest), but a rebuild wipes
+them too, and until 2026-08-01 nothing here noticed: renns_streets sat empty for
+two weeks while every assertion still passed.
+
 Always operates on data/streets.db. tools/seed_top500.py and
 tools/seed_batch2.py shell out to import_csv.py without a --db flag, so they
 can only ever write to that fixed path — there's no way to honor a
@@ -16,8 +21,10 @@ Usage:
     python3 tools/restore_curation.py
     python3 tools/restore_curation.py --min-pct 60
     python3 tools/restore_curation.py --wiki-scope   # also fetch pending wiki_scope rows live (slow)
+    python3 tools/restore_curation.py --allow-empty renns_streets  # while renns.ancpi.ro is down
 
 Steps (in order, stop on first failure):
+    0. SOURCE_FLOORS pre-flight over the source tables (see --allow-empty)
     1. seed_lookups.py
     2. tools/seed_top500.py
     3. tools/seed_batch2.py
@@ -51,6 +58,21 @@ DB = "data/streets.db"
 # trip TOLERANCE_PCT well before this needs manual widening.
 KNOWN_GOOD_PCT_STREETS_CLASSIFIED = 64.0
 TOLERANCE_PCT = 5.0
+
+# Source tables this script does NOT restore, but whose absence silently degrades
+# everything downstream. `renns_streets` was emptied by a build_db.py rebuild on
+# 2026-07-15 and went unnoticed for over two weeks: the union quietly dropped from
+# ~224k to 166k rows and still passed every check here, because the assertions only
+# ever looked at curation coverage. Floors are ~10% under the verified 2026-08-01
+# counts (osm 108,489 / postal 23,724 / renns 116,016 pre-loss / union 163,404
+# with RENNS missing), loose enough to absorb a genuine re-ingest, tight enough
+# that a wiped or half-crawled source trips them.
+SOURCE_FLOORS = {
+    "osm_streets":            95_000,
+    "postal_streets":         22_000,
+    "renns_streets":         100_000,
+    "all_street_names_cache": 150_000,
+}
 
 REQUIRED_CSVS = [
     "data/curation/llm_batch.csv",
@@ -128,6 +150,10 @@ def main():
                      help="Fail if pct_streets_classified drops below this (default: known-good minus tolerance)")
     ap.add_argument("--wiki-scope", action="store_true",
                      help="Also run wiki_scope.py live batches for any pending persons (slow, network-bound)")
+    ap.add_argument("--allow-empty", action="append", default=[], metavar="TABLE",
+                     help="Skip the row-count floor for this source table (repeatable). "
+                          "Use when a source genuinely cannot be re-ingested, e.g. "
+                          "--allow-empty renns_streets while renns.ancpi.ro is offline.")
     args = ap.parse_args()
 
     py = sys.executable
@@ -137,6 +163,39 @@ def main():
         print("Missing required curation CSV(s) — cannot restore:", file=sys.stderr)
         for p in missing:
             print(f"  {p}", file=sys.stderr)
+        sys.exit(1)
+
+    # Pre-flight, not post-flight: none of the restore steps below touch the
+    # source tables, so there is no reason to spend several minutes replaying
+    # curation before reporting that a source was wiped.
+    unknown_exempt = [t for t in args.allow_empty if t not in SOURCE_FLOORS]
+    if unknown_exempt:
+        print(f"--allow-empty names no such source table: {', '.join(unknown_exempt)}",
+              file=sys.stderr)
+        print(f"  known: {', '.join(SOURCE_FLOORS)}", file=sys.stderr)
+        sys.exit(1)
+
+    print("Source tables:")
+    starved = []
+    for table, floor in SOURCE_FLOORS.items():
+        n = table_count(table)
+        if table in args.allow_empty:
+            print(f"  {table:<24} {n:>9,}  (floor {floor:,} waived via --allow-empty)")
+        elif n < floor:
+            print(f"  {table:<24} {n:>9,}  BELOW FLOOR {floor:,}")
+            starved.append((table, n, floor))
+        else:
+            print(f"  {table:<24} {n:>9,}  (floor {floor:,})")
+    if starved:
+        sys.stdout.flush()   # keep the table listing above the failure in piped logs
+        print("\nFAILED: source table(s) below their known-good floor — a rebuild or a "
+              "failed re-ingest has dropped data this script does not restore:", file=sys.stderr)
+        for table, n, floor in starved:
+            print(f"  {table}: {n:,} < {floor:,}", file=sys.stderr)
+        print("\nRe-ingest the affected source(s) before restoring curation — see CLAUDE.md's\n"
+              "Common Commands for the per-source ingest/match/sanity sequence. If a source is\n"
+              "legitimately unavailable, rerun with --allow-empty <table> to record the exemption.",
+              file=sys.stderr)
         sys.exit(1)
 
     steps = [

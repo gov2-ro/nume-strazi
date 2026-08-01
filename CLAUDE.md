@@ -41,7 +41,9 @@ If asked to do something not covered by the above, ask before improvising.
 │   ├── import_csv.py           # upsert classified CSV into lookup tables
 │   ├── seed_top500.py          # batch 1 curation (top-500 keys)
 │   ├── seed_batch2.py          # batch 2 curation
-│   ├── llm_classify.py         # LLM batch classifier (Anthropic/Google/OpenRouter)
+│   ├── llm_layer.py            # provider-agnostic LLM access (simonw/llm + .env + pricing)
+│   ├── llm_classify.py         # LLM batch classifier (DeepSeek/Google/Anthropic/OpenRouter)
+│   ├── llm_runs_report.py      # summarise llm_runs.jsonl — tokens + cost per run
 │   ├── llm_compare.py          # compare two llm_classify CSVs for convergence
 │   ├── audit_person_qids.py    # verify persons.wikidata_qid against P31=Q5; clear/re-resolve
 │   ├── fetch_portraits.py      # Wikidata P18 → Wikimedia thumbnails → dist/portraits/
@@ -80,7 +82,7 @@ These are the booby traps. Internalize before writing any query or transform.
 9. **Postal source is the 2016 xlsx only (`data/reference/coduri-postale+/infocod-cu-siruta-mai-2016.xlsx`).** The 2009 `coduri_postale.sql` dump in the same folder was evaluated and excluded — it adds zero new locality coverage over the xlsx (see CODE_SPEC §12.1), don't re-propose it without reading that section first. Postal only covers Bucuresti + localities over 50,000 population; zero `postal_streets` rows for a small/rural UAT is expected, not a bug. Cross-source comparison (`streets_all_sources`, `docs/queries.sql`'s `external_corroboration_gap`) must join on `core_name_norm`, never `name_normalized` — `osm_streets.name_normalized` includes the street-type prefix, postal's/RENNS's and the electoral source's don't.
 10. **RENNS's `uat.id` is the electoral source's SIRUTA code directly** — no name-matching fallback needed (see CODE_SPEC §13.4). Only crawl it per-`(county, UAT)`; the unfiltered flat endpoint has confirmed pagination drift (see CODE_SPEC §13.5) — don't re-add it without re-verifying that first. București has zero RENNS roads (structural, not a bug) and only ~60% of Romania's UATs are digitized in RENNS yet.
 11. **`streets_all_sources` is additive but not cross-source-deduplicated** — a street missing from the electoral source but corroborated by 2-3 external sources gets one row *per source* there. Use `all_street_names` (CODE_SPEC §13.8/§14.5) for a genuinely deduplicated "every street name in Romania" list — **this is the project's canonical corpus, materialized as `all_street_names_cache`**: one flat, fully symmetric view across all 4 sources (the electoral source is just another source, no `layer` column, no dependency on the match tables), grouped by `(siruta, street_type, core_name_norm)` — not `core_name_norm` alone — for the same type-matters reason as rule #1, with `in_electoral` (0/1) marking whether the electoral source is among the contributing sources. Type mismatches (e.g. OSM's `Calea X` vs postal's `Strada X`) are never auto-merged, even electoral-to-external — check `type_variant_candidates` (`docs/queries.sql`) instead of assuming they've been reconciled. `variants` (JSON) preserves every source's exact spelling; `corroboration_count` counts distinct sources; no source is ranked above another, so the representative name is just the alphabetically-first one.
-12. **`build_db.py` wipes ALL curation state, not just the schema.** Rebuilding to add/change a table drops `persons`/`nature_terms`/`name_categories`/`place_refs`/QIDs/wiki_scope/birthplaces/biostats along with everything else (observed: 57%→16.4% classification coverage after a rebuild that only restored OSM/postal, not curation — twice). Always run `python3 tools/restore_curation.py` after `build_db.py` — it runs the full restore sequence in fixed order and asserts `classification_coverage_summary`'s `pct_streets_classified` against a known-good floor, failing loudly instead of silently shipping degraded curation. For a schema-only change, prefer a targeted live migration (`DROP VIEW`/`CREATE VIEW` against the running DB) over a full rebuild — see how the street_type dedup fix (#1) was applied.
+12. **`build_db.py` wipes ALL curation state, not just the schema.** Rebuilding to add/change a table drops `persons`/`nature_terms`/`name_categories`/`place_refs`/QIDs/wiki_scope/birthplaces/biostats along with everything else (observed: 57%→16.4% classification coverage after a rebuild that only restored OSM/postal, not curation — twice). Always run `python3 tools/restore_curation.py` after `build_db.py` — it runs the full restore sequence in fixed order and asserts `classification_coverage_summary`'s `pct_streets_classified` against a known-good floor, failing loudly instead of silently shipping degraded curation. **It also wipes the OSM/postal/RENNS source tables, which nothing restores** — those need a per-source re-ingest (see Common Commands). `restore_curation.py` pre-flight-checks them against `SOURCE_FLOORS` and refuses to run if one is starved; a source that genuinely can't be re-ingested needs an explicit `--allow-empty <table>` so the exemption shows up in the run log rather than passing silently. That check exists because `renns_streets` sat empty for two weeks (2026-07-15 → 08-01) while every other assertion still passed. For a schema-only change, prefer a targeted live migration (`DROP VIEW`/`CREATE VIEW` against the running DB) over a full rebuild — see how the street_type dedup fix (#1) was applied.
 13. **OSM/postal/RENNS match tiers are named `exact_type_core` (1.0) / `fuzzy_core_name` (0.5) / (postal only) `reordered_core_name` (0.4)**, not `exact_normalized`. Pass 1 compares `(street_type, core_name_norm)` directly — never compare raw `name_normalized` strings across sources, since OSM's includes the street-type prefix and the electoral source's/postal's/RENNS's don't (rule #9).
 14. **`uat_reference` (siruta → judet/uat label) is a build-time-only table**, loaded from `data/gis/populatie-romania-siruta-coords.csv` + 6 hardcoded Bucharest sectors, used solely to label `all_street_names` rows for UATs the electoral source has zero data for. Dropped from the shipped `dist/streets.db` (already baked into `all_street_names`'s materialized columns) — don't expect to query it in the client-side filter UI.
 15. **OSM ways are assigned to UATs by polygon containment, never by proximity.** `tools/osm_boundaries.py` builds `uat_boundaries` (3,183 of 3,185 SIRUTAs) from OSM `admin_level=8` relations plus Bucharest's six `admin_level=9` "Sector N" relations, and `tools/osm_ingest.py` point-in-polygons each way's midpoint against it. Run the boundaries tool **before** the ingest — the ingest exits if `uat_boundaries` is empty. OSM tags no SIRUTA on boundaries (`siruta:code` on 6 of 3,379), so the polygon→SIRUTA mapping is geometric: a boundary owns the SIRUTA whose reference centroid it contains. Do **not** reintroduce a nearest-centroid fallback: until 2026-07-31 the ingest snapped ways to the nearest centroid *drawn from a list filtered to electoral SIRUTAs*, which both capped OSM at ~1,207 UATs and silently attributed out-of-scope streets to a neighbour up to ~55 km away. Fixing it took OSM from 1,185 to 2,630 UATs covered. A way outside every boundary is dropped, by design.
@@ -103,6 +105,11 @@ python3 build_db.py --limit 5000
 # Always operates on data/streets.db (seed_top500.py/seed_batch2.py can't be
 # pointed at another path, so this script doesn't offer a --db override either).
 python3 tools/restore_curation.py
+
+# Pre-flight also asserts the OSM/postal/RENNS source tables are above their
+# SOURCE_FLOORS. RENNS is empty while renns.ancpi.ro is offline, so today it
+# needs an explicit waiver (repeat the flag per table):
+python3 tools/restore_curation.py --allow-empty renns_streets
 
 # wiki_scope/sitelinks aren't included above (no --replay-csv mode — always a
 # live, rate-limited Wikidata call). Reported by restore_curation.py either way;
@@ -130,11 +137,32 @@ python3 build_site.py --variant all --serve --port 9000 --base /nume-strazi --mo
 # Run all named queries from docs/queries.sql
 python3 run_queries.py
 
-# LLM classification (provider auto-detected from model name)
-# ANTHROPIC_API_KEY / GOOGLE_API_KEY / OPENROUTER_API_KEY must be set
-python3 tools/llm_classify.py --limit 500                              # Haiku (default)
-python3 tools/llm_classify.py --model gemini-2.0-flash-lite --limit 500  # Google
-python3 tools/llm_classify.py --model google/gemini-flash-1.5-8b --limit 500  # OpenRouter
+# LLM classification. Keys come from .env via tools/llm_layer.py (simonw/llm) —
+# no need to export anything. Provider is inferred from the model name.
+# Use deepseek-chat, NOT the .env default deepseek-v4-flash: v4-flash is a
+# REASONING model that bills thinking against max_tokens and regularly burns the
+# whole budget before emitting content, losing ~50% of batches. Measured
+# 2026-08-01 on identical 20-key batches: deepseek-chat 0.44 s/key & $0.11/1k
+# keys with zero failures; deepseek-v4-flash 11.09 s/key, $0.40/1k, half the
+# batches empty. Full 39k backlog: ~5 h and ~$4.30 vs ~58 h.
+python3 tools/llm_classify.py --model deepseek-chat --limit 500
+python3 tools/llm_classify.py --model deepseek-chat --limit 0    # whole backlog
+python3 tools/llm_classify.py --model gemini-2.5-flash-lite --limit 500
+
+# Resumable: re-running the same command skips keys already in the --out CSV, so
+# an interrupted run loses at most one batch. Aborts after 5 consecutive failed
+# batches (--max-consecutive-errors) — a bad model name 400s forever otherwise;
+# one such typo run churned 1,271 dead batches before this guard existed.
+
+# Per-batch model/token/cost provenance, appended to data/curation/llm_runs.jsonl
+python3 tools/llm_runs_report.py                    # one line per run
+python3 tools/llm_runs_report.py --batches RUN_ID   # per-batch detail
+python3 tools/llm_runs_report.py --errors           # only failed batches
+python3 tools/llm_runs_report.py --reprice          # recost from current PRICING
+# Token counts are exact (straight from the API); cost is an estimate from
+# llm_layer.PRICING, a hand-maintained table that will drift. Fix a price there
+# and --reprice recosts every past run.
+
 python3 tools/llm_compare.py data/curation/llm_claude-haiku-4-5.csv \
                               data/curation/llm_gemini-2.0-flash-lite.csv
 

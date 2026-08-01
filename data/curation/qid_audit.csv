@@ -1,85 +1,30 @@
 wikidata_qid,curated_full_name,verdict,entity_label,detail,core_name_norms
-Q1028044,Nicolae Tonitza,not_human,Alpine,Q15127012,nicolae tonitza
-Q1086361,Ștefan cel Mare,not_human,Ștefan cel Mare,Q659103,stefan cel mare
-Q1136134,Cosmin,not_human,Cosmin,Q12308941,cosminului
-Q12112450,Constantin Daicoviciu,not_human,Constantin Daicoviciu,Q659103,constantin daicoviciu
-Q12131591,Mircea cel Bătrân,not_human,Mircea cel Bătrân,Q532,mircea cel batran
 Q125375,Bethlen Gábor,not_human,sfințire,Q1190554,bethlen gabor
-Q12723504,Budai Nagy Antal,not_human,Cartierul Budai Nagy Antal,Q123705,budai nagy antal
-Q12724867,Iancu Jianu,not_human,Iancu Jianu,Q659103,iancu jianu
-Q12724934,Mihai Viteazu,not_human,Mihai Viteazu,Q659103,mihai viteazu
-Q12730779,Ion Agîrbiceanu,not_human,Ion Agârbiceanu,Q4167410,ion agarbiceanu
 Q1298714,Ecaterina Teodoroiu,not_human,sympatheia,Q33104279,ecaterina teodoroiu
 Q130786,József Attila,label_mismatch,Victor Suvorov,,jozsef attila
 Q131694,Regele Carol I,not_human,Aden,"Q486972,Q515,Q1549591,Q27554677",carol i
-Q136671998,Walter Mărăcineanu,not_human,Walter Mărăcineanu,Q2175765,walter maracineanu
 Q1372003,Eremia Grigorescu,label_mismatch,Konrad Rabensteiner zu Döhlau,,eremia grigorescu | g-ral eremia grigorescu
-Q1388476,Theodor Aman,not_human,Malabar Independent Syrian Church,Q879146,theodor aman
-Q1398494,Ion Andreescu,not_human,,Q526877,ion andreescu
 Q1425,Traianus,label_mismatch,Traian,,traian
 Q1430,Marcus Aurelius,label_mismatch,Marc Aureliu,,marcus aurelius
 Q152690,Arany János,label_mismatch,Maeve Binchy,,arany janos
-Q156605,Mihai Viteazul,not_human,,Q3863,mihai bravu
 Q159014,Regele Ferdinand I,not_human,Corydalis lutea,Q16521,ferdinand
 Q159020,Regina Maria,not_human,Eleocharis palustris,Q16521,maria
-Q16425275,Horea,not_human,Horea,Q659103,horea
-Q16427771,Crișan,not_human,Crișan,Q659103,crisan
-Q16427794,Alexandru Vlahuță,not_human,Alexandru Vlahuță,Q659103,alexandru vlahuta
 Q165655,Ady Endre,not_human,weightlifting at the 1980 Summer Olympics,Q26132862,ady endre
-Q1656593,"Horia, Cloșca și Crișan",label_mismatch,Horea,,"horia,closca si crisan"
 Q168717,Jókai Mór,not_human,ProSieben,"Q1378498,Q1616075,Q2961812",jokai mor
-Q169930,Mihai Eminescu,not_human,extended play,Q106043376,mihail eminescu
-Q188215,George Enescu,not_human,gnom,Q24533670,george enescu
-Q193389,Burebista,not_human,Clupeiformes,Q16521,burebista
-Q208494,Mircea cel Bătrân,not_human,industrial metal,Q188451,mircea cel mare | mircea voda
 Q216023,Constantin Brâncoveanu,not_human,,Q169534,constantin brancoveanu
-Q21681150,Aprodul Purice,not_human,Aprodul Purice,Q4414033,approdul purice
-Q217022,Ion Luca Caragiale,not_human,Anii 240 î.Hr.,Q39911,i. l. caragiale | i.l. caragiale | ion luca caragiale
-Q217048,Mihail Sadoveanu,not_human,Botezul lui Isus,"Q856663,Q1406161,Q35856",mihail sadoveanu
-Q2465460,Godeanu,not_human,Godeanu,Q659103,godeanu
-Q25114194,Horia,not_human,Horia,Q12308941,horia
-Q2524023,Vasile Conta,not_human,Fomes,Q16521,vasile conta
-Q2537456,Dragoș Vodă,not_human,Dragoș Vodă,Q659103,dragos voda
-Q2540525,Ion Roată,not_human,Ion Roată,Q659103,ion roata
-Q2719337,Alexandru cel Bun,not_human,Alexandru cel Bun,Q659103,alexandru cel bun
-Q285520,Barbu Știrbei,not_human,Barbu Știrbei,Q22808320,stirbei voda
-Q305001,Negru Vodă,not_human,Negru Vodă,"Q16858213,Q902814",negru voda
 Q330815,Nicolae Grigorescu,label_mismatch,Juan Bautista de Espinosa,,nicolae grigorescu
-Q330905,Ștefan Luchian,not_human,Abrahamian,Q4167410,stefan luchian
-Q336614,Constantin Noica,not_human,,Q193622,constantin noica
-Q355898,Dinu Lipatti,not_human,Tokio,Q4167410,dinu lipatti
-Q381100,Ciprian Porumbescu,not_human,Dopravní podnik hlavního města Prahy,"Q740752,Q4830453,Q6881511",ciprian porumbescu
 Q381161,Adrian Păunescu,label_mismatch,Marco Padalino,,adrian paunescu
 Q437004,Ana Aslan,not_human,Altendorf,"Q253019,Q378636",ana aslan
-Q44611,Vlad Țepeș,not_human,Kawachi district,Q1122846,tepes voda
 Q46261,Petőfi Sándor,not_human,arhitectura romanică,Q32880,petofi sandor
-Q46951076,Frații Buzești,not_human,frații Buzești,Q16334295,fratii buzesti
 Q48592,Kossuth Lajos,not_human,Noma,"Q11707,Q19316447",kossuth lajos
-Q4968865,Baba Novac,not_human,Baba Novac,Q532,baba novac
-Q5057872,Gheorghe Doja,not_human,Gheorghe Doja,Q659103,gheorghe doja
-Q5112591,Costache Negri,not_human,Costache Negri,Q659103,costache negri
-Q5114661,Ion Neculce,not_human,Ion Neculce,Q659103,ion neculce
 Q524987,Vasile Lupu,label_mismatch,Ricky Walden,,vasile lupu
-Q528773,Corneliu Coposu,not_human,Blussangeaux,Q484170,corneliu coposu
 Q535,Victor Hugo,label_mismatch,,,victor hugo
 Q559382,Neagoe Basarab,label_mismatch,Roger de Moulins,,neagoe basarab
-Q561702,Veronica Micle,not_human,KCH,Q4167410,veronica micle
-Q609482,Alexandru Odobescu,not_human,Alexandru Odobescu,Q659103,alexandru odobescu
 Q647380,Duiliu Zamfirescu,not_human,2009 UCI Mountain Bike & Trials World Championships,Q114609228,duiliu zamfirescu
 Q647381,C. A. Rosetti,label_mismatch,Raúl Iturriaga,,c. a. rosetti
-Q647397,Vasile Pârvan,not_human,Edmodo,"Q35127,Q4830453,Q205961",vasile parvan
-Q647428,Constantin Dobrogeanu-Gherea,not_human,Megachile invenita,Q16521,constantin dobrogeanu gherea | dobrogeanu gherea
-Q647429,Ion C. Brătianu,not_human,Mahonia nervosa,Q16521,i. c. bratianu
 Q647431,Eftimie Murgu,label_mismatch,Josette Andriot,,eftimie murgu
 Q647434,Dinicu Golescu,label_mismatch,Anthony Baldinucci,,dinicu golescu
 Q647447,Gheorghe Magheru,label_mismatch,Leo Smith,,g-ral gheorghe magheru
-Q647476,Ion Ghica,not_human,HMU,Q4167410,ion ghica
 Q647489,Ion Neculce,not_human,Chienti,Q4022,cronicar ion neculce
-Q647536,Petrache Poenaru,not_human,NGC 6623-1,Q184348,petrache poenaru
 Q7198,Publius Ovidius Naso,label_mismatch,Ovidiu,,ovidiu
-Q755770,Vasile Goldiș,not_human,Vasile Goldiș,Q532,vasile goldis
-Q779030,Axente Sever,not_human,Axente Sever,Q659103,axente sever
 Q83359,Bartók Béla,label_mismatch,James Dean,,bartok bela
-Q903230,Decebal,not_human,Decebal,Q532,decebal
-Q940856,Nicolae Bălcescu,not_human,Nicolae Bălcescu,Q659103,nicolae balcescu
-Q97196468,Dominic Medrea,not_human,Dominic Medrea,,dominic medrea

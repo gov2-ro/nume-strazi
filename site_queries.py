@@ -60,6 +60,21 @@ def _one(conn: sqlite3.Connection, sql: str, params: tuple = ()) -> dict:
     return dict(row) if row else {}
 
 
+def _attach_street_slugs(rows: list[dict], built: set[str] | None) -> None:
+    """Set r["slug"], or None when no street page was rendered for it.
+
+    Same guard `built_uat_keys` gives UAT links: a template must not emit an
+    anchor to a page that doesn't exist. It matters most for UAT "Nume
+    distinctive", which selects names present in <= 3 UATs nationally — by
+    construction those never reach the top-N that get pages, so essentially
+    every one of those links was a 404. Pass None to skip the check (callers
+    that don't know what was rendered).
+    """
+    for r in rows:
+        slug = slugify(r.get("display") or r.get("name_normalized") or "")
+        r["slug"] = slug if (built is None or slug in built) else None
+
+
 def section1(conn: sqlite3.Connection) -> dict:
     # Headline corpus = the cross-source union (electoral + OSM + postal + RENNS,
     # deduplicated by (siruta, street_type, core_name_norm)). Flipped from
@@ -1832,28 +1847,56 @@ def enumerate_streets(conn: sqlite3.Connection, min_uats: int = 5) -> list[dict]
 
 
 def enumerate_persons(conn: sqlite3.Connection) -> list[dict]:
-    """Every person in the persons table — they all get a detail page."""
-    rows = _rows(conn, """
-        SELECT p.core_name_norm, p.full_name, p.wikidata_qid,
-               COUNT(sd.core_name_norm) AS street_count
+    """Every honoured *identity* — one detail page each.
+
+    Grouped by PERSON_IDENTITY, not core_name_norm, so a figure curated under
+    several spellings (Cuza has four) gets one page carrying all of them. This
+    is the same grain the honoree rankings use; keying pages differently made a
+    ranking row link to a page showing a smaller number than the row itself.
+
+    `core_name_norms` carries the whole alias group so the caller can hand it
+    straight to person_detail(). The slug is unchanged — it was already
+    qid-or-name, i.e. the identity — so no URL moves.
+    """
+    rows = _rows(conn, f"""
+        SELECT {PERSON_IDENTITY}                          AS identity,
+               p.core_name_norm, p.full_name, p.wikidata_qid,
+               (SELECT COUNT(*) FROM all_street_names_cache sd
+                 WHERE sd.core_name_norm = p.core_name_norm) AS street_count
         FROM persons p
-        LEFT JOIN all_street_names_cache sd ON sd.core_name_norm = p.core_name_norm
-        GROUP BY p.core_name_norm
-        ORDER BY street_count DESC, p.full_name
     """)
-    out = []
+
+    # Fold aliases into one entry per identity. Representative full_name/qid
+    # comes from the highest-street-count row; the counts sum across the group.
+    groups: dict[str, dict] = {}
     for r in rows:
+        g = groups.get(r["identity"])
+        n = r["street_count"] or 0
+        if g is None:
+            groups[r["identity"]] = {
+                "identity":       r["identity"],
+                "core_name_norms": [r["core_name_norm"]],
+                "full_name":      r["full_name"],
+                "qid":            r["wikidata_qid"],
+                "street_count":   n,
+                "_top":           n,
+            }
+            continue
+        g["core_name_norms"].append(r["core_name_norm"])
+        g["street_count"] += n
+        if n > g["_top"]:
+            g["_top"], g["full_name"], g["qid"] = n, r["full_name"], r["wikidata_qid"]
+
+    out = []
+    for g in groups.values():
         # Prefer QID — stable, unambiguous. Fall back to name slug.
-        slug = (r["wikidata_qid"] or "").lower() or slugify(r["full_name"])
+        slug = (g["qid"] or "").lower() or slugify(g["full_name"])
         if not slug:
             continue
-        out.append({
-            "slug":           slug,
-            "core_name_norm": r["core_name_norm"],
-            "full_name":      r["full_name"],
-            "qid":            r["wikidata_qid"],
-            "street_count":   r["street_count"] or 0,
-        })
+        g.pop("_top")
+        g["core_name_norms"].sort()
+        out.append({"slug": slug, **g})
+    out.sort(key=lambda g: (-g["street_count"], g["full_name"]))
     return out
 
 
@@ -2148,23 +2191,52 @@ def street_detail(conn: sqlite3.Connection, name_normalized: str,
     }
 
 
-def person_detail(conn: sqlite3.Connection, core_name_norm: str,
-                   built_uat_keys: set[tuple[str, str]] | None = None) -> dict:
-    """Person bio + complete street footprint.
+def person_detail(conn: sqlite3.Connection, identity: str,
+                   built_uat_keys: set[tuple[str, str]] | None = None,
+                   core_name_norms: list[str] | None = None) -> dict:
+    """Person bio + complete street footprint, keyed by identity.
+
+    `identity` is a PERSON_IDENTITY value (QID, or full_name when there is no
+    QID) covering every core_name_norm curation has filed under that person.
+    Pass `core_name_norms` when the caller already has the alias group
+    (enumerate_persons returns it) to skip a lookup.
 
     Pass precomputed built_uat_keys (from enumerate_uats) to avoid rendering links
     to UAT pages that don't exist. If None, computes it internally.
     """
-    person = _one(conn, "SELECT * FROM persons WHERE core_name_norm = ?", (core_name_norm,))
-    if not person:
+    if core_name_norms is None:
+        core_name_norms = [
+            r["core_name_norm"] for r in _rows(
+                conn, f"SELECT p.core_name_norm FROM persons p WHERE {PERSON_IDENTITY} = ?",
+                (identity,))
+        ]
+    if not core_name_norms:
         return {}
+    marks = ",".join("?" * len(core_name_norms))
 
-    rows = _rows(conn, """
+    # Merge the alias rows into one bio: an alias may carry a gender or era the
+    # primary row lacks, so take the first non-NULL per column rather than
+    # whichever row happens to sort first.
+    alias_rows = _rows(conn, f"""
+        SELECT p.* FROM persons p
+        WHERE p.core_name_norm IN ({marks})
+        ORDER BY (SELECT COUNT(*) FROM all_street_names_cache sd
+                   WHERE sd.core_name_norm = p.core_name_norm) DESC, p.full_name
+    """, tuple(core_name_norms))
+    if not alias_rows:
+        return {}
+    person = dict(alias_rows[0])
+    for extra in alias_rows[1:]:
+        for col, val in extra.items():
+            if person.get(col) is None and val is not None:
+                person[col] = val
+
+    rows = _rows(conn, f"""
         SELECT sd.judet, sd.uat, sd.siruta, sd.name, sd.core_name, sd.name_normalized
         FROM all_street_names_cache sd
-        WHERE sd.core_name_norm = ?
+        WHERE sd.core_name_norm IN ({marks})
         ORDER BY sd.judet, sd.uat
-    """, (core_name_norm,))
+    """, tuple(core_name_norms))
 
     # Compute built_uat_keys if not provided.
     if built_uat_keys is None:
@@ -2193,18 +2265,21 @@ def person_detail(conn: sqlite3.Connection, core_name_norm: str,
         b["uats"].sort(key=lambda u: (-u["count"], u["uat"]))
     judet_list = sorted(per_judet.values(), key=lambda b: -b["total"])
 
-    # Peers: other persons sharing profession or era
-    peers = _rows(conn, """
-        SELECT p.core_name_norm, p.full_name, p.wikidata_qid,
-               COUNT(sd.core_name_norm) AS street_count
+    # Peers: other persons sharing profession or era. Grouped by identity like
+    # the page itself, or Cuza's four alias keys would fill half the list.
+    peers = _rows(conn, f"""
+        SELECT {PERSON_IDENTITY}       AS identity,
+               MAX(p.full_name)        AS full_name,
+               MAX(p.wikidata_qid)     AS wikidata_qid,
+               SUM((SELECT COUNT(*) FROM all_street_names_cache sd
+                     WHERE sd.core_name_norm = p.core_name_norm)) AS street_count
         FROM persons p
-        LEFT JOIN all_street_names_cache sd ON sd.core_name_norm = p.core_name_norm
-        WHERE p.core_name_norm != ?
+        WHERE {PERSON_IDENTITY} != ?
           AND (p.profession = ? OR p.era = ?)
-        GROUP BY p.core_name_norm
-        ORDER BY street_count DESC
+        GROUP BY identity
+        ORDER BY street_count DESC, full_name
         LIMIT 8
-    """, (core_name_norm, person.get("profession") or "", person.get("era") or ""))
+    """, (identity, person.get("profession") or "", person.get("era") or ""))
     for pr in peers:
         pr["slug"] = (pr["wikidata_qid"] or "").lower() or slugify(pr["full_name"])
 
@@ -2224,6 +2299,7 @@ def uat_detail(
     *,
     global_rarity: dict | None = None,
     nat: dict | None = None,
+    built_street_slugs: set[str] | None = None,
 ) -> dict:
     """All streets in one UAT, themed and ranked, with national-average deltas.
 
@@ -2278,8 +2354,7 @@ def uat_detail(
         ORDER BY n DESC, display
         LIMIT 20
     """, (siruta,))
-    for r in top_streets:
-        r["slug"] = slugify(r["display"] or r["name_normalized"])
+    _attach_street_slugs(top_streets, built_street_slugs)
 
     top_persons = _rows(conn, """
         SELECT p.full_name, p.wikidata_qid, p.core_name_norm, p.profession,
@@ -2307,12 +2382,12 @@ def uat_detail(
         distinctive = sorted(
             [{"name_normalized": r["name_normalized"],
               "display": r["display"],
-              "uat_n": global_rarity[r["name_normalized"]],
-              "slug": slugify(r["display"] or r["name_normalized"])}
+              "uat_n": global_rarity[r["name_normalized"]]}
              for r in uat_names
              if global_rarity.get(r["name_normalized"], 99) <= 3],
             key=lambda x: (x["uat_n"], x["display"] or ""),
         )[:12]
+        _attach_street_slugs(distinctive, built_street_slugs)
     else:
         distinctive = _rows(conn, """
             WITH global_rarity AS (
@@ -2330,8 +2405,7 @@ def uat_detail(
             ORDER BY gr.uat_n, display
             LIMIT 12
         """, (siruta,))
-        for r in distinctive:
-            r["slug"] = slugify(r["display"] or r["name_normalized"])
+        _attach_street_slugs(distinctive, built_street_slugs)
 
     # National averages — precomputed by caller in batch mode.
     if nat is None:
@@ -2393,7 +2467,8 @@ def _theme_where(theme_type: str, theme_key: str):
     return "", "1 = 0", ()
 
 
-def theme_detail(conn: sqlite3.Connection, theme_type: str, theme_key: str) -> dict:
+def theme_detail(conn: sqlite3.Connection, theme_type: str, theme_key: str,
+                 built_street_slugs: set[str] | None = None) -> dict:
     """Streets belonging to a theme, ranked by popularity, with județ heatmap."""
     join_clause, where_clause, params = _theme_where(theme_type, theme_key)
 
@@ -2419,8 +2494,7 @@ def theme_detail(conn: sqlite3.Connection, theme_type: str, theme_key: str) -> d
         ORDER BY total DESC
         LIMIT 60
     """, params)
-    for r in top_streets:
-        r["slug"] = slugify(r["display"] or r["name_normalized"])
+    _attach_street_slugs(top_streets, built_street_slugs)
 
     # Județ heatmap data
     per_judet = _rows(conn, f"""

@@ -36,7 +36,11 @@ vezi și: [numele-strazilor.mariuscomper.uk](https://numele-strazilor.mariuscomp
 - Provides a named SQL query catalog covering overview, people, themes,
   regional maps, renaming history, curiosities, and cross-source coverage gaps
 
-Current coverage: **64.0% classified** (107,957 deduped streets across 1,207 UATs, 42 județe).
+Current corpus: **163,404 street names across 2,708 UATs** in the 4-source
+deduplicated master list (`all_street_names`), of which the electoral source
+alone contributes 107,957. Classification coverage: **68.9%** of the union,
+74.7% of the electoral subset. RENNS is currently absent from the union
+(`renns.ancpi.ro` offline), so the total is depressed from its ~224,000 peak.
 
 ---
 
@@ -57,7 +61,7 @@ flowchart LR
     SEED["seed_lookups.py<br/>seed_top500.py<br/>seed_batch2.py"]
     DB[("streets.db<br/>SQLite")]
     EXP["export_unclassified.py"]
-    LLM["llm_classify.py<br/>Claude / Gemini"]
+    LLM["llm_classify.py<br/>DeepSeek / Gemini / Claude"]
     CSV["curation CSVs"]
     IMP["import_csv.py<br/>upsert by core_name_norm"]
     OSM["osm_ingest.py<br/>osm_match.py<br/>osm_score.py"]
@@ -113,18 +117,25 @@ multiple polling sections. Always use the `electoral_dedup` view.
 Python 3.11+. Core dependencies:
 
 ```bash
-# ETL + LLM classifier
-pip install openpyxl anthropic
+# ETL
+pip install openpyxl
+
+# LLM classifier (optional — only needed to run tools/llm_classify.py).
+# Provider access goes through simonw/llm; install the plugins you'll use.
+pip install llm llm-deepseek llm-gemini llm-anthropic python-dotenv openai
 
 # OSM enrichment (optional — only needed to run tools/osm_ingest.py)
 pip install osmium shapely
 ```
 
+API keys live in a local `.env` (gitignored) and are picked up automatically —
+see `.env.example`. Nothing needs exporting by hand.
+
 A virtual environment is recommended:
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
-pip install openpyxl anthropic
+pip install openpyxl
 ```
 
 ---
@@ -178,7 +189,7 @@ flowchart LR
     DB[("data/streets.db")]
     SITE["build_site.py<br/>Jinja2 → static HTML"]
     SLIM["tools/build_dist_db.py<br/>materialise electoral_dedup<br/>drop unused cols + tables<br/>VACUUM, page_size=4096"]
-    DIST[("dist/streets.db<br/>~91 MB")]
+    DIST[("dist/streets.db<br/>~69 MB")]
   end
   subgraph dep["Deploy (rsync)"]
     HOST["shared host<br/>Apache / Nginx"]
@@ -204,7 +215,7 @@ testing only. Apache/Nginx serve `Accept-Ranges: bytes` natively.
 ```bash
 # Build the slim production DB (materialises electoral_dedup + streets_all_sources +
 # all_street_names as real tables with only client-needed columns, drops source
-# tables, VACUUMs). Run after each build_db.py rebuild. ~163 MB → ~91 MB (bigger
+# tables, VACUUMs). Run after each build_db.py rebuild. 221 MB → 69 MB (bigger
 # than the pre-RENNS ~13.5 MB since the two consolidation tables now carry all
 # 4 sources' worth of rows).
 python3 tools/build_dist_db.py
@@ -407,7 +418,7 @@ flowchart LR
     DB[("streets.db")]
     EXP["export_unclassified.py<br/>--limit 500"]
     U["unclassified.csv"]
-    LLM["llm_classify.py<br/>Claude / Gemini / OpenRouter"]
+    LLM["llm_classify.py<br/>via llm_layer.py<br/>DeepSeek / Gemini / Claude"]
     MAN["manual review"]
     C["classified.csv"]
     IMP["import_csv.py<br/>ON CONFLICT DO UPDATE"]

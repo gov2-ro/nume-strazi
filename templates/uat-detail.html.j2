@@ -63,7 +63,7 @@
           <div class="rank-row" style="grid-template-columns: 24px minmax(0,1fr) 44px;">
             <div class="rank-num">{{ i + 1 }}</div>
             <div>
-              <a href="{{ base }}/strada/{{ s.slug }}/" class="street-tag sm">{{ s.display or s.name_normalized }}</a>
+              {% if s.slug %}<a href="{{ base }}/strada/{{ s.slug }}/" class="street-tag sm">{{ s.display or s.name_normalized }}</a>{% else %}<span class="street-tag sm">{{ s.display or s.name_normalized }}</span>{% endif %}
             </div>
             <div class="rank-count">{{ s.n }}</div>
           </div>
@@ -101,7 +101,7 @@
     <div class="detail-section-header">Nume distinctive (rare la nivel național)</div>
     <div class="uat-cluster">
       {% for d in distinctive %}
-        <a class="uat-pill" href="{{ base }}/strada/{{ d.slug }}/" title="prezent în {{ d.uat_n }} UAT-uri național">{{ d.display or d.name_normalized }}</a>
+        {% if d.slug %}<a class="uat-pill" href="{{ base }}/strada/{{ d.slug }}/" title="prezent în {{ d.uat_n }} UAT-uri național">{{ d.display or d.name_normalized }}</a>{% else %}<span class="uat-pill uat-pill-plain" title="prezent în {{ d.uat_n }} UAT-uri național — fără pagină proprie">{{ d.display or d.name_normalized }}</span>{% endif %}
       {% endfor %}
     </div>
   </div>

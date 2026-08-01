@@ -17,6 +17,10 @@ data/gis/
 # run to run) and the unclassified.csv export (cheap, useful as a snapshot).
 !data/curation/
 !data/curation/*.csv
+# llm_runs.jsonl — per-batch model/token/cost provenance for every classification
+# run. Tracked deliberately: it is the only record of which model produced a
+# given batch and what it cost, and the CSVs it explains are themselves tracked.
+!data/curation/*.jsonl
 
 # Python
 __pycache__/

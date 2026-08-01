@@ -97,6 +97,27 @@ def _render(env: jinja2.Environment, template_name: str, out_path: Path, **ctx) 
     out_path.write_text(env.get_template(template_name).render(**ctx), encoding="utf-8")
 
 
+def _prune_stale(parent: Path, valid_slugs: set[str]) -> int:
+    """Delete <parent>/<slug>/ directories that this build no longer renders.
+
+    The rendered set shrinks whenever an enumeration changes — the UAT filter of
+    2026-05-18, the corpus move to all_street_names_cache, the 2026-08-01 rekey
+    of person pages from core_name_norm to identity. Without a sweep the old
+    directories keep being served with stale counts and stale outbound links:
+    on 2026-08-01 the only broken /persoana/ links left in dist/ were all inside
+    orphaned /strada/ pages from an earlier build. /oras/ has had this sweep
+    since 2026-05-18 and does its own two-level walk.
+    """
+    if not parent.exists():
+        return 0
+    pruned = 0
+    for d in parent.iterdir():
+        if d.is_dir() and d.name not in valid_slugs:
+            shutil.rmtree(d)
+            pruned += 1
+    return pruned
+
+
 def build_browser_data(db_path: str = DB_PATH) -> None:
     """Generate dist/browser/data.json — pre-computed compact rows + meta."""
     conn = site_queries.get_connection(db_path)
@@ -146,19 +167,25 @@ def build_detail_pages(db_path: str = DB_PATH,
         _render(env, "street-detail.html.j2",
                 DIST / "strada" / slug / "index.html",
                 portraits=portraits, **og, **detail)
-    print(f"    → dist/strada/ ({len(streets)} pages)")
+    # What actually got a page. UAT and theme pages link to street pages, so
+    # they need this to avoid emitting anchors to slugs that were never
+    # rendered — the same guard built_uat_keys provides in the other direction.
+    built_street_slugs = set(seen)
+    pruned_s = _prune_stale(DIST / "strada", built_street_slugs)
+    print(f"    → dist/strada/ ({len(streets)} pages, pruned {pruned_s} stale)")
 
     # ── Persons ──────────────────────────────────────────────────────────────
     persons = site_queries.enumerate_persons(conn)
     print(f"  Rendering {len(persons)} person detail pages…")
-    seen_p: dict[str, str] = {}  # slug → core_name_norm (first = highest street count)
+    seen_p: set[str] = set()  # enumerate_persons is per-identity, so this should never fire
     rendered_p = 0
     for p in persons:
         slug = p["slug"]
         if slug in seen_p:
-            continue  # duplicate QID — keep the first (higher street_count) rendering
-        seen_p[slug] = p["core_name_norm"]
-        detail = site_queries.person_detail(conn, p["core_name_norm"], built_uat_keys)
+            continue  # two identities collapsing to one slug — keep the larger
+        seen_p.add(slug)
+        detail = site_queries.person_detail(
+            conn, p["identity"], built_uat_keys, p["core_name_norms"])
         if not detail:
             continue
         full_name = detail.get("full_name") or p["full_name"]
@@ -175,7 +202,9 @@ def build_detail_pages(db_path: str = DB_PATH,
                 DIST / "persoana" / slug / "index.html",
                 portraits=portraits, slug=slug, **og, **detail)
         rendered_p += 1
-    print(f"    → dist/persoana/ ({rendered_p} pages)")
+
+    pruned_p = _prune_stale(DIST / "persoana", seen_p)
+    print(f"    → dist/persoana/ ({rendered_p} pages, pruned {pruned_p} stale)")
 
     # ── UATs ─────────────────────────────────────────────────────────────────
     uats = uats_for_keys
@@ -197,7 +226,8 @@ def build_detail_pages(db_path: str = DB_PATH,
     """)
     for u in uats:
         detail = site_queries.uat_detail(
-            conn, str(u["siruta"]), global_rarity=global_rarity, nat=nat
+            conn, str(u["siruta"]), global_rarity=global_rarity, nat=nat,
+            built_street_slugs=built_street_slugs,
         )
         if not detail:
             continue
@@ -243,7 +273,8 @@ def build_detail_pages(db_path: str = DB_PATH,
             print(f"  WARN: theme slug collision '{slug}'")
             continue
         seen_t[slug] = key
-        detail = site_queries.theme_detail(conn, t["type"], t["key"])
+        detail = site_queries.theme_detail(conn, t["type"], t["key"],
+                                           built_street_slugs)
         if not detail:
             continue
         theme_label = t.get("label") or t["key"]
@@ -257,7 +288,8 @@ def build_detail_pages(db_path: str = DB_PATH,
         _render(env, "theme-detail.html.j2",
                 DIST / "tema" / slug / "index.html",
                 portraits=portraits, theme_meta=t, **og, **detail)
-    print(f"    → dist/tema/ ({len(themes)} pages)")
+    pruned_t = _prune_stale(DIST / "tema", set(seen_t))
+    print(f"    → dist/tema/ ({len(themes)} pages, pruned {pruned_t} stale)")
 
     # ── Index pages ──────────────────────────────────────────────────────────
     _render(env, "persons-index.html.j2",
