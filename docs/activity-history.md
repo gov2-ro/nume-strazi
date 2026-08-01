@@ -1,5 +1,116 @@
 # Activity History
 
+## 2026-08-01 — OSM reach measured, competitor comparison corrected, honoree counts de-duplicated
+
+User asked why Mihai Eminescu now reads 739, and whether the OSM reach gap
+against numele-strazilor.mariuscomper.uk warranted a fresh Geofabrik extract.
+Neither question had the answer it looked like it had.
+
+### 1. 739 was a double count
+
+739 is `occurrences`, not UATs — 564 UATs have an Eminescu street. But the
+number was wrong even as a street count. `all_street_names_cache` dedupes on
+`(siruta, street_type, core_name_norm)`, and the identity grouping folds four
+`core_name_norm` spellings into Q184935, so the variants survive as separate
+rows and get counted again:
+
+```
+ORAŞ COMĂNEŞTI   Fundătura   mihai eminescu
+ORAŞ COMĂNEŞTI   Fundătura   mihail eminescu     ← same street
+MUNICIPIUL PITEŞTI  Intrarea  eminescu mihai
+MUNICIPIUL PITEŞTI  Intrarea  mihai eminescu     ← same street
+```
+
+739 rows over **589** distinct `(siruta, street_type)` pairs; 143 UAT+type pairs
+held more than one spelling. A ~25% overstatement on the headline honoree.
+
+Fixed at four sites, all sharing one new `site_queries.STREET_UNIT` constant:
+`top_honorees_national` in `docs/queries.sql`, `enumerate_persons`,
+`person_detail` and its `peers` block. `enumerate_persons` needed restructuring
+rather than a one-line change — it summed per-key counts in Python, which cannot
+dedupe across keys, so the identity total is now computed in SQL and assigned
+rather than summed. `person_detail`'s row query gained `DISTINCT` and dropped
+three selected-but-unread columns that would have defeated it.
+
+The distinction that makes this safe: **only groupings that span several
+`core_name_norm` values need it.** A query grouped by a single key can still
+`COUNT(*)`, because `Strada X` and `Bulevardul X` in one UAT are genuinely two
+streets (rule #1). `queries.sql`'s other `occurrences` column groups by one key
+and was left alone.
+
+Ranking after the fix — note Creangă overtakes Vladimirescu, and detail totals
+now equal ranking totals exactly:
+
+| | before | after |
+|---|---|---|
+| Mihai Eminescu | 739 | **589** |
+| Ion Creangă | 432 | **395** |
+| Tudor Vladimirescu | 436 | **392** |
+| Ștefan cel Mare | 393 | **391** |
+| Alexandru Ioan Cuza | 419 | **387** |
+
+`uats_present` and `judete_present` were already `COUNT(DISTINCT)` and did not
+move.
+
+### 2. The `highway=track` hypothesis was wrong
+
+The standing theory was that our reach fell short because rural UATs tag their
+only named road as `highway=track`. New `tools/osm_reach_report.py` does one
+pass over the PBF, resolving every *named* highway way's midpoint to a UAT by
+the same polygon containment the ingest uses, and tallies reach per class:
+
+| filter | UATs |
+|---|---|
+| current 8 classes | 2,632 |
+| + `track` (9,141 named ways) | 2,709 (**+77**) |
+| + every remaining class, greedy | **2,802 (ceiling)** |
+| `uat_boundaries` | 3,183 |
+
+Greedy gains after `track`: `proposed` +33, `path` +26, `construction` +18,
+`footway` +8, `motorway` +4, `trunk` +3, `services` +1, then zero. The classes
+overlap heavily, so the per-class "new UATs" column cannot be summed — hence the
+greedy rollup rather than a sum.
+
+**381 of 3,183 UATs contain no named highway way of any class**, so no scope
+widening reaches them. `track` costs 9,141 ways of scope dilution for 2.4% reach.
+Still a real call, but a small one.
+
+Geofabrik freshness was ruled out first and cheaply: the extract is dated
+2026-07-30, two days old. Re-downloading would have changed nothing.
+
+### 3. The comparison itself was against a number they never published
+
+Read the site rather than continuing to reason from our own note. It is a single
+ranked table of street names by distinct-UAT presence, with **no per-UAT
+drill-down** — so the plan to test it against the 381 zero-named-highway UATs
+had nothing to query. That absence is itself the answer.
+
+The site states **no total UAT count anywhere**. The "~3,181" in `BACKLOG.md`
+was Romania's own UAT count, from our 2026-07-31 entry, attributed to them by
+mistake. Their stated method is essentially ours — *"Majoritatea sunt limite
+OpenStreetMap de nivel administrativ 8; Bucureștiul este inclus o singură dată"*
+— `admin_level=8` containment, Bucharest counted once where we split it into six
+sectors. Their source date is 2026-07-29 against our 2026-07-30.
+
+Like-for-like:
+
+| name | theirs | ours (exact key) | ours (all spellings) |
+|---|---|---|---|
+| Principală | 803 | 779 | 790 |
+| Mihai Eminescu | 477 | 473 | 481 |
+
+Their peak per-name figure is 803; ours is 790. Their Eminescu count falls
+*between* our two, so that difference is canonical-form folding, not coverage.
+**No ~550-UAT reach gap exists** — the original note compared their per-name UAT
+counts against our total UAT reach, which are not the same quantity. The
+`track` item is re-scoped to the real question: whether ~13-24 UATs on
+`Principală` justify widening scope.
+
+A correction pointer was added to the 2026-07-31 entry. Its two bugs were real
+and are fixed; only the size of the residual gap was overstated.
+
+Tests: 49 passed, 3 failed — the same pre-existing failures in BACKLOG P3.
+
 ## 2026-08-01 — Taxonomy normalisation: 461 → 372 subcategories, canonicalised at import
 
 Prerequisite for filter UI. `name_categories.subcategory` is free text written
@@ -427,6 +538,26 @@ streets than we do."
 distinct-UAT presence over OSM alone: 477 UATs for "Mihai Eminescu". Our
 4-source union already held 488 for `mihai eminescu` and 515 across all Eminescu
 spellings. Our *OSM layer*, though, only reached 424, and that gap was real.
+
+> **Follow-up (2026-08-01):** the residual gap left open below was measured and
+> the site was read directly, which settled it — see that day's entry for the
+> full numbers. Three corrections to what follows:
+>
+> 1. **The `highway=track` deferral at the end of this entry was the wrong
+>    lead.** `tools/osm_reach_report.py` measures `track` at **+77 UATs**, and
+>    the union of *every* highway class at 2,802 of 3,183 — 381 UATs contain no
+>    named highway way at all, so no scope widening reaches them.
+> 2. **A "~3,181 UATs" figure for that site propagated into `docs/BACKLOG.md`
+>    from around this work.** It was never their claim; the site states no total
+>    UAT count. 3,181 is Romania's own UAT count, quoted a few lines below in
+>    Bug 1. Corrected there.
+> 3. **Like-for-like, the two datasets are at parity.** Their peak per-name
+>    figure is 803 (`Principală`) against our 790; their 477 for Mihai Eminescu
+>    falls between our 473 (exact key) and 481 (all spellings), so that
+>    difference is canonical-form folding, not coverage.
+>
+> The two bugs this entry reports are unaffected — both were real and both are
+> fixed. Only the size of the remaining gap was overstated.
 
 ### Bug 1 — OSM ingest was capped at the electoral source's UAT list
 

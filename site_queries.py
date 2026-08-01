@@ -24,6 +24,19 @@ _SIRUTA_COORDS: dict | None = None
 # docs/BACKLOG.md.
 PERSON_IDENTITY = "COALESCE(p.wikidata_qid, p.full_name)"
 
+# One street is one (siruta, street_type). `all_street_names_cache` dedupes on
+# (siruta, street_type, core_name_norm), so any grouping that folds several
+# core_name_norm values into a single identity re-counts the same street once
+# per spelling: Comănești holds both "Fundătura mihai eminescu" and "Fundătura
+# mihail eminescu" — one street, two rows. Counting rows overstated Mihai
+# Eminescu by 25% (739 against 589 real streets).
+#
+# Only needed where the group spans keys. A query grouped by a single
+# core_name_norm can safely COUNT(*): "Strada X" and "Bulevardul X" in one UAT
+# are genuinely two streets (CLAUDE.md rule #1), and no key repeats within a
+# (siruta, street_type).
+STREET_UNIT = "sd.siruta || '|' || COALESCE(sd.street_type, '')"
+
 
 def _siruta_coords() -> dict:
     """Lazy-load {siruta:int -> (lat, lon)} from the GIS coords CSV (cached).
@@ -1858,16 +1871,27 @@ def enumerate_persons(conn: sqlite3.Connection) -> list[dict]:
     straight to person_detail(). The slug is unchanged — it was already
     qid-or-name, i.e. the identity — so no URL moves.
     """
+    # `street_count` is per key, used only to pick the representative name.
+    # `identity_street_count` is the real total for the whole alias group and is
+    # constant across it — assigned, never summed, because summing the per-key
+    # counts double-counts a street spelled two ways in one UAT (see STREET_UNIT).
     rows = _rows(conn, f"""
         SELECT {PERSON_IDENTITY}                          AS identity,
                p.core_name_norm, p.full_name, p.wikidata_qid,
                (SELECT COUNT(*) FROM all_street_names_cache sd
-                 WHERE sd.core_name_norm = p.core_name_norm) AS street_count
+                 WHERE sd.core_name_norm = p.core_name_norm) AS street_count,
+               (SELECT COUNT(DISTINCT {STREET_UNIT})
+                  FROM all_street_names_cache sd
+                 WHERE sd.core_name_norm IN (
+                   SELECT p2.core_name_norm FROM persons p2
+                    WHERE COALESCE(p2.wikidata_qid, p2.full_name)
+                        = COALESCE(p.wikidata_qid, p.full_name)
+                 )) AS identity_street_count
         FROM persons p
     """)
 
     # Fold aliases into one entry per identity. Representative full_name/qid
-    # comes from the highest-street-count row; the counts sum across the group.
+    # comes from the highest-street-count row.
     groups: dict[str, dict] = {}
     for r in rows:
         g = groups.get(r["identity"])
@@ -1878,12 +1902,11 @@ def enumerate_persons(conn: sqlite3.Connection) -> list[dict]:
                 "core_name_norms": [r["core_name_norm"]],
                 "full_name":      r["full_name"],
                 "qid":            r["wikidata_qid"],
-                "street_count":   n,
+                "street_count":   r["identity_street_count"] or 0,
                 "_top":           n,
             }
             continue
         g["core_name_norms"].append(r["core_name_norm"])
-        g["street_count"] += n
         if n > g["_top"]:
             g["_top"], g["full_name"], g["qid"] = n, r["full_name"], r["wikidata_qid"]
 
@@ -2231,8 +2254,13 @@ def person_detail(conn: sqlite3.Connection, identity: str,
             if person.get(col) is None and val is not None:
                 person[col] = val
 
+    # DISTINCT on (siruta, street_type): one street per row. Without it an alias
+    # group spanning two spellings counts the same street twice, inflating
+    # `total` and the per-UAT tallies (see STREET_UNIT). `name`/`core_name`/
+    # `name_normalized` were selected here but never read, and keeping them
+    # would defeat the DISTINCT since they differ per spelling.
     rows = _rows(conn, f"""
-        SELECT sd.judet, sd.uat, sd.siruta, sd.name, sd.core_name, sd.name_normalized
+        SELECT DISTINCT sd.judet, sd.uat, sd.siruta, sd.street_type
         FROM all_street_names_cache sd
         WHERE sd.core_name_norm IN ({marks})
         ORDER BY sd.judet, sd.uat
@@ -2267,13 +2295,16 @@ def person_detail(conn: sqlite3.Connection, identity: str,
 
     # Peers: other persons sharing profession or era. Grouped by identity like
     # the page itself, or Cuza's four alias keys would fill half the list.
+    # LEFT JOIN + COUNT(DISTINCT), not SUM(per-key COUNT(*)): summing re-counts
+    # a street that two alias spellings both match (see STREET_UNIT). The join
+    # also keeps peers with zero streets, which the subquery form did too.
     peers = _rows(conn, f"""
-        SELECT {PERSON_IDENTITY}       AS identity,
-               MAX(p.full_name)        AS full_name,
-               MAX(p.wikidata_qid)     AS wikidata_qid,
-               SUM((SELECT COUNT(*) FROM all_street_names_cache sd
-                     WHERE sd.core_name_norm = p.core_name_norm)) AS street_count
+        SELECT {PERSON_IDENTITY}                 AS identity,
+               MAX(p.full_name)                  AS full_name,
+               MAX(p.wikidata_qid)               AS wikidata_qid,
+               COUNT(DISTINCT {STREET_UNIT})     AS street_count
         FROM persons p
+        LEFT JOIN all_street_names_cache sd ON sd.core_name_norm = p.core_name_norm
         WHERE {PERSON_IDENTITY} != ?
           AND (p.profession = ? OR p.era = ?)
         GROUP BY identity

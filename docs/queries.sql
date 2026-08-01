@@ -157,7 +157,13 @@ SELECT k.identity,
        COUNT(DISTINCT a.core_name_norm) AS name_variants,
        COUNT(DISTINCT a.siruta)         AS uats_present,
        COUNT(DISTINCT a.judet)          AS judete_present,
-       COUNT(*)                         AS occurrences,
+       -- One street is one (siruta, street_type). COUNT(*) re-counted a street
+       -- once per spelling folded into the identity: Comănești has both
+       -- "Fundătura mihai eminescu" and "Fundătura mihail eminescu", and
+       -- Eminescu read 739 against 589 real streets. Grouping by a single
+       -- core_name_norm can still COUNT(*) safely -- see the query above.
+       COUNT(DISTINCT a.siruta || '|' || COALESCE(a.street_type, ''))
+                                        AS occurrences,
        MAX(m.segments)                  AS osm_segments,
        ROUND(MAX(m.km), 1)              AS osm_km
 FROM all_street_names_cache a
