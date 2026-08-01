@@ -123,7 +123,13 @@ SAINTS = sorted([
 MONTHS_RO = ["ianuarie","februarie","martie","aprilie","mai","iunie",
              "iulie","august","septembrie","octombrie","noiembrie","decembrie"]
 DATE_RE = re.compile(r"^(\d{1,2})\s+(" + "|".join(MONTHS_RO) + r")$", re.IGNORECASE)
-NUMERIC_RE = re.compile(r"^\d+[A-Za-z]?$")
+# Unnamed numbered streets. The bare form ("23", "23A") and the "Nr."-prefixed
+# form ("Nr. 23", "Nr.7", "Nr 11") are the same thing; only the bare one was
+# matched until 2026-08-01, leaving 198 "nr. N" keys looking like real names and
+# sitting in the LLM classifier's candidate pool as guaranteed skips.
+# The trailing-text guard matters: "Nr. 1 Principala Mierea" is a real name and
+# must NOT match.
+NUMERIC_RE = re.compile(r"^(?:nr\.?\s*)?\d+[A-Za-z]?$", re.IGNORECASE)
 
 
 def parse_artery(raw):

@@ -437,7 +437,7 @@ flowchart LR
 # Export top-500 unclassified keys to a CSV for manual review
 python3 tools/export_unclassified.py --limit 500
 
-# Classify with Claude Haiku (requires ANTHROPIC_API_KEY — see below)
+# Classify (model from --model, or LLM_MODEL in .env — see below)
 python3 tools/llm_classify.py --limit 500 --out data/curation/llm_batch1.csv
 
 # Review the output CSV, then import
@@ -447,23 +447,50 @@ python3 tools/import_csv.py data/curation/llm_batch1.csv
 python3 tools/llm_classify.py --limit 500 --out data/curation/llm_batch1.csv --import
 ```
 
+Run the deterministic classifiers first — they cost nothing and shrink the
+backlog before any API call is made:
+
+```bash
+python3 tools/seed_road_codes.py     # DN/DJ/DC/DE road codes → name_categories
+```
+
 `llm_classify.py` is resumable: re-running with the same `--out` file skips
 keys already written to it.
 
-### API key
+A batch that exhausts the model's token budget is halved and retried rather
+than dropped — reasoning models bill thinking against `max_tokens` and can
+return an empty response, and the failure shrinks with the batch. A key that
+still fails on its own is written out as a skip with the error in `notes`, so
+resume steps past it instead of re-attempting it on every future run.
 
-The LLM classifier uses the [Anthropic API](https://console.anthropic.com).
-The key is read from the environment — it is never stored in the repo.
+### API keys
+
+Provider access goes through `tools/llm_layer.py` (built on
+[simonw/llm](https://llm.datasette.io)), which picks the provider from the model
+name. Keys live in a gitignored `.env` — nothing needs exporting by hand. Copy
+`.env.example` and fill in whichever provider you use:
 
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-...
+cp .env.example .env
 ```
 
-To persist across sessions, add it to your shell profile (`~/.zshrc` or `~/.bashrc`):
+```ini
+LLM_MODEL=deepseek-v4-flash    # default when --model is omitted
+DEEPSEEK_API_KEY=
+GOOGLE_API_KEY=
+ANTHROPIC_API_KEY=
+OPENROUTER_API_KEY=
+```
+
+Check what resolves, and make one live call:
 
 ```bash
-echo 'export ANTHROPIC_API_KEY=sk-ant-...' >> ~/.zshrc
+python3 tools/llm_layer.py
+python3 tools/llm_layer.py --model deepseek-v4-flash
 ```
+
+Every batch's model, token counts and estimated cost are appended to
+`data/curation/llm_runs.jsonl`; read them with `python3 tools/llm_runs_report.py`.
 
 ---
 
@@ -496,10 +523,13 @@ echo 'export ANTHROPIC_API_KEY=sk-ant-...' >> ~/.zshrc
 │   ├── build_dist_db.py        # data/streets.db → dist/streets.db (materialise, slim, VACUUM)
 │   ├── export_unclassified.py  # Export top-N unclassified keys to CSV
 │   ├── import_csv.py           # Upsert classified CSV into lookup tables
-│   ├── llm_classify.py         # Claude Haiku batch classifier
+│   ├── llm_layer.py            # Provider-agnostic LLM access (simonw/llm + .env + pricing)
+│   ├── llm_classify.py         # LLM batch classifier (provider inferred from model name)
 │   ├── llm_compare.py          # Compare two llm_classify CSVs for convergence
+│   ├── llm_runs_report.py      # Summarise llm_runs.jsonl — tokens + cost per run
 │   ├── seed_top500.py          # Batch 1 curation (top-500 keys)
 │   ├── seed_batch2.py          # Batch 2 curation
+│   ├── seed_road_codes.py      # DN/DJ/DC/DE road codes → name_categories (regex, no API)
 │   ├── restore_curation.py     # Run the full post-rebuild curation restore, asserting coverage
 │   ├── fetch_portraits.py      # Wikidata P18 → Wikimedia thumbnails → dist/portraits/
 │   ├── wikidata_persons.py     # Fetch/replay Wikidata QIDs for persons

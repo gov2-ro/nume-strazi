@@ -160,6 +160,94 @@ def call_llm(model: str, entries: list,
     return _parse_text(text), usage
 
 
+def _is_budget_error(exc: Exception) -> bool:
+    """True for the reasoning-budget exhaustion llm_layer raises on empty content.
+
+    Matched on the message rather than an exception type because llm_layer
+    raises a plain RuntimeError; the distinguishing detail is that this failure
+    shrinks with the batch, unlike a 400/401/quota error, which does not.
+    """
+    return "returned no content" in str(exc)
+
+
+def _run_split(rows, batch_no, model, args, writer, fh, log, totals, acc, depth=1):
+    """Halve a budget-exhausted batch and retry each half; recurse as needed.
+
+    Returns (classified, skipped, errors). A single key that still fails is
+    written out as a skip carrying the error in `notes`, so the resume path
+    steps past it rather than re-attempting it on every future run.
+
+    `fh` is flushed after every sub-batch: a split of a 20-key batch can run for
+    minutes across several calls, and buffering all of it until the caller's
+    flush would put that whole stretch at risk on a Ctrl-C.
+    """
+    if len(rows) == 1:
+        halves = [rows]
+    else:
+        mid = len(rows) // 2
+        halves = [rows[:mid], rows[mid:]]
+
+    n_cls = n_skip = n_err = 0
+    for half in halves:
+        entries = [{"key": r[0], "sample": r[4], "freq": r[1], "judete": r[5]}
+                   for r in half]
+        lookup  = {r[0]: r for r in half}
+        pad     = "  " * depth
+        print(f"{pad}└ retry {len(half):>3} key(s) … ", end="", flush=True)
+        t0 = time.time()
+        try:
+            results, usage = call_llm(model, entries, args.max_tokens)
+        except Exception as e:
+            if _is_budget_error(e) and len(half) > 1:
+                print("still over budget — splitting further")
+                log("batch_split", batch=batch_no, keys=len(half), depth=depth,
+                    seconds=round(time.time() - t0, 2), error=str(e)[:300],
+                    first_key=half[0][0])
+                c, s, x = _run_split(half, batch_no, model, args, writer, fh,
+                                     log, totals, acc, depth + 1)
+                n_cls, n_skip, n_err = n_cls + c, n_skip + s, n_err + x
+                continue
+            print(f"ERROR: {e}")
+            log("batch_error", batch=batch_no, keys=len(half), depth=depth,
+                seconds=round(time.time() - t0, 2), error=str(e)[:300],
+                first_key=half[0][0], irreducible=len(half) == 1)
+            n_err += len(half)
+            if len(half) == 1:
+                row = empty_row(*half[0])
+                row["notes"] = f"llm error: {str(e)[:200]}"
+                writer.writerow(row)
+                fh.flush()
+            continue
+
+        for k in totals:
+            totals[k] += usage.get(k) or 0
+        cost = usage.get("estimated_cost_usd")
+        if cost is None:
+            acc["cost_known"] = False
+        else:
+            acc["cost_usd"] += cost
+
+        b_cls = b_skip = 0
+        for cls in results:
+            key = cls.get("key", "")
+            if key not in lookup:
+                continue
+            writer.writerow(apply(empty_row(*lookup[key]), cls))
+            if cls.get("table", "skip") != "skip":
+                b_cls += 1
+            else:
+                b_skip += 1
+        n_cls, n_skip = n_cls + b_cls, n_skip + b_skip
+        fh.flush()
+        print(f"{b_cls} classified, {b_skip} skipped")
+        log("batch", batch=batch_no, keys=len(half), depth=depth,
+            classified=b_cls, skipped=b_skip,
+            seconds=round(time.time() - t0, 2), first_key=half[0][0], **usage)
+        time.sleep(args.sleep)
+
+    return n_cls, n_skip, n_err
+
+
 # ── row helpers ───────────────────────────────────────────────────────────────
 
 def empty_row(cnorm, freq, jn, un, sample, jlist):
@@ -294,11 +382,61 @@ def main():
             try:
                 results, usage = call_llm(model, entries, args.max_tokens)
             except Exception as e:
+                # A reasoning model can burn the whole max_tokens budget on
+                # thinking and return empty content (llm_layer raises on that).
+                # It is a function of batch size, not of the keys: the same
+                # 20-key batch starting at 'mcdrive' died identically on
+                # 2026-08-01 at 00:22 and again at 10:09, ~150 s and a full
+                # 16,384-token budget each time. Failed keys were never written
+                # to the CSV, so resume rebuilt the same batch and re-attempted
+                # it first on every subsequent run — a permanent poison pill at
+                # the head of the queue. Halving and retrying converts that into
+                # progress; a genuinely bad single key ends up isolated and
+                # recorded, so the run moves past it.
+                if _is_budget_error(e) and len(batch_rows) > 1:
+                    print(f"budget exhausted at {len(batch_rows)} keys — splitting")
+                    log("batch_split", batch=batch_no, keys=len(batch_rows),
+                        seconds=round(time.time() - t0, 2), error=str(e)[:300],
+                        first_key=batch_rows[0][0])
+                    acc = {"cost_usd": 0.0, "cost_known": True}
+                    sub_cls, sub_skip, sub_err = _run_split(
+                        batch_rows, batch_no, model, args, writer, f, log,
+                        totals, acc, depth=1)
+                    n_classified += sub_cls
+                    n_skipped    += sub_skip
+                    n_errors     += sub_err
+                    cost_usd     += acc["cost_usd"]
+                    if not acc["cost_known"]:
+                        cost_known = False
+                    f.flush()
+                    if sub_cls or sub_skip:
+                        consecutive_errors = 0
+                        continue
+                    # Every sub-batch failed too — that is not a batch-size
+                    # problem, so let it count toward the abort threshold.
+                    consecutive_errors += 1
+                    if consecutive_errors >= args.max_consecutive_errors:
+                        print(f"\nABORTING: {consecutive_errors} batches failed "
+                              f"in a row without a single success, including "
+                              f"after splitting. Fix the cause and re-run; work "
+                              f"already in {out_path.name} is kept.")
+                        log("run_abort", reason="consecutive_errors",
+                            consecutive_errors=consecutive_errors, batch=batch_no)
+                        break
+                    continue
                 print(f"ERROR: {e}")
                 n_errors += len(batch_rows)
                 log("batch_error", batch=batch_no, keys=len(batch_rows),
                     seconds=round(time.time() - t0, 2), error=str(e)[:300],
                     first_key=batch_rows[0][0])
+                # Irreducible: a single key that still fails is written out as a
+                # skip so the resume path steps past it instead of re-attempting
+                # it forever. `notes` records why, so these are findable later.
+                if len(batch_rows) == 1:
+                    row = empty_row(*batch_rows[0])
+                    row["notes"] = f"llm error: {str(e)[:200]}"
+                    writer.writerow(row)
+                    f.flush()
                 # A misspelled model name returns 400 on every batch, forever. On
                 # 2026-08-01 one such run churned through 1,271 consecutive
                 # failures over 11 minutes before the backlog ran out. Nothing

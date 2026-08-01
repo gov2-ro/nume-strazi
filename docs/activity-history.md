@@ -1,5 +1,152 @@
 # Activity History
 
+## 2026-08-01 — LLM run review: poison-pill batch, two deterministic-classifier gaps, 4 bad classifications
+
+User ran a small `deepseek-v4-flash` classification batch and asked for a review
+of the results. Three separate problems, all now fixed.
+
+### 1. A permanently stuck batch at the head of the queue
+
+Run `20260801T100934Z`: 30 candidates, 180 s, $0.0039, and **3 keys classified**.
+Batch 1 (20 keys from `mcdrive`) hit `max_tokens=16384` during reasoning and
+returned empty content; batch 2 (10 keys) gave 3 classified + 7 skipped.
+
+The failure was not new. The identical 20-key batch had died the same way at
+`00:22:36` — same first key, same 16,384-token burn, ~150 s each time. Cause:
+failed keys are never written to the out CSV, and the resume path derives
+`processed` from that CSV, so every subsequent run rebuilt the same batch and
+re-attempted it *first*. A permanent poison pill costing ~150 s and a full token
+budget per run, forever.
+
+`tools/llm_classify.py` now halves a budget-exhausted batch and retries,
+recursing down to a single key (`_run_split`). A key that still fails alone is
+written out as a skip with the error in `notes`, so resume steps past it instead
+of re-attempting it. `_is_budget_error` matches on llm_layer's "returned no
+content" message rather than an exception type — the distinguishing property is
+that this failure shrinks with the batch, unlike a 400/401/quota error, which
+does not, so those still count toward `--max-consecutive-errors`.
+
+Verified live on the actual stuck batch (`20260801T111633Z`), which processed
+**all 20 keys with 0 errors — 15 classified, 5 skipped**, where the same batch
+had previously lost all 20 twice. The split tree:
+
+```
+Batch 1 [1–20]  budget exhausted at 20 keys — splitting
+  └ 10 → 9 classified, 1 skipped        (unblocked `mcdrive`)
+  └ 10 → over budget
+      └ 5 → over budget
+          └ 2 → ok        └ 3 → over budget → 1 → ok, 2 → ok
+      └ 5 → over budget
+          └ 2 → ok        └ 3 → over budget → 1 → ok, 2 → ok
+```
+
+**This measures the model's practical batch ceiling: 2 keys.** Every attempt at
+10, 5 and 3 keys failed; every attempt at 2 and 1 succeeded. Reasoning overhead
+does not scale linearly — 10 keys spent ~3.1k reasoning tokens to emit ~274
+tokens of answer, 20 keys ran away past 16,384 without emitting anything. Whole
+run: 29,350 output tokens of which **28,633 were reasoning** (97.6%).
+
+Honest cost of the fix: it recovers the work, it does not make the model viable.
+Measured **69.94 s/key and $1.64/1k keys** — for the 38,349 remaining keys that
+is roughly **745 hours and $63**.
+
+### 2. Two deterministic classifiers that were being paid for
+
+- **`Nr.`-prefixed numbered streets.** `streets_lib.NUMERIC_RE` was
+  `^\d+[A-Za-z]?$` — it caught `23` and `23A` but not `Nr. 23`, `Nr.7`, `Nr 11`,
+  which are the same thing. 198 such keys sat in the LLM candidate pool as
+  guaranteed skips; 10 of the 27 skips in the reviewed CSV were exactly these.
+  Regex widened to `^(?:nr\.?\s*)?\d+[A-Za-z]?$` (case-insensitive). The
+  trailing-text guard matters and is tested: `Nr. 1 Principala Mierea` is a real
+  name and must not match.
+
+  Applied to the live DB by targeted migration rather than `build_db.py`, per
+  CLAUDE.md rule #12 — a rebuild would have wiped all curation. The migration
+  drives off the real regex, not a hand-written GLOB, so the result is exactly
+  what a rebuild produces: 900 rows across `streets` (20), `osm_streets` (433)
+  and `all_street_names_cache` (447); postal and RENNS had none. Idempotent,
+  confirmed by a second run changing nothing.
+
+- **Road codes.** New `tools/seed_road_codes.py` classifies DN/DJ/DC/DE codes
+  (`DN6D`, `DJ243A`, `DC117-Bica`, `DE 1845/4`) into
+  `name_categories` / `infrastructure` by regex — 348 keys the model had been
+  handling correctly but at API cost. Added as step 7 of
+  `tools/restore_curation.py`.
+
+  **`DE` is not a European route.** The first pass labelled it `european_road`;
+  the actual keys (`DE 1845/4`, `DE 657/1/31`, cadastral parcel references) give
+  it away as *drum de exploatare*, an agricultural/cadastral access road.
+  Romania's European routes are `E60`/`E85`, prefix `E`. Relabelled
+  `exploitation_road` and the parcel-suffix form added to the regex.
+
+Combined effect on the LLM backlog: **38,879 → 38,349 keys** (530 removed).
+`pct_streets_classified` unchanged at 74.7 — most road codes are OSM-only, so
+they don't appear in the electoral-source-based coverage view. The 20-key drop
+in that view's denominator is the `Nr.` reclassification, working as intended.
+
+### 3. Four classifications not fit to import
+
+The reviewed CSV (90 rows: 45 persons, 27 skips, 9 place_refs, 7
+name_categories, 2 nature_terms) was never imported — verified zero rows in the
+lookup tables for its keys. The person rows are largely sound, and `era` follows
+the prompt's own definitions (`interwar=1900-1947`, not the historical sense),
+so entries like `teclu nicolae` 1839–1916 → interwar are on-spec.
+
+Corrected before import, keeping the model's original verdict in `notes` since
+the CSV is both an import input and the durable record of what was said:
+
+| key | model said | verdict |
+|---|---|---|
+| `tanorok` | occupational / teachers | **wrong** — Hungarian *tanorok* is a Transylvanian toponym for an enclosed pasture by the village, not *tanárok* "teachers". All 5 in Harghita, 3 spelled `Tanórok`. Demoted to skip. |
+| `cierului` | nature_terms / sky | **suspect** — looks like *cier* read as *cer*. All 4 rural BC/NT; *cier* is a regional land term. Demoted to skip. |
+| `phoenix` | mythology / mythical_bird | **ambiguous** — 3 of 4 are the Timișoara metro, home of the band Phoenix. Demoted to skip. |
+| `centura radauti`, `centura timisoara nord`/`sud` | place_refs → the city | **inconsistent** with `dn6d` → infrastructure. Retagged `infrastructure`/`ring_road`; a ring road is not a reference to the city it encircles. |
+
+`calea cernauti` → Cernăuți / city / **UA** was a good catch worth noting.
+
+The verification run's 20 keys surfaced two more inconsistencies, both logged in
+BACKLOG rather than fixed here: `mcdrive` came back `trade`/`brand` where `kfc`
+had been skipped, and `transcindrel` went to `place_refs` (Cindrel / mountain)
+where `transalpina` and `transursoaia` went to `infrastructure`/`road` — same
+`Trans-` + massif construction, two different tables.
+
+### `deepseek-chat` does not exist
+
+The recommendation this project acted on for two weeks — CLAUDE.md, `.env.example`
+and the 2026-07-14 history entry's comparison table (0.44 s/key, $0.11/1k, zero
+failures) — names a model the DeepSeek API rejects: `400: The supported API model
+names are deepseek-v4-pro or deepseek-v4-flash`. The `llm-deepseek` 0.1.6 plugin
+registers the id, which is presumably how it got measured, but it does not
+resolve to anything reachable today. User stripped it from CLAUDE.md and
+`.env.example`; the history entry keeps its record with a correction pointer.
+
+**Consequence: there is no benchmarked model for this workload.**
+`deepseek-v4-flash` measures at 745 h / $63 for the remaining backlog (above).
+`deepseek-v4-pro` is untested and priced 2× in `llm_layer.PRICING`.
+`gemini-2.5-flash-lite` is the cheapest entry in that table but the Google key
+is IP-restricted and 403s from this network. Logged in BACKLOG.
+
+User also flagged `llm_layer.PRICING` as possibly hallucinated and added a TODO.
+Circumstantial support: the deleted `deepseek-chat` row carried numbers
+identical to `deepseek-v4-flash`, and `deepseek-reasoner` identical to
+`deepseek-v4-pro` — the signature of copied rather than looked-up values. The
+four remaining entries are unverified; every cost in `llm_runs_report.py` should
+be treated as provisional until they are checked against provider pages. Token
+counts are unaffected — those come straight from the API.
+
+### What is actually left
+
+38,349 keys covering 44,761 street rows of 163,404 in `all_street_names_cache`
+(70.6% already classified, 2.1% rule-handled). **86% of the remaining keys occur
+exactly once nationwide**; the backlog averages 1.17 rows per key. The
+frequency-ranked head is done — what remains is the long tail of local
+toponyms (`plapcei`, `la badea`), which is also where the skip rate is highest
+(27 of 90 rows in the reviewed CSV, 5 of 20 in the verification run). Marginal
+value per API call from here is far below what the headline count suggests.
+
+Test suite: 49 passed, 3 failed — the same three pre-existing failures already
+tracked in BACKLOG P3, confirmed unrelated.
+
 ## 2026-08-01 — Person pages rekeyed to identity; source-table floors added; 13 bogus QIDs that the previous fix missed
 
 Closing out the phase started on 2026-07-31. User asked "are we done for this
@@ -126,6 +273,15 @@ still lost roughly half. Measured on identical 20-key batches:
 |---|---|---|---|
 | `deepseek-chat` | 0.44 | $0.11 | 0 |
 | `deepseek-v4-flash` | 11.09 | $0.40 | ~50% |
+
+> **Correction (2026-08-01):** the `deepseek-chat` half of this table is void.
+> The DeepSeek API rejects that id — `400: The supported API model names are
+> deepseek-v4-pro or deepseek-v4-flash`. The `llm-deepseek` 0.1.6 plugin
+> registers the name (see above), but it does not resolve to a model reachable
+> today, so these numbers cannot be reproduced. References were stripped from
+> CLAUDE.md and `.env.example`; the entry is kept as a record of what was
+> believed at the time. The `deepseek-v4-flash` measurements and the
+> reasoning-budget diagnosis below still hold.
 
 25× slower, 3.6× dearer, and it loses half its work — raising `max_tokens`
 doesn't help, since reasoning expands to fill whatever it is given. Full backlog:

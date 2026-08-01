@@ -42,7 +42,7 @@ except ImportError:
 
 # ── 2. Bridge our .env names → the names the llm plugins look for ──────────
 # llm-deepseek and llm-gemini check their own vars at registration time; without
-# this bridge `llm.get_model("deepseek-chat")` raises UnknownModelError even
+# this bridge `llm.get_model("deepseek-v4-chat")` raises UnknownModelError even
 # with a perfectly good DEEPSEEK_API_KEY set. llm-anthropic reads
 # ANTHROPIC_API_KEY natively, so it needs no bridge.
 _KEY_BRIDGE = {
@@ -62,8 +62,7 @@ PROVIDERS: dict[str, tuple[str, str]] = {
 }
 
 # OpenAI-compatible endpoints, for models the installed llm plugins don't know.
-# llm-deepseek 0.1.6 registers only deepseek-chat/coder/reasoner, so the current
-# deepseek-v4-flash id has to go out through this path.
+
 _API_BASES: dict[str, str] = {
     "deepseek":   "https://api.deepseek.com",
     "openrouter": "https://openrouter.ai/api/v1",
@@ -76,12 +75,12 @@ _DEFAULT_PROVIDER = os.getenv("LLM_PROVIDER", "deepseek")
 # usage block. Cost is an ESTIMATE derived from this table, which is a manual
 # snapshot and will drift — providers change prices without notice. Correct a
 # number here and past runs can be recosted from the logged token counts.
-# Verified 2026-08-01 against provider pricing pages.
+# Verified 2026-08-01 against provider pricing pages. 
+# TODO: check, there was some hallucination
+
 PRICING: dict[str, tuple[float, float, float]] = {
-    "deepseek-chat":     (0.27, 0.07, 1.10),
     "deepseek-v4-flash": (0.27, 0.07, 1.10),
     "deepseek-v4-pro":   (0.55, 0.14, 2.19),
-    "deepseek-reasoner": (0.55, 0.14, 2.19),
     "gemini-2.5-flash-lite":     (0.10, 0.025, 0.40),
     "gemini-2.0-flash-lite":     (0.075, 0.019, 0.30),
     "claude-haiku-4-5-20251001": (1.00, 0.10, 5.00),

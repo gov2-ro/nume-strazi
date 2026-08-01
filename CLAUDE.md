@@ -139,20 +139,37 @@ python3 run_queries.py
 
 # LLM classification. Keys come from .env via tools/llm_layer.py (simonw/llm) —
 # no need to export anything. Provider is inferred from the model name.
-# Use deepseek-chat, NOT the .env default deepseek-v4-flash: v4-flash is a
-# REASONING model that bills thinking against max_tokens and regularly burns the
-# whole budget before emitting content, losing ~50% of batches. Measured
-# 2026-08-01 on identical 20-key batches: deepseek-chat 0.44 s/key & $0.11/1k
-# keys with zero failures; deepseek-v4-flash 11.09 s/key, $0.40/1k, half the
-# batches empty. Full 39k backlog: ~5 h and ~$4.30 vs ~58 h.
-python3 tools/llm_classify.py --model deepseek-chat --limit 500
-python3 tools/llm_classify.py --model deepseek-chat --limit 0    # whole backlog
+
+python3 tools/llm_classify.py --model deepseek-v4-flash --limit 0    # whole backlog
 python3 tools/llm_classify.py --model gemini-2.5-flash-lite --limit 500
 
 # Resumable: re-running the same command skips keys already in the --out CSV, so
 # an interrupted run loses at most one batch. Aborts after 5 consecutive failed
 # batches (--max-consecutive-errors) — a bad model name 400s forever otherwise;
 # one such typo run churned 1,271 dead batches before this guard existed.
+
+# deepseek-v4-flash is a REASONING model: it bills thinking against max_tokens
+# and can spend the entire budget before emitting one content token, returning
+# HTTP 200 with finish_reason="length" and empty content. llm_layer raises
+# "<model> returned no content" on that rather than letting it surface as a JSON
+# parse error. It is a function of BATCH SIZE, not of the keys — measured
+# 2026-08-01: 20 keys blew past 16,384 tokens, 10 keys used ~3.1k reasoning for
+# ~274 tokens of actual answer. Since 2026-08-01 llm_classify.py halves the
+# batch and retries (recursively, down to 1 key) instead of dropping it; a key
+# that still fails alone is written to the CSV as a skip with the error in
+# `notes`, so resume steps past it. Before that fix the same 20-key batch was a
+# permanent poison pill at the head of the queue — it re-ran and re-failed on
+# every subsequent run, ~150 s and a full token budget each time.
+
+# Deterministic classifiers run BEFORE the LLM — never spend API calls on these:
+#   - "Nr. 23"/"Nr.7" unnamed numbered streets are is_numeric (streets_lib.py
+#     NUMERIC_RE), same as the bare "23" form. Fixed 2026-08-01; 198 such keys
+#     had been sitting in the candidate pool as guaranteed skips.
+#   - DN/DJ/DC/DE road codes → tools/seed_road_codes.py (348 keys, regex-only).
+#     "DE" is drum de exploatare (agricultural/cadastral access road), NOT a
+#     European route — Romania's E-routes are E60/E85, prefix "E".
+python3 tools/seed_road_codes.py --dry-run   # inspect before writing
+python3 tools/seed_road_codes.py             # idempotent upsert; also step 7 of restore_curation.py
 
 # Per-batch model/token/cost provenance, appended to data/curation/llm_runs.jsonl
 python3 tools/llm_runs_report.py                    # one line per run
