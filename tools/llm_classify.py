@@ -160,14 +160,42 @@ def call_llm(model: str, entries: list,
     return _parse_text(text), usage
 
 
-def _is_budget_error(exc: Exception) -> bool:
-    """True for the reasoning-budget exhaustion llm_layer raises on empty content.
+def _why(exc: Exception) -> str:
+    """Short reason for the console, so 'budget' is never read as money."""
+    if isinstance(exc, json.JSONDecodeError):
+        return "empty/non-JSON reply"
+    return "out of output tokens"
 
-    Matched on the message rather than an exception type because llm_layer
-    raises a plain RuntimeError; the distinguishing detail is that this failure
-    shrinks with the batch, unlike a 400/401/quota error, which does not.
+
+def _is_budget_error(exc: Exception) -> bool:
+    """True for failures that plausibly shrink with the batch, so splitting helps.
+
+    Two shapes, both traced to the same cause — a reasoning model spending its
+    whole token budget on thinking:
+
+    1. `finish_reason="length"` with empty content, which llm_layer turns into a
+       "returned no content" RuntimeError. Matched on the message because
+       llm_layer raises a plain RuntimeError.
+    2. The reply arrives but is empty or not JSON, so `_parse_text` raises
+       JSONDecodeError. Observed 2026-08-01: a 5-key batch burned 194 s and came
+       back `Expecting value: line 1 column 1 (char 0)` — content-empty without
+       `finish_reason="length"`. That was NOT split, and because the batch was
+       larger than one key nothing was written, so all 5 keys were silently
+       dropped from the run.
+
+    Deliberately excludes HTTP status errors (400/401/quota): those do not shrink
+    with the batch, so splitting would just multiply a guaranteed failure. They
+    keep counting toward --max-consecutive-errors instead.
+
+    Splitting a genuinely malformed reply is harmless and terminates: the halves
+    shrink to single keys, which get written out as recorded skips.
     """
-    return "returned no content" in str(exc)
+    if isinstance(exc, json.JSONDecodeError):
+        return True
+    msg = str(exc)
+    if "Error code:" in msg:          # openai APIStatusError — transport, not size
+        return False
+    return "returned no content" in msg
 
 
 def _run_split(rows, batch_no, model, args, writer, fh, log, totals, acc, depth=1):
@@ -199,7 +227,7 @@ def _run_split(rows, batch_no, model, args, writer, fh, log, totals, acc, depth=
             results, usage = call_llm(model, entries, args.max_tokens)
         except Exception as e:
             if _is_budget_error(e) and len(half) > 1:
-                print("still over budget — splitting further")
+                print(f"{_why(e)} — splitting further")
                 log("batch_split", batch=batch_no, keys=len(half), depth=depth,
                     seconds=round(time.time() - t0, 2), error=str(e)[:300],
                     first_key=half[0][0])
@@ -394,7 +422,7 @@ def main():
                 # progress; a genuinely bad single key ends up isolated and
                 # recorded, so the run moves past it.
                 if _is_budget_error(e) and len(batch_rows) > 1:
-                    print(f"budget exhausted at {len(batch_rows)} keys — splitting")
+                    print(f"{_why(e)} at {len(batch_rows)} keys — splitting")
                     log("batch_split", batch=batch_no, keys=len(batch_rows),
                         seconds=round(time.time() - t0, 2), error=str(e)[:300],
                         first_key=batch_rows[0][0])

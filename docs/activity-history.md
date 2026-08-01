@@ -255,6 +255,32 @@ Honest cost of the fix: it recovers the work, it does not make the model viable.
 Measured **69.94 s/key and $1.64/1k keys** — for the 38,349 remaining keys that
 is roughly **745 hours and $63**.
 
+**Two corrections from watching a longer run (same day, user's `--limit 45000`):**
+
+- **There is no fixed batch ceiling.** The "2 keys" figure above came from one
+  run and does not generalise. Across the longer run, successful batch sizes
+  were 1 (×3), 2 (×6), 5 (×10), 10 (×12) and **20 (×1)** — one 20-key batch went
+  through on 7,948 reasoning tokens, less than half the budget. The model's
+  thinking cost varies widely on comparable input, which is precisely why
+  adapting per batch beats forcing a conservative global `--batch-size`.
+
+- **The split condition was too narrow, and it lost keys.** `_is_budget_error`
+  only matched llm_layer's `finish_reason="length"` message. A 5-key batch spent
+  194 s and came back `Expecting value: line 1 column 1 (char 0)` — content-empty
+  *without* that finish reason, so `_parse_text` raised `JSONDecodeError`, the
+  batch did not split, and because it was larger than one key nothing was
+  written: all 5 keys silently dropped from the run (recoverable — they return
+  to the candidate list next run, confirmed with `susita` back at the head).
+  Now splits on `JSONDecodeError` too, while still refusing to split HTTP status
+  errors (`Error code:` — 400/401/quota do not shrink with the batch, so
+  splitting would only multiply a guaranteed failure). Splitting a genuinely
+  malformed reply is harmless and terminates: halves shrink to single keys,
+  which get recorded as skips.
+
+  Console wording changed with it — "budget exhausted" read as *money* rather
+  than the `max_tokens` output ceiling. Now "out of output tokens" or
+  "empty/non-JSON reply", whichever actually happened.
+
 ### 2. Two deterministic classifiers that were being paid for
 
 - **`Nr.`-prefixed numbered streets.** `streets_lib.NUMERIC_RE` was
